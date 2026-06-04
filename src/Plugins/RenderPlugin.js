@@ -15,6 +15,9 @@ import Liquid from "../Adapters/Engines/Liquid.js";
 
 class EleventyNunjucksError extends EleventyBaseError {}
 
+const compileCache = new WeakMap();
+const compileFileCache = new WeakMap();
+
 /** @this {object} */
 async function compile(content, templateLang, options = {}) {
 	let { templateConfig, extensionMap } = options;
@@ -29,6 +32,15 @@ async function compile(content, templateLang, options = {}) {
 	// Breaking change in 2.0+, previous default was `html` and now we default to the page template syntax
 	if (!templateLang) {
 		templateLang = this.page.templateSyntax;
+	}
+
+	if (!compileCache.has(templateConfig)) {
+		compileCache.set(templateConfig, new Map());
+	}
+	let projectCache = compileCache.get(templateConfig);
+	let cacheKey = `${content}###${templateLang || ""}`;
+	if (projectCache.has(cacheKey)) {
+		return projectCache.get(cacheKey);
 	}
 
 	if (!extensionMap) {
@@ -62,7 +74,9 @@ async function compile(content, templateLang, options = {}) {
 		);
 	}
 
-	return tr.getCompiledTemplate(content);
+	let fn = await tr.getCompiledTemplate(content);
+	projectCache.set(cacheKey, fn);
+	return fn;
 }
 
 // No templateLang default, it should infer from the inputPath.
@@ -94,6 +108,12 @@ async function compileFile(inputPath, options = {}, templateLang) {
 		);
 	}
 
+	if (!compileFileCache.has(templateConfig)) {
+		compileFileCache.set(templateConfig, new Map());
+	}
+	let projectCache = compileFileCache.get(templateConfig);
+	let cacheKey = `${normalizedPath}###${templateLang || ""}`;
+
 	if (!extensionMap) {
 		if (strictMode) {
 			throw new Error("Internal error: missing `extensionMap` in RenderPlugin->compileFile.");
@@ -112,12 +132,27 @@ async function compileFile(inputPath, options = {}, templateLang) {
 	}
 
 	if (!tr.engine.needsToReadFileContents()) {
-		return tr.getCompiledTemplate(null);
+		let fn = await tr.getCompiledTemplate(null);
+		// Note: we don't cache these yet, but we could.
+		return fn;
 	}
 
 	// TODO we could make this work with full templates (with front matter?)
 	let content = readFileSync(inputPath, "utf8");
-	return tr.getCompiledTemplate(content);
+
+	if (projectCache.has(cacheKey)) {
+		let cached = projectCache.get(cacheKey);
+		if (cached.content === content) {
+			return cached.fn;
+		}
+	}
+
+	let fn = await tr.getCompiledTemplate(content);
+	projectCache.set(cacheKey, {
+		content,
+		fn,
+	});
+	return fn;
 }
 
 /** @this {object} */

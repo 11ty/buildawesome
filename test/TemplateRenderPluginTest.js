@@ -1,4 +1,5 @@
 import test from "ava";
+import fs from "node:fs";
 
 import {
   default as RenderPlugin,
@@ -7,8 +8,11 @@ import {
   RenderManager,
 } from "../src/Plugins/RenderPlugin.js";
 import Eleventy from "../src/Eleventy.js";
+import TemplateConfig from "../src/TemplateConfig.js";
+import ProjectDirectories from "../src/Util/ProjectDirectories.js";
 
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
+
 
 async function getTestOutput(input, configCallback = function () {}) {
   let elev = new Eleventy(input, "./_site/", {
@@ -321,3 +325,55 @@ test("#3368 #3810 config init bug with RenderManager", async (t) => {
   let results = await elev.toJSON();
   t.is(results[0].content, `<h1>Sign up for our newsletter!</h1>`);
 });
+
+async function getSharedConfig() {
+  let templateConfig = new TemplateConfig(null, false);
+  templateConfig.setDirectories(new ProjectDirectories());
+  await templateConfig.init();
+  return templateConfig;
+}
+
+test("Verify compileFile returns the same function with memoization (shared config)", async (t) => {
+  const filePath = "./test/stubs-render-plugin/11tyjs-file.njk";
+  let templateConfig = await getSharedConfig();
+  let options = { templateConfig };
+
+  let fn1 = await RenderPluginFile(filePath, options);
+  let fn2 = await RenderPluginFile(filePath, options);
+
+  t.is(fn1, fn2);
+});
+
+test("Verify compileFile returns different functions for different content (shared config)", async (t) => {
+  const filePath = "./test/stubs-render-plugin/temp-file.njk";
+  fs.writeFileSync(filePath, "content 1");
+
+  let templateConfig = await getSharedConfig();
+  let options = { templateConfig };
+
+  let fn1 = await RenderPluginFile(filePath, options);
+
+  fs.writeFileSync(filePath, "content 2");
+  let fn2 = await RenderPluginFile(filePath, options);
+
+  t.not(fn1, fn2);
+
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+});
+
+test("Verify compile (string) returns the same function with memoization (shared config)", async (t) => {
+  let templateConfig = await getSharedConfig();
+  let options = { templateConfig };
+  const content = "Hello {{ name }}";
+
+  // Need to mock this.page.templateSyntax if templateLang is not passed
+  const context = { page: { templateSyntax: "njk" } };
+
+  let fn1 = await RenderPluginString.call(context, content, "njk", options);
+  let fn2 = await RenderPluginString.call(context, content, "njk", options);
+
+  t.is(fn1, fn2);
+});
+
