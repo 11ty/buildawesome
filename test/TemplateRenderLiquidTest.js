@@ -8,12 +8,14 @@ import ExtensionMap from "../src/ExtensionMap.js";
 import { getTemplateConfigInstance } from "./_testHelpers.js";
 import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
 
-async function getNewTemplateRender(name, inputDir, userConfig = {}) {
+async function getNewTemplateRender(name, inputDir, configure = null) {
 	let eleventyConfig = await getTemplateConfigInstance({
 		dir: {
 			input: inputDir
 		}
-	}, null, userConfig);
+	}, null, {});
+
+  if (configure) await configure(eleventyConfig);
 
   let tr = new TemplateRender(name, eleventyConfig);
   tr.extensionMap = new ExtensionMap(eleventyConfig);
@@ -21,6 +23,16 @@ async function getNewTemplateRender(name, inputDir, userConfig = {}) {
   tr.extensionMap.setFormats([]);
   await tr.init();
   return tr;
+}
+
+function noDynamicPartials(eleventyConfig) {
+  eleventyConfig.setLiquidOptions({
+    dynamicPartials: false,
+  });
+}
+
+function builtinParameterParsing(eleventyConfig) {
+  eleventyConfig.setLiquidParameterParsing("builtin");
 }
 
 async function getPromise(resolveTo) {
@@ -74,11 +86,7 @@ test("Liquid Render Include", async (t) => {
   let tr1 = await getNewTemplateRender("liquid", "./test/stubs/");
   t.is(tr1.getEngineName(), "liquid");
 
-  let tr2 = await getNewTemplateRender("liquid", "./test/stubs/", {
-    liquidOptions: {
-      dynamicPartials: false,
-    },
-  });
+  let tr2 = await getNewTemplateRender("liquid", "./test/stubs/", noDynamicPartials);
 
   let fn = await tr2.getCompiledTemplate("<p>{% include included %}</p>");
   t.is(await fn(), "<p>This is an include.</p>");
@@ -88,11 +96,7 @@ test("Liquid Render Relative Include (dynamicPartials off)", async (t) => {
   let tr1 = await getNewTemplateRender("liquid", "./test/stubs/");
   t.is(tr1.getEngineName(), "liquid");
 
-  let tr2 = await getNewTemplateRender("liquid", "./test/stubs/", {
-    liquidOptions: {
-      dynamicPartials: false,
-    },
-  });
+  let tr2 = await getNewTemplateRender("liquid", "./test/stubs/", noDynamicPartials);
 
   // Important note: when inputPath is set to `liquid`, this *only* uses _includes relative paths in Liquid->compile
   let fn = await tr2.getCompiledTemplate("<p>{% include ./included %}</p>");
@@ -114,11 +118,7 @@ test("Liquid Render Relative (current dir) Include", async (t) => {
   let tr = await getNewTemplateRender(
     "./test/stubs/relative-liquid/does_not_exist_and_thats_ok.liquid",
     "./test/stubs/",
-    {
-      liquidOptions: {
-        dynamicPartials: false,
-      },
-    }
+    noDynamicPartials,
   );
 
   let fn = await tr.getCompiledTemplate("<p>{% include ./dir/included %}</p>");
@@ -129,11 +129,7 @@ test("Liquid Render Relative (parent dir) Include", async (t) => {
   let tr = await getNewTemplateRender(
     "./test/stubs/relative-liquid/dir/does_not_exist_and_thats_ok.liquid",
     "./test/stubs/",
-    {
-      liquidOptions: {
-        dynamicPartials: false,
-      },
-    }
+    noDynamicPartials,
   );
 
   let fn = await tr.getCompiledTemplate("<p>{% include ../dir/included %}</p>");
@@ -143,8 +139,7 @@ test("Liquid Render Relative (parent dir) Include", async (t) => {
 test("Liquid Render Relative (relative include should ignore _includes dir) Include", async (t) => {
   let tr = await getNewTemplateRender(
     "./test/stubs/does_not_exist_and_thats_ok.liquid",
-    "./test/stubs/",
-    {}
+    "./test/stubs/"
   );
 
   let fn = await tr.getCompiledTemplate(`<p>{% include './included' %}</p>`);
@@ -155,11 +150,7 @@ test("Liquid Render Include with Liquid Suffix", async (t) => {
   let tr1 = await getNewTemplateRender("liquid", "./test/stubs/");
   t.is(tr1.getEngineName(), "liquid");
 
-  let tr2 = await getNewTemplateRender("liquid", "./test/stubs/", {
-    liquidOptions: {
-      dynamicPartials: false,
-    },
-  });
+  let tr2 = await getNewTemplateRender("liquid", "./test/stubs/", noDynamicPartials);
 
   let fn = await tr2.getCompiledTemplate("<p>{% include included.liquid %}</p>");
   t.is(await fn(), "<p>This is an include.</p>");
@@ -169,11 +160,7 @@ test("Liquid Render Include with HTML Suffix", async (t) => {
   let tr1 = await getNewTemplateRender("liquid", "./test/stubs/");
   t.is(tr1.getEngineName(), "liquid");
 
-  let tr2 = await getNewTemplateRender("liquid", "./test/stubs/", {
-    liquidOptions: {
-      dynamicPartials: false,
-    },
-  });
+  let tr2 = await getNewTemplateRender("liquid", "./test/stubs/", noDynamicPartials);
 
   let fn = await tr2.getCompiledTemplate("<p>{% include included.html %}</p>");
   t.is(await fn(), "<p>This is an include.</p>");
@@ -183,11 +170,7 @@ test("Liquid Render Include with HTML Suffix and Data Pass in", async (t) => {
   let tr1 = await getNewTemplateRender("liquid", "./test/stubs/");
   t.is(tr1.getEngineName(), "liquid");
 
-  let tr2 = await getNewTemplateRender("liquid", "./test/stubs/", {
-    liquidOptions: {
-      dynamicPartials: false,
-    },
-  });
+  let tr2 = await getNewTemplateRender("liquid", "./test/stubs/", noDynamicPartials);
 
   let fn = await tr2.getCompiledTemplate("{% include included-data.html, myVariable: 'myValue' %}");
   t.is((await fn()).trim(), "This is an include. myValue");
@@ -217,11 +200,7 @@ test("Liquid Async Filter", async (t) => {
 });
 
 test("Issue 3206: Strict variables and custom filters in includes", async (t) => {
-  let tr = await getNewTemplateRender("liquid", "test/stubs", {
-    liquidOptions: {
-      strictVariables: true
-    }
-  });
+  let tr = await getNewTemplateRender("liquid", "test/stubs", noDynamicPartials);
   tr.engine.addFilter("makeItFoo", function () {
     return "foo";
   });
@@ -467,33 +446,21 @@ test("Liquid Async Paired Shortcode", async (t) => {
 });
 
 test("Liquid Render Include Subfolder", async (t) => {
-  let tr = await getNewTemplateRender("liquid", "./test/stubs/", {
-    liquidOptions: {
-      dynamicPartials: false,
-    },
-  });
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/", noDynamicPartials);
 
   let fn = await tr.getCompiledTemplate(`<p>{% include subfolder/included.liquid %}</p>`);
   t.is(await fn(), "<p>This is an include.</p>");
 });
 
 test("Liquid Render Include Subfolder HTML", async (t) => {
-  let tr = await getNewTemplateRender("liquid", "./test/stubs/", {
-    liquidOptions: {
-      dynamicPartials: false,
-    },
-  });
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/", noDynamicPartials);
 
   let fn = await tr.getCompiledTemplate(`<p>{% include subfolder/included.html %}</p>`);
   t.is(await fn(), "<p>This is an include.</p>");
 });
 
 test("Liquid Render Include Subfolder No file extension", async (t) => {
-  let tr = await getNewTemplateRender("liquid", "./test/stubs/", {
-    liquidOptions: {
-      dynamicPartials: false,
-    },
-  });
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/", noDynamicPartials);
 
   let fn = await tr.getCompiledTemplate(`<p>{% include subfolder/included %}</p>`);
   t.is(await fn(), "<p>This is an include.</p>");
@@ -539,11 +506,7 @@ test("Liquid Render Include Subfolder Double quotes No file extension", async (t
 /* End tests related to dynamicPartials */
 
 test("Liquid Options Overrides", async (t) => {
-  let tr = await getNewTemplateRender("liquid", "./test/stubs/", {
-    liquidOptions: {
-      dynamicPartials: false,
-    },
-  });
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/", noDynamicPartials);
 
   let options = tr.engine.getLiquidOptions();
   t.is(options.dynamicPartials, false);
@@ -660,6 +623,38 @@ test("Liquid Nested Paired Shortcode", async (t) => {
   );
 });
 
+test("Liquid Paired Kwargs Shortcode with Tag Inside", async (t) => {
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/", builtinParameterParsing);
+  tr.engine.addPairedShortcode("postfixWithZach", function (content, kwargs) {
+    var { str } = kwargs ?? {};
+    return str + content + "Zach";
+  });
+
+  t.is(
+    await tr._testRender(
+      "{% postfixWithZach str: name %}Content{% if tester %}If{% endif %}{% endpostfixWithZach %}",
+      { name: "test", tester: true }
+    ),
+    "testContentIfZach"
+  );
+});
+
+test("Liquid Nested Paired Kwargs Shortcode", async (t) => {
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/", builtinParameterParsing);
+  tr.engine.addPairedShortcode("postfixWithZach", function (content, kwargs) {
+    var { str } = kwargs ?? {};
+    return str + content + "Zach";
+  });
+
+  t.is(
+    await tr._testRender(
+      "{% postfixWithZach str: name %}Content{% postfixWithZach str: name2 %}Content{% endpostfixWithZach %}{% endpostfixWithZach %}",
+      { name: "test", name2: "test2" }
+    ),
+    "testContenttest2ContentZachZach"
+  );
+});
+
 test("Liquid Shortcode Multiple Args", async (t) => {
   let tr = await getNewTemplateRender("liquid", "./test/stubs/");
   tr.engine.addShortcode("postfixWithZach", function (str, str2) {
@@ -672,6 +667,56 @@ test("Liquid Shortcode Multiple Args", async (t) => {
       other: "howdy",
     }),
     "testhowdyZach"
+  );
+});
+
+test("Liquid Shortcode Keyword Arg", async (t) => {
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/", builtinParameterParsing);
+  tr.engine.addShortcode("postfixWithZach", function (str, kwargs) {
+    let { append } = kwargs ?? {};
+    return str + "Zach" + append;
+  });
+
+  t.is(
+    await tr._testRender("{% postfixWithZach name append: other %}", {
+      name: "test",
+      other: "howdy",
+    }),
+    "testZachhowdy"
+  );
+});
+
+test("Liquid Shortcode Multiple Keyword Args", async (t) => {
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/", builtinParameterParsing);
+  tr.engine.addShortcode("postfixWithZach", function (str, kwargs) {
+    let { prepend, append } = kwargs ?? {};
+    return prepend + str + "Zach" + append;
+  });
+
+  t.is(
+    await tr._testRender(
+      "{% postfixWithZach name prepend: 'string' append: other %}",
+      {
+        name: "test",
+        other: "howdy",
+      }
+    ),
+    "stringtestZachhowdy"
+  );
+});
+
+test("Liquid Shortcode Only Keyword Args", async (t) => {
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/", builtinParameterParsing);
+  tr.engine.addShortcode("postfixWithZach", function (kwargs) {
+    let { prepend, append } = kwargs ?? {};
+    return prepend + "Zach" + append;
+  });
+
+  t.is(
+    await tr._testRender("{% postfixWithZach prepend: 'string' append: name %}", {
+      name: "test",
+    }),
+    "stringZachtest"
   );
 });
 
