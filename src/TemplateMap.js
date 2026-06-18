@@ -285,6 +285,7 @@ class TemplateMap {
 		);
 
 		await this.initDependencyMap(fullTemplateOrder);
+		await this.refreshUserConfigCollections(fullTemplateOrder);
 		await this.resolveRemainingComputedData();
 
 		let orderedPaths = this.#removeTagsFromTemplateOrder(fullTemplateOrder);
@@ -476,6 +477,21 @@ class TemplateMap {
 		// https://www.11ty.dev/docs/collections-api/#return-values
 		debug(`Collection: collections.${name} size: ${result?.length}`);
 		return result;
+	}
+
+	async refreshUserConfigCollections(templateOrder = []) {
+		for (let entry of templateOrder) {
+			if (!GlobalDependencyMap.isCollection(entry)) {
+				continue;
+			}
+
+			let tagName = GlobalDependencyMap.getTagName(entry);
+			if (!this.isUserConfigCollectionName(tagName)) {
+				continue;
+			}
+
+			await this.setCollectionByTagName(tagName);
+		}
 	}
 
 	populateCollectionsWithContent() {
