@@ -820,6 +820,7 @@ Verbose Output: ${this.verboseMode}`;
 
 				runMode: this.runMode,
 				outputMode,
+				dryRun: this.isDryRun,
 				incremental: this.isIncremental,
 			};
 

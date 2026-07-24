@@ -782,6 +782,51 @@ test("{eleventy,buildawesome}.before and {eleventy,buildawesome}.after Event Arg
   let results = await elev.toJSON();
 });
 
+test("{eleventy,buildawesome}.before and {eleventy,buildawesome}.after Event Arguments, dryRun default", async (t) => {
+  t.plan(4);
+  let elev = new Eleventy("./test/noop/", "./test/noop/_site", {
+    config: function ($config) {
+      $config.on("eleventy.before", arg => {
+        t.is(arg.dryRun, false);
+      })
+      $config.on("buildawesome.before", arg => {
+        t.is(arg.dryRun, false);
+      })
+      $config.on("eleventy.after", arg => {
+        t.is(arg.dryRun, false);
+      })
+      $config.on("buildawesome.after", arg => {
+        t.is(arg.dryRun, false);
+      })
+    },
+  });
+
+  let results = await elev.toJSON();
+});
+
+test("{eleventy,buildawesome}.before and {eleventy,buildawesome}.after Event Arguments, dryRun enabled", async (t) => {
+  t.plan(4);
+  let elev = new Eleventy("./test/noop/", "./test/noop/_site", {
+    dryRun: true,
+    config: function ($config) {
+      $config.on("eleventy.before", arg => {
+        t.is(arg.dryRun, true);
+      })
+      $config.on("buildawesome.before", arg => {
+        t.is(arg.dryRun, true);
+      })
+      $config.on("eleventy.after", arg => {
+        t.is(arg.dryRun, true);
+      })
+      $config.on("buildawesome.after", arg => {
+        t.is(arg.dryRun, true);
+      })
+    },
+  });
+
+  let results = await elev.toJSON();
+});
+
 test("buildawesome.after fires sequentially setting eventEmitterMode 'sequential'", async (t) => {
   let reachFirst;
   const firstReached = new Promise(resolve => reachFirst = resolve)
