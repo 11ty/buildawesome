@@ -55,8 +55,26 @@ export default function (config) {
 	fullBundleDefaultConfig.call(this, config);
 
 	config.addFilter("log", (input, ...messages) => {
-		console.log(input, ...messages);
-		return input;
+		const allEntries = [input, ...messages];
+		if(allEntries.some(entry => entry instanceof Promise)) {
+			// If any entry is a Promise, we switch to async bahavior.
+			// Async bahvior means that we return a Promise and await all entries before logging them to
+			// avoid logs of "Promise {pending}".
+			// After all entries are resolved and logged, the returned Promise resolves to the input value.
+
+			// additional Promise wrapper to only resolve to the original input value
+			return new Promise((res, rej) => {
+				Promise.all(allEntries).then(resolvedEntries => {
+					console.log(...resolvedEntries);
+					// We can resolve to the original input argument safely here.
+					res(input);
+				}).catch(e => rej(e))
+			})
+		} else {
+			// if all entries are sync, log them normally and return `input`
+			console.log(...allEntries);
+			return input;
+		}
 	});
 
 	// Process arbitrary content with transforms
