@@ -140,7 +140,7 @@
 		"@11ty/eleventy-dev-server": "^3.0.0-alpha.10",
 		"@11ty/eleventy-plugin-bundle": "^4.0.2",
 		"@11ty/eleventy-utils": "^2.0.7",
-		"@11ty/gray-matter": "^2.1.0",
+		"@11ty/gray-matter": "^3.0.0",
 		"@11ty/lodash-custom": "^4.17.21",
 		"@11ty/node-version-check": "^1.0.1",
 		"@11ty/nunjucks": "^4.0.0-alpha.3",

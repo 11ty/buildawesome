@@ -215,7 +215,8 @@ class TemplateContent {
 
 					// Supplementary engines
 					engines: {
-						// Moved to a fork of gray-matter to modernize to js-yaml@4 internally
+						// v4: Moved to a fork of gray-matter to modernize to js-yaml@4 internally
+						// v4.0.0-alpha.11 gray-matter@3 upgrade removed timestamp/date from YAML parsing (workaround available at #4333)
 						// yaml: yaml.load.bind(yaml),
 
 						// Backwards compatible with `js` object front matter

@@ -2,6 +2,7 @@ import test from "ava";
 import fs from "fs";
 import pretty from "pretty";
 import TOML from "@iarna/toml";
+import * as yaml from "js-yaml";
 
 import TemplateData from "../src/Data/TemplateData.js";
 import FileSystemSearch from "../src/FileSystemSearch.js";
@@ -1259,10 +1260,28 @@ test("Front Matter Tags (Multiple)", async (t) => {
 });
 
 test("Front matter date with quotes (liquid), issue #258", async (t) => {
+let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs/frontmatter-date/test.liquid",
+    output: "dist"
+  }, function(cfg) {
+    const YAML_SCHEMA = yaml.CORE_SCHEMA.withTags(yaml.timestampTag);
+    const YAML_LOAD = (str, options) => yaml.load(str, Object.assign({ schema: YAML_SCHEMA }, options));
+
+    cfg.setFrontMatterParsingOptions({
+      engines: {
+        yaml: YAML_LOAD,
+      }
+    })
+  });
+
+  let dataObj = new TemplateData(eleventyConfig);
   let tmpl = await getNewTemplate(
     "./test/stubs/frontmatter-date/test.liquid",
     "./test/stubs/",
-    "dist"
+    "dist",
+    dataObj,
+    null,
+    eleventyConfig
   );
 
   let data = await tmpl.getData();
@@ -1273,10 +1292,28 @@ test("Front matter date with quotes (liquid), issue #258", async (t) => {
 });
 
 test("Front matter date with quotes (njk), issue #258", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs/frontmatter-date/test.njk",
+    output: "dist"
+  }, function(cfg) {
+    const YAML_SCHEMA = yaml.CORE_SCHEMA.withTags(yaml.timestampTag);
+    const YAML_LOAD = (str, options) => yaml.load(str, Object.assign({ schema: YAML_SCHEMA }, options));
+
+    cfg.setFrontMatterParsingOptions({
+      engines: {
+        yaml: YAML_LOAD,
+      }
+    })
+  });
+
+  let dataObj = new TemplateData(eleventyConfig);
   let tmpl = await getNewTemplate(
     "./test/stubs/frontmatter-date/test.njk",
     "./test/stubs/",
-    "dist"
+    "dist",
+    dataObj,
+    null,
+    eleventyConfig
   );
 
   let data = await tmpl.getData();
