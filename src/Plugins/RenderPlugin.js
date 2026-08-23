@@ -4,16 +4,16 @@ import { Merge, TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 // TODO add a first-class Markdown component to expose this using Markdown-only syntax (will need to be synchronous for markdown-it)
 
 import { ProxyWrap } from "../Util/Objects/ProxyWrap.js";
-import TemplateDataInitialGlobalData from "../Data/TemplateDataInitialGlobalData.js";
-import EleventyBaseError from "../Errors/EleventyBaseError.js";
+import ConfigurationGlobalData from "../Data/ConfigurationGlobalData.js";
+import BaseError from "../Errors/BaseError.js";
 import TemplateRender from "../TemplateRender.js";
 import ProjectDirectories from "../Util/ProjectDirectories.js";
 import TemplateConfig from "../TemplateConfig.js";
-import EleventyExtensionMap from "../EleventyExtensionMap.js";
+import ExtensionMap from "../ExtensionMap.js";
 import TemplateEngineManager from "../Engines/TemplateEngineManager.js";
 import Liquid from "../Adapters/Engines/Liquid.js";
 
-class EleventyNunjucksError extends EleventyBaseError {}
+class NunjucksError extends BaseError {}
 
 /** @this {object} */
 async function compile(content, templateLang, options = {}) {
@@ -35,7 +35,7 @@ async function compile(content, templateLang, options = {}) {
 		if (strictMode) {
 			throw new Error("Internal error: missing `extensionMap` in RenderPlugin->compile.");
 		}
-		extensionMap = new EleventyExtensionMap(templateConfig);
+		extensionMap = new ExtensionMap(templateConfig);
 		extensionMap.engineManager = new TemplateEngineManager(templateConfig);
 	}
 	let tr = new TemplateRender(templateLang, templateConfig);
@@ -99,7 +99,7 @@ async function compileFile(inputPath, options = {}, templateLang) {
 			throw new Error("Internal error: missing `extensionMap` in RenderPlugin->compileFile.");
 		}
 
-		extensionMap = new EleventyExtensionMap(templateConfig);
+		extensionMap = new ExtensionMap(templateConfig);
 		extensionMap.engineManager = new TemplateEngineManager(templateConfig);
 	}
 	let tr = new TemplateRender(inputPath, templateConfig);
@@ -144,6 +144,7 @@ async function renderShortcodeFn(fn, data) {
 		// save `page` and `eleventy` for reuse
 		data.page = this.page;
 		data.eleventy = this.eleventy;
+		data.buildawesome = this.buildawesome;
 	}
 
 	return fn(data);
@@ -158,17 +159,17 @@ async function renderShortcodeFn(fn, data) {
  * string (or file) inside of another template. {@link https://v3.11ty.dev/docs/plugins/render/}
  *
  * @since 1.0.0
- * @param {module:11ty/eleventy/UserConfig} eleventyConfig - User-land configuration instance.
+ * @param {module:11ty/eleventy/UserConfig} $config - User-land configuration instance.
  * @param {object} options - Plugin options
  */
-function RenderPlugin(eleventyConfig, options = {}) {
+function RenderPlugin($config, options = {}) {
 	let templateConfig;
-	eleventyConfig.on("eleventy.config", (tmplConfigInstance) => {
+	$config.on("buildawesome.config", (tmplConfigInstance) => {
 		templateConfig = tmplConfigInstance;
 	});
 
 	let extensionMap;
-	eleventyConfig.on("eleventy.extensionmap", (map) => {
+	$config.on("buildawesome.extensionmap", (map) => {
 		extensionMap = map;
 	});
 
@@ -193,7 +194,7 @@ function RenderPlugin(eleventyConfig, options = {}) {
 			parse: function (tagToken, remainTokens) {
 				this.name = tagToken.name;
 
-				if (eleventyConfig.liquid.parameterParsing === "builtin") {
+				if ($config.liquid.parameterParsing === "builtin") {
 					this.orderedArgs = Liquid.parseArgumentsBuiltin(tagToken.args);
 					// note that Liquid does have a Hash class for name-based argument parsing but offers no easy to support both modes in one class
 				} else {
@@ -224,6 +225,7 @@ function RenderPlugin(eleventyConfig, options = {}) {
 
 					normalizedContext.page = ctx.get(["page"]);
 					normalizedContext.eleventy = ctx.get(["eleventy"]);
+					normalizedContext.buildawesome = ctx.get(["buildawesome"]);
 				}
 
 				let argArray = [];
@@ -275,7 +277,7 @@ function RenderPlugin(eleventyConfig, options = {}) {
 				);
 				let rawLevel = 1;
 				let str = "";
-				let matches = null;
+				let matches;
 
 				// Exit when there's nothing to match
 				// or when we've found the matching "endraw" block
@@ -324,13 +326,12 @@ function RenderPlugin(eleventyConfig, options = {}) {
 
 					normalizedContext.page = context.ctx.page;
 					normalizedContext.eleventy = context.ctx.eleventy;
+					normalizedContext.buildawesome = context.ctx.buildawesome;
 				}
 
 				body(function (e, bodyContent) {
 					if (e) {
-						resolve(
-							new EleventyNunjucksError(`Error with Nunjucks paired shortcode \`${tagName}\``, e),
-						);
+						resolve(new NunjucksError(`Error with Nunjucks paired shortcode \`${tagName}\``, e));
 					}
 
 					Promise.resolve(
@@ -346,7 +347,7 @@ function RenderPlugin(eleventyConfig, options = {}) {
 						},
 						function (e) {
 							resolve(
-								new EleventyNunjucksError(`Error with Nunjucks paired shortcode \`${tagName}\``, e),
+								new NunjucksError(`Error with Nunjucks paired shortcode \`${tagName}\``, e),
 								null,
 							);
 						},
@@ -388,26 +389,26 @@ function RenderPlugin(eleventyConfig, options = {}) {
 	// Render strings
 	if (options.tagName) {
 		// use falsy to opt-out
-		eleventyConfig.addJavaScriptFunction(options.tagName, _renderStringShortcodeFn);
+		$config.addJavaScriptFunction(options.tagName, _renderStringShortcodeFn);
 
-		eleventyConfig.addLiquidTag(options.tagName, function (liquidEngine, extras) {
+		$config.addLiquidTag(options.tagName, function (liquidEngine, extras) {
 			return liquidTemplateTag(liquidEngine, options.tagName, extras);
 		});
 
-		eleventyConfig.addNunjucksTag(options.tagName, function (nunjucksLib) {
+		$config.addNunjucksTag(options.tagName, function (nunjucksLib) {
 			return nunjucksTemplateTag(nunjucksLib, options.tagName);
 		});
 	}
 
 	// Filter for rendering strings
 	if (options.filterName) {
-		eleventyConfig.addAsyncFilter(options.filterName, _renderStringShortcodeFn);
+		$config.addAsyncFilter(options.filterName, _renderStringShortcodeFn);
 	}
 
 	// Render File
 	// use `false` to opt-out
 	if (options.tagNameFile) {
-		eleventyConfig.addAsyncShortcode(options.tagNameFile, _renderFileShortcodeFn);
+		$config.addAsyncShortcode(options.tagNameFile, _renderFileShortcodeFn);
 	}
 }
 
@@ -440,7 +441,7 @@ class RenderManager {
 			accessGlobalData: true,
 		});
 
-		this.#extensionMap = new EleventyExtensionMap(this.#templateConfig);
+		this.#extensionMap = new ExtensionMap(this.#templateConfig);
 		this.#extensionMap.engineManager = new TemplateEngineManager(this.#templateConfig);
 	}
 
@@ -459,7 +460,7 @@ class RenderManager {
 
 	// `callback` is async-friendly but requires await upstream
 	config(callback) {
-		// run an extra `function(eleventyConfig)` configuration callbacks
+		// run an extra `function($config)` configuration callbacks
 		if (callback && typeof callback === "function") {
 			return callback(this.templateConfig.userConfig);
 		}
@@ -467,7 +468,7 @@ class RenderManager {
 
 	get initialGlobalData() {
 		if (!this._data) {
-			this._data = new TemplateDataInitialGlobalData(this.templateConfig);
+			this._data = new ConfigurationGlobalData(this.templateConfig);
 		}
 		return this._data;
 	}

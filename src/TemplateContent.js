@@ -2,25 +2,22 @@ import { readFileSync } from "node:fs";
 import matter from "@11ty/gray-matter";
 import lodash from "@11ty/lodash-custom";
 import { DeepCopy, TemplatePath } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
 
 import JavaScriptFrontMatter from "./Engines/FrontMatter/JavaScript.js";
+import { createDebug } from "./Util/DebugLogUtil.js";
 import { EOL } from "./Util/NewLineAdapter.js";
 import TemplateData from "./Data/TemplateData.js";
 import TemplateRender from "./TemplateRender.js";
-import EleventyBaseError from "./Errors/EleventyBaseError.js";
-import EleventyErrorUtil from "./Errors/EleventyErrorUtil.js";
+import BaseError from "./Errors/BaseError.js";
+import ErrorUtil from "./Errors/ErrorUtil.js";
 import eventBus from "./EventBus.js";
 
-import { withResolvers } from "./Util/PromiseUtil.js";
-
 const { set: lodashSet } = lodash;
-const debug = debugUtil("Eleventy:TemplateContent");
-const debugDev = debugUtil("Dev:Eleventy:TemplateContent");
+const debug = createDebug("TemplateContent");
 
-class TemplateContentFrontMatterError extends EleventyBaseError {}
-class TemplateContentCompileError extends EleventyBaseError {}
-class TemplateContentRenderError extends EleventyBaseError {}
+class TemplateContentFrontMatterError extends BaseError {}
+class TemplateContentCompileError extends BaseError {}
+class TemplateContentRenderError extends BaseError {}
 
 class TemplateContent {
 	#initialized = false;
@@ -218,7 +215,8 @@ class TemplateContent {
 
 					// Supplementary engines
 					engines: {
-						// Moved to a fork of gray-matter to modernize to js-yaml@4 internally
+						// v4: Moved to a fork of gray-matter to modernize to js-yaml@4 internally
+						// v4.0.0-alpha.11 gray-matter@3 upgrade removed timestamp/date from YAML parsing (workaround available at #4333)
 						// yaml: yaml.load.bind(yaml),
 
 						// Backwards compatible with `js` object front matter
@@ -397,26 +395,38 @@ class TemplateContent {
 	async #getFrontMatterData() {
 		let fm = await this.read();
 
+		let virtualTemplateDefinition = this.getVirtualTemplateDefinition();
+		let virtualTemplateData;
+		if (virtualTemplateDefinition) {
+			virtualTemplateData = virtualTemplateDefinition.data;
+
+			TemplateData.cleanupData(virtualTemplateData, {
+				file: this.inputPath,
+				isVirtualTemplate: Boolean(virtualTemplateData),
+			});
+		}
+
 		// gray-matter isn’t async-friendly but can return a promise from custom front matter
 		if (fm.data instanceof Promise) {
 			fm.data = await fm.data;
 		}
 
-		let tr = await this.getTemplateRender();
-		let extraData = await tr.engine.getExtraDataFromFile(this.inputPath);
+		let frontMatterData = Object.assign({}, fm.data);
 
-		let virtualTemplateDefinition = this.getVirtualTemplateDefinition();
-		let virtualTemplateData;
-		if (virtualTemplateDefinition) {
-			virtualTemplateData = virtualTemplateDefinition.data;
-		}
-
-		let data = Object.assign({}, fm.data, extraData, virtualTemplateData);
-
-		TemplateData.cleanupData(data, {
+		TemplateData.cleanupData(frontMatterData, {
 			file: this.inputPath,
 			isVirtualTemplate: Boolean(virtualTemplateData),
 		});
+
+		let tr = await this.getTemplateRender();
+		let extraData = await tr.engine.getExtraDataFromFile(this.inputPath);
+
+		TemplateData.cleanupData(extraData, {
+			file: this.inputPath,
+			isVirtualTemplate: Boolean(virtualTemplateData),
+		});
+
+		let data = Object.assign(frontMatterData, extraData, virtualTemplateData);
 
 		return {
 			data,
@@ -481,7 +491,6 @@ class TemplateContent {
 		// this.templateRender is guaranteed here
 		let tr = await this.getTemplateRender();
 		if (engineOverride !== undefined) {
-			debugDev("%o overriding template engine to use %o", this.inputPath, engineOverride);
 			await tr.setEngineOverride(engineOverride, bypassMarkdown);
 		} else {
 			tr.setUseMarkdown(!bypassMarkdown);
@@ -491,8 +500,6 @@ class TemplateContent {
 				return str;
 			};
 		}
-
-		debugDev("%o compile() using engine: %o", this.inputPath, tr.engineName);
 
 		try {
 			let res;
@@ -510,7 +517,7 @@ class TemplateContent {
 
 					// Compilation is async, so we eagerly cache a Promise that eventually
 					// resolves to the compiled function
-					let withRes = withResolvers();
+					let withRes = Promise.withResolvers();
 					res = withRes.resolve;
 
 					cache.set(key, withRes.promise);
@@ -526,7 +533,7 @@ class TemplateContent {
 			let fn = await tr.getCompiledTemplate(str);
 			inputPathBenchmark.after();
 			templateBenchmark.after();
-			debugDev("%o getCompiledTemplate function created", this.inputPath);
+
 			if (this.config.useTemplateCache && res) {
 				res(fn);
 			}
@@ -689,10 +696,10 @@ class TemplateContent {
 				inputPathBenchmark.after();
 			}
 			templateBenchmark.after();
-			debugDev("%o getCompiledTemplate called, rendered content created", this.inputPath);
+
 			return rendered;
 		} catch (e) {
-			if (EleventyErrorUtil.isPrematureTemplateContentError(e)) {
+			if (ErrorUtil.isPrematureTemplateContentError(e)) {
 				return Promise.reject(e);
 			} else {
 				let tr = await this.getTemplateRender();
@@ -770,7 +777,7 @@ class TemplateContent {
 
 TemplateContent._inputCache = new Map();
 TemplateContent._compileCache = new Map();
-eventBus.on("eleventy.resourceModified", (path) => {
+eventBus.on("buildawesome.resourcemodified", (path) => {
 	// delete from input cache
 	TemplateContent.deleteFromInputCache(path);
 
@@ -783,7 +790,7 @@ eventBus.on("eleventy.resourceModified", (path) => {
 });
 
 // Used when the configuration file reset https://github.com/11ty/eleventy/issues/2147
-eventBus.on("eleventy.compileCacheReset", () => {
+eventBus.on("buildawesome.compilecachereset", () => {
 	TemplateContent._compileCache = new Map();
 });
 

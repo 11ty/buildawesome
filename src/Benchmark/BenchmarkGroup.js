@@ -1,24 +1,25 @@
-import debugUtil from "debug";
-
-import ConsoleLogger from "../Util/ConsoleLogger.js";
+import { createDebug } from "../Util/DebugLogUtil.js";
 import isAsyncFunction from "../Util/IsAsyncFunction.js";
 import Benchmark from "./Benchmark.js";
 
-const debugBenchmark = debugUtil("Eleventy:Benchmark");
+const debugBenchmark = createDebug("Benchmark");
 
 class BenchmarkGroup {
 	constructor() {
 		this.benchmarks = {};
-		// Warning: aggregate benchmarks automatically default to false via BenchmarkManager->getBenchmarkGroup
+
 		this.isVerbose = true;
-		this.logger = new ConsoleLogger();
 		this.minimumThresholdMs = 50;
 		this.minimumThresholdPercent = 8;
 	}
 
+	setLogger(logger) {
+		this.logger = logger;
+	}
+
+	// This is an override for aggregate benchmarks automatically default to false via BenchmarkManager->getBenchmarkGroup
 	setIsVerbose(isVerbose) {
 		this.isVerbose = isVerbose;
-		this.logger.isVerbose = isVerbose;
 	}
 
 	reset() {
@@ -118,7 +119,9 @@ class BenchmarkGroup {
 				totalForBenchmark >= this.minimumThresholdMs &&
 				percent > this.minimumThresholdPercent
 			) {
-				this.logger.warn(str);
+				if (this.isVerbose) {
+					this.logger.warn(str);
+				}
 			}
 
 			// Opt out of logging if low count (1× or 2×) or 0ms / 1%

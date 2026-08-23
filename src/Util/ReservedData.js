@@ -1,8 +1,9 @@
-class EleventyReservedDataError extends TypeError {}
+class CoreReservedDataError extends TypeError {}
 
 class ReservedData {
 	static fullProperties = [
 		"pkg", // Object.freeze’d upstream
+		"buildawesome", // Object.freeze’d upstream
 		"eleventy", // Object.freeze’d upstream
 		// "page" is only frozen for specific subproperties below
 		"content",
@@ -79,8 +80,8 @@ class ReservedData {
 			reservedNames ??= cause.reservedNames;
 		}
 
-		let e = new EleventyReservedDataError(
-			`You attempted to set one of Eleventy’s reserved data property names${reservedNames ? `: ${reservedNames.join(", ")}` : ""}${sourceLocation ? ` (source: ${sourceLocation})` : ""}. You can opt-out of this behavior with \`eleventyConfig.setFreezeReservedData(false)\` or rename/remove the property in your data cascade that conflicts with Eleventy’s reserved property names (e.g. \`eleventy\`, \`pkg\`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/`,
+		let e = new CoreReservedDataError(
+			`You attempted to set one of Build Awesome’s reserved data property names${reservedNames ? `: ${reservedNames.join(", ")}` : ""}${sourceLocation ? ` (source: ${sourceLocation})` : ""}. You can opt-out of this behavior with \`$config.setFreezeReservedData(false)\` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. \`buildawesome\`, \`eleventy\`, \`pkg\`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/`,
 			{ cause },
 		);
 
@@ -99,7 +100,7 @@ class ReservedData {
 	}
 
 	static isReservedDataError(e) {
-		return e instanceof EleventyReservedDataError;
+		return e instanceof CoreReservedDataError;
 	}
 }
 

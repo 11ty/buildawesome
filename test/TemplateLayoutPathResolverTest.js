@@ -1,7 +1,7 @@
 import test from "ava";
 
 import TemplateLayoutPathResolver from "../src/TemplateLayoutPathResolver.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 
 import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback } from "./_testHelpers.js";
 
@@ -15,7 +15,7 @@ async function getResolverInstance(path, inputDir, { eleventyConfig, map } = {})
   }
 
   if (!map) {
-    map = new EleventyExtensionMap(eleventyConfig);
+    map = new ExtensionMap(eleventyConfig);
     map.setFormats(["liquid", "md", "njk", "html", "11ty.js"]);
   }
 

@@ -4,16 +4,16 @@ import { TemplatePath } from "@11ty/eleventy-utils";
 
 import importer from "./importer.js";
 import { clearRequireCache, requireCommonJsTypeScript } from "../Util/RequireUtils.js";
-import { port1 } from "./EsmResolverPortAdapter.js";
-import EleventyBaseError from "../Errors/EleventyBaseError.js";
+import { addModifiedPath } from "./EsmResolverPortAdapter.js";
+import BaseError from "../Errors/BaseError.js";
 import eventBus from "../EventBus.js";
 
-class EleventyImportError extends EleventyBaseError {}
+class ImportError extends BaseError {}
 
 const requestPromiseCache = new Map();
 
-function isTypeScript(filePath) {
-	return filePath.endsWith(".ts") || filePath.endsWith(".cts") || filePath.endsWith(".mts");
+function isCommonJSTypeScript(filePath, type) {
+	return (type === "cjs" && filePath.endsWith(".ts")) || filePath.endsWith(".cts"); // no .mts here
 }
 
 function getImportErrorMessage(filePath, type) {
@@ -56,16 +56,14 @@ function loadContents(path, options = {}) {
 }
 
 let lastModifiedPaths = new Map();
-eventBus.on("eleventy.importCacheReset", (fileQueue) => {
+eventBus.on("buildawesome.importcachereset", (fileQueue) => {
 	for (let filePath of fileQueue) {
 		let absolutePath = TemplatePath.absolutePath(filePath);
 		let newDate = Date.now();
 		lastModifiedPaths.set(absolutePath, newDate);
 
 		// post to EsmResolver worker thread
-		if (port1) {
-			port1.postMessage({ path: absolutePath, newDate });
-		}
+		addModifiedPath(absolutePath, newDate);
 
 		clearRequireCache(absolutePath);
 	}
@@ -94,7 +92,7 @@ async function dynamicImportAbsolutePath(absolutePath, options = {}) {
 			return JSON.parse(rawInput);
 		} catch (e) {
 			return Promise.reject(
-				new EleventyImportError(getImportErrorMessage(absolutePath, "fs.readFile(json)"), e),
+				new ImportError(getImportErrorMessage(absolutePath, "fs.readFile(json)"), e),
 			);
 		}
 	}
@@ -103,9 +101,9 @@ async function dynamicImportAbsolutePath(absolutePath, options = {}) {
 	// in https://github.com/11ty/eleventy/pull/3493 Was a bit faster but
 	// error messaging was worse for require(esm)
 
-	// Workaround for https://github.com/nodejs/node/issues/61385
+	// Workaround for Node issue https://github.com/nodejs/node/issues/61385
 	// Remove this when fixed upstream!
-	if (type === "cjs" && isTypeScript(absolutePath)) {
+	if (isCommonJSTypeScript(absolutePath, type)) {
 		return requireCommonJsTypeScript(absolutePath);
 	}
 
@@ -189,7 +187,7 @@ async function dynamicImportAbsolutePath(absolutePath, options = {}) {
 		},
 		(error) => {
 			return Promise.reject(
-				new EleventyImportError(getImportErrorMessage(absolutePath, `import(${type})`), error),
+				new ImportError(getImportErrorMessage(absolutePath, `import(${type})`), error),
 			);
 		},
 	);
@@ -212,7 +210,7 @@ async function dynamicImportRaw(localPath, type) {
 }
 
 export {
-	loadContents as EleventyLoadContent,
-	dynamicImport as EleventyImport,
-	dynamicImportRaw as EleventyImportRaw,
+	loadContents as LoadContent,
+	dynamicImport as DynamicImport,
+	dynamicImportRaw as DynamicImportRaw,
 };

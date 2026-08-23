@@ -1,12 +1,12 @@
 import test from "ava";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 
 test("Markdown in markdown #3954", async (t) => {
   let elev = new Eleventy({
     input: "./test/stubs-virtual/",
-    config: eleventyConfig => {
-      eleventyConfig.addTemplate("_includes/layout.md", `{{ content }}`);
-      eleventyConfig.addTemplate("index.md", `---
+    config: $config => {
+      $config.addTemplate("_includes/layout.md", `{{ content }}`);
+      $config.addTemplate("index.md", `---
 layout: layout.md
 ---
 #  Heading
@@ -32,9 +32,9 @@ layout: layout.md
 test("Preprocess Markdown with markdown #3925", async (t) => {
   let elev = new Eleventy({
     input: "./test/stubs-virtual/",
-    config: eleventyConfig => {
-      eleventyConfig.setMarkdownTemplateEngine("md");
-      eleventyConfig.addTemplate("index.md", `#  Heading
+    config: $config => {
+      $config.setMarkdownTemplateEngine("md");
+      $config.addTemplate("index.md", `#  Heading
 
 \`\`\`
 # This is code

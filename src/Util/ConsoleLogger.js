@@ -1,7 +1,9 @@
-import debugUtil from "debug";
+import { createDebug } from "./DebugLogUtil.js";
 import chalk from "../Adapters/Packages/chalk.js";
 
-const debug = debugUtil("Eleventy:Logger");
+import { isUsingBuildAwesome } from "../Util/IsBuildAwesome.js";
+
+const debug = createDebug("Logger");
 
 /**
  * Logger implementation that logs to STDOUT.
@@ -14,14 +16,31 @@ class ConsoleLogger {
 	#isChalkEnabled = true;
 	/** @type {object|boolean|undefined} */
 	#logger;
+	/** @type {string} */
+	#defaultLogPrefix = "[11ty]";
+	/** @type {object} */
+	#colorFallbacks = {
+		info: "blue",
+		warn: "yellow",
+		error: "red",
+	};
 
-	constructor() {}
+	constructor() {
+		// via ENV variables
+		if (isUsingBuildAwesome()) {
+			this.setPrefix(`[buildawesome]`);
+		}
+	}
 
 	isLoggingEnabled() {
 		if (!this.isVerbose || process.env.DEBUG) {
 			return true;
 		}
 		return this.#logger !== false;
+	}
+
+	setPrefix(prefix) {
+		this.#defaultLogPrefix = prefix;
 	}
 
 	get isVerbose() {
@@ -45,7 +64,15 @@ class ConsoleLogger {
 	}
 
 	get logger() {
-		return this.#logger || console;
+		if (this.#logger) {
+			return this.#logger;
+		}
+		if ("console" in globalThis) {
+			return globalThis.console;
+		}
+		throw new Error(
+			"Internal JavaScript runtime error: No logger instance found (is globalThis not supported?).",
+		);
 	}
 
 	/** @param {string} msg */
@@ -73,17 +100,25 @@ class ConsoleLogger {
 
 	/** @param {string} msg */
 	info(msg) {
-		this.message(msg, "log", "blue");
+		this.message(msg, "log", this.#colorFallbacks.info);
 	}
 
 	/** @param {string} msg */
 	warn(msg) {
-		this.message(msg, "warn", "yellow");
+		this.message(msg, "warn", this.#colorFallbacks.warn);
 	}
 
 	/** @param {string} msg */
 	error(msg) {
-		this.message(msg, "error", "red");
+		this.message(msg, "error", this.#colorFallbacks.error);
+	}
+
+	/** @param {string} message */
+	#dim(message) {
+		if ("dim" in chalk) {
+			return chalk.dim(message);
+		}
+		return message;
 	}
 
 	/**
@@ -93,18 +128,29 @@ class ConsoleLogger {
 	 * @param {LogType} [type='log'] - The error level to log.
 	 * @param {string|undefined} [chalkColor=undefined] - Color name or falsy to disable
 	 * @param {boolean} [forceToConsole=false] - Enforce a log on console instead of specified target.
+	 * @param {string|undefined} [prefix=undefined] - Dimmed string at the start of each line
 	 */
 	message(
 		message,
 		type = "log",
 		chalkColor = undefined,
 		forceToConsole = false,
-		prefix = "[11ty]",
+		prefix = undefined,
 	) {
 		if (!forceToConsole && (!this.isVerbose || process.env.DEBUG)) {
 			debug(message);
 		} else if (this.#logger !== false) {
-			message = `${chalk.gray(prefix)} ${message.split("\n").join(`\n${chalk.gray(prefix)} `)}`;
+			if (prefix === undefined) {
+				prefix = this.#defaultLogPrefix;
+			}
+
+			let prefixStr = prefix ? `${this.#dim(prefix)} ` : "";
+			message = `${prefixStr}${message.split("\n").join(`\n${prefixStr}`)}`;
+
+			// default color for every type but log
+			if (chalkColor === undefined && type) {
+				chalkColor = this.#colorFallbacks[type];
+			}
 
 			if (chalkColor && this.isChalkEnabled) {
 				this.logger[type](chalk[chalkColor](message));

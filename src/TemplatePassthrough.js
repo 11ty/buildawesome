@@ -2,17 +2,17 @@ import path from "node:path";
 
 import copy from "@11ty/recursive-copy";
 import { TemplatePath } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
 
 import { readableFileSize } from "./Util/FileSize.js";
 import { isDynamicPattern } from "./Util/GlobMatcher.js";
-import EleventyBaseError from "./Errors/EleventyBaseError.js";
+import BaseError from "./Errors/BaseError.js";
 import checkPassthroughCopyBehavior from "./Util/PassthroughCopyBehaviorCheck.js";
 import ProjectDirectories from "./Util/ProjectDirectories.js";
+import { createDebug } from "./Util/DebugLogUtil.js";
 
-const debug = debugUtil("Eleventy:TemplatePassthrough");
+const debug = createDebug("TemplatePassthrough");
 
-class TemplatePassthroughError extends EleventyBaseError {}
+class TemplatePassthroughError extends BaseError {}
 
 class TemplatePassthrough {
 	isDryRun = false;

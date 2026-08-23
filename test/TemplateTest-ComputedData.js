@@ -1,8 +1,8 @@
 import test from "ava";
 
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 import TemplateData from "../src/Data/TemplateData.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 
 import getNewTemplate from "./_getNewTemplateForTests.js";
 import { renderTemplate } from "./_getRenderedTemplates.js";
@@ -132,7 +132,7 @@ test("eleventyComputed relies on global data", async (t) => {
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
   let tmpl = await getNewTemplate(
     "./test/stubs/eleventyComputed/use-global-data.njk",
@@ -159,7 +159,7 @@ test("eleventyComputed intermixes with global data", async (t) => {
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -257,8 +257,8 @@ test("eleventyComputed render strings in arrays", async (t) => {
 
 test("Issue #3728 Computed data with arrays of different sizes, arrays are treated as a single unit", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
-    config: eleventyConfig => {
-      eleventyConfig.addTemplate("index.njk", `---js
+    config: $config => {
+      $config.addTemplate("index.njk", `---js
 const arr = [1,2,3,4,5];
 const eleventyComputed = {
   arr: ["a", "b", "c"]
@@ -276,21 +276,21 @@ const eleventyComputed = {
 
 test("Issue #3827 with Computed data with arrays and layouts (×2 eleventyComputed)", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
-    config: eleventyConfig => {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addTemplate("_includes/base.njk", `---js
+    config: $config => {
+      $config.setUseTemplateCache(false);
+      $config.addTemplate("_includes/base.njk", `---js
 const eleventyComputed = {
   arr: ["base", "base2"]
 };
 ---
 {{ content | safe }}`);
 
-      eleventyConfig.addTemplate("page1.njk", `---js
+      $config.addTemplate("page1.njk", `---js
 const layout = "base.njk";
 ---
 {{ arr }}`);
 
-    eleventyConfig.addTemplate("page2.njk", `---js
+    $config.addTemplate("page2.njk", `---js
 const layout = "base.njk";
 const eleventyComputed = {
   arr: ["override", "override2"]
@@ -317,18 +317,18 @@ const eleventyComputed = {
 
 test("Issue #3728 with Computed data with arrays and layouts (×1 eleventyComputed)", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
-    config: eleventyConfig => {
-      eleventyConfig.addTemplate("_includes/base.njk", `---js
+    config: $config => {
+      $config.addTemplate("_includes/base.njk", `---js
 const arr = ["base", 1];
 ---
 {{ content | safe }}`);
 
-      eleventyConfig.addTemplate("page1.njk", `---js
+      $config.addTemplate("page1.njk", `---js
 const layout = "base.njk";
 ---
 {{ arr }}`);
 
-    eleventyConfig.addTemplate("page2.njk", `---js
+    $config.addTemplate("page2.njk", `---js
 const layout = "base.njk";
 const eleventyComputed = {
   arr: ["override", 2]

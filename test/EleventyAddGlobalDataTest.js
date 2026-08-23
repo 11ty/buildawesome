@@ -1,11 +1,11 @@
 import test from "ava";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 
 test("Eleventy addGlobalData should run once", async (t) => {
   let count = 0;
   let elev = new Eleventy("./test/stubs-addglobaldata/", "./test/stubs-addglobaldata/_site", {
-    config: function (eleventyConfig) {
-      eleventyConfig.addGlobalData("count", () => {
+    config: function ($config) {
+      $config.addGlobalData("count", () => {
         count++;
         return count;
       });
@@ -22,8 +22,8 @@ test("Eleventy addGlobalData shouldn’t run if no input templates match!", asyn
     "./test/stubs-addglobaldata-noop/",
     "./test/stubs-addglobaldata-noop/_site",
     {
-      config: function (eleventyConfig) {
-        eleventyConfig.addGlobalData("count", () => {
+      config: function ($config) {
+        $config.addGlobalData("count", () => {
           count++;
           return count;
         });
@@ -37,9 +37,9 @@ test("Eleventy addGlobalData shouldn’t run if no input templates match!", asyn
 
 test("Eleventy addGlobalData can feed layouts to populate data cascade with layout data, issue #1245", async (t) => {
   let elev = new Eleventy("./test/stubs-2145/", "./test/stubs-2145/_site", {
-    config: function (eleventyConfig) {
-      eleventyConfig.addGlobalData("layout", () => "layout.njk");
-      eleventyConfig.dataFilterSelectors.add("LayoutData");
+    config: function ($config) {
+      $config.addGlobalData("layout", () => "layout.njk");
+      $config.dataFilterSelectors.add("LayoutData");
     },
   });
 
@@ -50,20 +50,20 @@ test("Eleventy addGlobalData can feed layouts to populate data cascade with layo
 
 test("Eleventy addGlobalData merge data #3389", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
-    config: function (eleventyConfig) {
-      eleventyConfig.addGlobalData("eleventyComputed", {
+    config: function ($config) {
+      $config.addGlobalData("eleventyComputed", {
         testing(data) {
           return `testing:${data.page.url}`;
         }
       });
 
-      eleventyConfig.addGlobalData("eleventyComputed", {
+      $config.addGlobalData("eleventyComputed", {
         other(data) {
           return `other:${data.page.url}`;
         }
       });
 
-      eleventyConfig.addTemplate("computed.njk", "{{ testing }}|{{ other }}", {})
+      $config.addTemplate("computed.njk", "{{ testing }}|{{ other }}", {})
     },
   });
 
@@ -74,20 +74,20 @@ test("Eleventy addGlobalData merge data #3389", async (t) => {
 
 test("Eleventy addGlobalData merge data #3389 lodash set", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
-    config: function (eleventyConfig) {
-      eleventyConfig.addGlobalData("eleventyComputed.testing", () => {
+    config: function ($config) {
+      $config.addGlobalData("eleventyComputed.testing", () => {
         return (data) => {
           return `testing:${data.page.url}`;
         }
       });
 
-      eleventyConfig.addGlobalData("eleventyComputed.other", () => {
+      $config.addGlobalData("eleventyComputed.other", () => {
         return (data) => {
           return `other:${data.page.url}`;
         }
       });
 
-      eleventyConfig.addTemplate("computed.njk", "{{ testing }}|{{ other }}", {})
+      $config.addTemplate("computed.njk", "{{ testing }}|{{ other }}", {})
     },
   });
 
@@ -98,16 +98,16 @@ test("Eleventy addGlobalData merge data #3389 lodash set", async (t) => {
 
 test.skip("Eleventy addGlobalData merge data #3389 no nested function", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
-    config: function (eleventyConfig) {
-      eleventyConfig.addGlobalData("eleventyComputed.testing", (data) => {
+    config: function ($config) {
+      $config.addGlobalData("eleventyComputed.testing", (data) => {
         return `testing:${data.page.url}`;
       });
 
-      eleventyConfig.addGlobalData("eleventyComputed.other", (data) => {
+      $config.addGlobalData("eleventyComputed.other", (data) => {
         return `other:${data.page.url}`;
       });
 
-      eleventyConfig.addTemplate("computed.njk", "{{ testing }}|{{ other }}", {})
+      $config.addTemplate("computed.njk", "{{ testing }}|{{ other }}", {})
     },
   });
 

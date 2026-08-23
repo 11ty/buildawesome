@@ -1,6 +1,6 @@
 import globals from "globals";
 import pluginJs from "@eslint/js";
-import stylisticJs from "@stylistic/eslint-plugin-js";
+import stylistic from "@stylistic/eslint-plugin";
 import prettier from "eslint-config-prettier";
 
 export const GLOB_SRC_EXT = "?([cm])[jt]s?(x)";
@@ -22,7 +22,7 @@ export default [
 	{
 		name: "11ty/rules/project-specific",
 		plugins: {
-			"@stylistic/js": stylisticJs,
+			"@stylistic/js": stylistic,
 		},
 		languageOptions: {
 			globals: {

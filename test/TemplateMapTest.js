@@ -1473,7 +1473,7 @@ test("eleventy.layouts Event", async (t) => {
 			output: "./test/stubs-layouts-event/_site",
 		},
     function(cfg) {
-      cfg.on("eleventy.layouts", (layoutMap) => {
+      cfg.on("buildawesome.layouts", (layoutMap) => {
         t.deepEqual(layoutMap, {
           "./test/stubs-layouts-event/_includes/first.liquid": ["./test/stubs-layouts-event/page.md"],
           "./test/stubs-layouts-event/_includes/second.liquid": [

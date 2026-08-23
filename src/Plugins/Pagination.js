@@ -2,17 +2,19 @@ import { isPlainObject } from "@11ty/eleventy-utils";
 import lodash from "@11ty/lodash-custom";
 import { DeepCopy } from "@11ty/eleventy-utils";
 
-import EleventyBaseError from "../Errors/EleventyBaseError.js";
+import BaseError from "../Errors/BaseError.js";
 import { ProxyWrap } from "../Util/Objects/ProxyWrap.js";
 // import { DeepFreeze } from "../Util/Objects/DeepFreeze.js";
 import TemplateData from "../Data/TemplateData.js";
 
 const { set: lodashSet, get: lodashGet, chunk: lodashChunk } = lodash;
 
-class PaginationConfigError extends EleventyBaseError {}
-class PaginationError extends EleventyBaseError {}
+class PaginationConfigError extends BaseError {}
+class PaginationError extends BaseError {}
 
 class Pagination {
+	static NOT_FOUND_VALUE = "__NOT_FOUND_ERROR__";
+
 	constructor(tmpl, data, config) {
 		if (!config) {
 			throw new PaginationConfigError("Expected `config` argument to Pagination class.");
@@ -113,15 +115,13 @@ class Pagination {
 	}
 
 	_has(target, key) {
-		let notFoundValue = "__NOT_FOUND_ERROR__";
-		let data = lodashGet(target, key, notFoundValue);
-		return data !== notFoundValue;
+		let data = lodashGet(target, key, Pagination.NOT_FOUND_VALUE);
+		return data !== Pagination.NOT_FOUND_VALUE;
 	}
 
 	_get(target, key) {
-		let notFoundValue = "__NOT_FOUND_ERROR__";
-		let data = lodashGet(target, key, notFoundValue);
-		if (data === notFoundValue) {
+		let data = lodashGet(target, key, Pagination.NOT_FOUND_VALUE);
+		if (data === Pagination.NOT_FOUND_VALUE) {
 			throw new Error(
 				`Could not find pagination data${this.inputPathForErrorMessages}, went looking for: ${key}`,
 			);
@@ -349,7 +349,6 @@ class Pagination {
 			// page.url and page.outputPath are used to avoid another getOutputLocations call later, see Template->addComputedData
 			clonedData.page.url = href;
 			clonedData.page.outputPath = path;
-			clonedData.page.dir = dir;
 
 			entries.push({
 				pageNumber,

@@ -1,14 +1,14 @@
 import test from "ava";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 
 test("#3860 addCollection consumes `collections` but is missing `collections.all`", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addFilter("keys", obj => Object.keys(obj));
-      eleventyConfig.addTemplate("post1.md", "# Post1", { tags: ["bar"]});
-      eleventyConfig.addTemplate("post2.md", "# Post2", { tags: ["foo"]});
+    config($config) {
+      $config.addFilter("keys", obj => Object.keys(obj));
+      $config.addTemplate("post1.md", "# Post1", { tags: ["bar"]});
+      $config.addTemplate("post2.md", "# Post2", { tags: ["foo"]});
 
-      eleventyConfig.addTemplate("tag.njk", "{{ collections | keys }}", {
+      $config.addTemplate("tag.njk", "{{ collections | keys }}", {
 		    pagination: {
 		      data: "collections",
 		      size: 1,

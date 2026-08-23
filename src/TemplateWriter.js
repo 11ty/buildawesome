@@ -1,24 +1,24 @@
 import { TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
 
 import Template from "./Template.js";
 import TemplateMap from "./TemplateMap.js";
-import EleventyBaseError from "./Errors/EleventyBaseError.js";
-import { EleventyErrorHandler } from "./Errors/EleventyErrorHandler.js";
-import EleventyErrorUtil from "./Errors/EleventyErrorUtil.js";
-import ConsoleLogger from "./Util/ConsoleLogger.js";
+import BaseError from "./Errors/BaseError.js";
+import ErrorUtil from "./Errors/ErrorUtil.js";
+import { createDebug } from "./Util/DebugLogUtil.js";
 
-const debug = debugUtil("Eleventy:TemplateWriter");
+const debug = createDebug("TemplateWriter");
 
-class TemplateWriterMissingConfigArgError extends EleventyBaseError {}
-class EleventyPassthroughCopyError extends EleventyBaseError {}
-class EleventyTemplateError extends EleventyBaseError {}
+class TemplateWriterMissingConfigArgError extends BaseError {}
+class PassthroughCopyError extends BaseError {}
+class TemplateError extends BaseError {}
 
 class TemplateWriter {
 	#eleventyFiles;
 	#passthroughManager;
 	#errorHandler;
+	#logger;
 	#extensionMap;
+	#incrementalFiles = [];
 
 	constructor(
 		templateFormats, // TODO remove this in favor of this.#eleventyFiles
@@ -35,7 +35,6 @@ class TemplateWriter {
 		this.templateFormats = templateFormats;
 
 		this.templateData = templateData;
-		this.isVerbose = true;
 		this.isDryRun = false;
 		this.writeCount = 0;
 		this.renderCount = 0;
@@ -68,27 +67,22 @@ class TemplateWriter {
 	/* Getter for error handler */
 	get errorHandler() {
 		if (!this.#errorHandler) {
-			this.#errorHandler = new EleventyErrorHandler();
-			this.#errorHandler.isVerbose = this.verboseMode;
-			this.#errorHandler.logger = this.logger;
+			throw new Error("Internal error: missing ErrorHandler instance.");
 		}
 
 		return this.#errorHandler;
 	}
 
-	/* Getter for Logger */
 	get logger() {
-		if (!this._logger) {
-			this._logger = new ConsoleLogger();
-			this._logger.isVerbose = this.verboseMode;
+		if (!this.#logger) {
+			throw new Error("Internal error: missing ConsoleLogger instance.");
 		}
 
-		return this._logger;
+		return this.#logger;
 	}
 
-	/* Setter for Logger */
 	set logger(logger) {
-		this._logger = logger;
+		this.#logger = logger;
 	}
 
 	/* For testing */
@@ -175,7 +169,7 @@ class TemplateWriter {
 		return paths;
 	}
 
-	_createTemplate(path, to = "fs") {
+	createTemplate(path, to = "fs") {
 		let tmpl = this._templatePathCache.get(path);
 		let wasCached = false;
 
@@ -196,9 +190,9 @@ class TemplateWriter {
 		}
 
 		tmpl.setTransforms(this.config.transforms);
+		tmpl.setPreprocessors(this.config.preprocessors);
 		tmpl.setLinters(this.config.linters);
 		tmpl.setDryRun(this.isDryRun);
-		tmpl.setIsVerbose(this.isVerbose);
 		tmpl.reset();
 
 		return {
@@ -208,15 +202,16 @@ class TemplateWriter {
 	}
 
 	// incrementalFileShape is `template` or `copy` (for passthrough file copy)
-	async _addToTemplateMapIncrementalBuild(incrementalFileShape, paths, to = "fs") {
+	async #addToTemplateMapIncrementalBuild(incrementalFileShapes, paths, to = "fs") {
 		// Render overrides are only used when `--ignore-initial` is in play and an initial build is not run
 		let ignoreInitialBuild = !this.isRunInitialBuild;
 		let secondOrderRelevantLookup = {};
 		let templates = [];
+		let cacheResetTracker = new Set();
 
 		let promises = [];
 		for (let path of paths) {
-			let { template: tmpl } = this._createTemplate(path, to);
+			let { template: tmpl } = this.createTemplate(path, to);
 
 			// Note: removed a fix here to fetch missing templateRender instances
 			// that was tested as no longer needed (Issue #3170)
@@ -228,14 +223,17 @@ class TemplateWriter {
 			await tmpl.asyncTemplateInitialization();
 
 			// This must happen before data is generated for the incremental file only
-			if (incrementalFileShape === "template" && tmpl.inputPath === this.incrementalFile) {
-				tmpl.resetCaches();
-			} else if (
+			if (
+				(incrementalFileShapes[path] === "template" &&
+					this.#incrementalFiles.includes(tmpl.inputPath)) ||
 				// Issue #3824 #3870
-				tmpl.isFileRelevantToThisTemplate(this.incrementalFile, {
-					isFullTemplate: incrementalFileShape === "template",
-				})
+				this.#incrementalFiles.find((p) =>
+					tmpl.isFileRelevantToThisTemplate(p, {
+						isFullTemplate: incrementalFileShapes[p] === "template",
+					}),
+				)
 			) {
+				cacheResetTracker.add(tmpl.inputPath);
 				tmpl.resetCaches();
 			}
 
@@ -248,7 +246,9 @@ class TemplateWriter {
 
 		// Delete incremental file from the dependency graph so we get fresh entries!
 		// This _must_ happen before any additions, the other ones are in Custom.js and GlobalDependencyMap.js (from the eleventy.layouts Event)
-		this.config.uses.resetNode(this.incrementalFile);
+		for (let p of this.#incrementalFiles) {
+			this.config.uses.resetNode(p);
+		}
 
 		// write new template relationships to the global dependency graph for next time
 		this.templateMap.addAllToGlobalDependencyGraph();
@@ -262,18 +262,23 @@ class TemplateWriter {
 		}
 
 		for (let tmpl of templates) {
-			if (incrementalFileShape === "template" && tmpl.inputPath === this.incrementalFile) {
+			if (
+				incrementalFileShapes[tmpl.inputPath] === "template" &&
+				this.#incrementalFiles.includes(tmpl.inputPath)
+			) {
 				tmpl.setRenderableOverride(undefined); // unset, probably render
 			} else if (
-				tmpl.isFileRelevantToThisTemplate(this.incrementalFile, {
-					isFullTemplate: incrementalFileShape === "template",
-				})
+				this.#incrementalFiles.find((p) =>
+					tmpl.isFileRelevantToThisTemplate(p, {
+						isFullTemplate: incrementalFileShapes[p] === "template",
+					}),
+				)
 			) {
 				// changed file is used by template
 				// template uses the changed file
 				tmpl.setRenderableOverride(undefined); // unset, probably render
 				secondOrderRelevantLookup[tmpl.inputPath] = true;
-			} else if (this.config.uses.isFileUsedBy(this.incrementalFile, tmpl.inputPath)) {
+			} else if (this.config.uses.areFilesUsedBy(this.#incrementalFiles, tmpl.inputPath)) {
 				// changed file uses this template
 				tmpl.setRenderableOverride("optional");
 			} else {
@@ -300,24 +305,23 @@ class TemplateWriter {
 
 		// Order of templates does not matter here, they’re reordered later based on dependencies in TemplateMap.js
 		for (let tmpl of templates) {
-			if (incrementalFileShape === "template" && tmpl.inputPath === this.incrementalFile) {
+			if (
+				incrementalFileShapes[tmpl.inputPath] === "template" &&
+				this.#incrementalFiles.includes(tmpl.inputPath)
+			) {
 				// Cache is reset above (to invalidate data cache at the right time)
 				tmpl.setDryRunViaIncremental(false);
 			} else if (!tmpl.isRenderableDisabled() && !tmpl.isRenderableOptional()) {
-				// Related to the template but not the template (reset the render cache, not the read cache)
-				tmpl.resetCaches({
-					data: true,
-					render: true,
-				});
+				if (!cacheResetTracker.has(tmpl.inputPath)) {
+					// Related to the template but not the template (reset the render cache, not the read cache)
+					tmpl.resetCaches({
+						render: true,
+					});
+				}
 
 				tmpl.setDryRunViaIncremental(false);
 			} else {
-				// During incremental we only reset the data cache for non-matching templates, see https://github.com/11ty/eleventy/issues/2710
-				// Keep caches for read/render
-				tmpl.resetCaches({
-					data: true,
-				});
-
+				// During incremental we don’t reset cache here, keep cache for read/reader (data cache is always reset elsewhere), see https://github.com/11ty/eleventy/issues/2710
 				tmpl.setDryRunViaIncremental(true);
 
 				this.skippedCount++;
@@ -325,15 +329,15 @@ class TemplateWriter {
 		}
 	}
 
-	async _addToTemplateMapFullBuild(paths, to = "fs") {
-		if (this.incrementalFile) {
-			return [];
+	async #addToTemplateMapFullBuild(paths, to = "fs") {
+		if (this.#incrementalFiles?.length > 0) {
+			throw new Error("Internal error: improper mixing of full build and incremental builds.");
 		}
 
 		let ignoreInitialBuild = !this.isRunInitialBuild;
 		let promises = [];
 		for (let path of paths) {
-			let { template: tmpl, wasCached } = this._createTemplate(path, to);
+			let { template: tmpl, wasCached } = this.createTemplate(path, to);
 			// Render overrides are only used when `--ignore-initial` is in play and an initial build is not run
 			if (ignoreInitialBuild) {
 				tmpl.setRenderableOverride(false); // disable render
@@ -349,59 +353,62 @@ class TemplateWriter {
 			promises.push(this.templateMap.add(tmpl));
 		}
 
-		return Promise.all(promises);
+		await Promise.all(promises);
+
+		// write new template relationships to the global dependency graph for next time
+		this.templateMap.addAllToGlobalDependencyGraph();
 	}
 
-	getFileShape(paths, incrementalFile) {
-		// WARNING: This is leaky—if Core is being used instead of Eleventy we are assuming everything is a template (not passthrough copy)
+	getIncrementalFileShapes(paths) {
+		// browser-based fork
 		if (!this.#eleventyFiles) {
-			return "template";
+			let shapes = {};
+			for (let incFile of this.#incrementalFiles) {
+				// this is an assumption for browser-based Eleventy only
+				shapes[incFile] = "template";
+			}
+			return shapes;
 		}
 
-		return this.#eleventyFiles.getFileShape(paths, incrementalFile);
+		return this.#eleventyFiles?.getIncrementalFileShapes(paths, this.#incrementalFiles);
 	}
 
-	async _addToTemplateMap(paths, to = "fs") {
-		let incrementalFileShape = this.getFileShape(paths, this.incrementalFile);
+	async #addToTemplateMap(paths, to = "fs") {
+		let incrementalFileShapes = this.getIncrementalFileShapes(paths);
 
 		// Filter out passthrough copy files
 		paths = paths.filter((path) => {
 			if (!this.extensionMap.hasEngine(path)) {
 				return false;
 			}
-			if (incrementalFileShape === "copy") {
+
+			if (incrementalFileShapes[path] === "copy") {
 				this.skippedCount++;
 				// Filters out templates if the incremental file is a passthrough copy file
 				return false;
 			}
+
 			return true;
 		});
 
-		if (this.incrementalFile) {
-			// Top level async to get at the promises returned.
-			return await this._addToTemplateMapIncrementalBuild(incrementalFileShape, paths, to);
+		if (this.#incrementalFiles?.length > 0) {
+			await this.#addToTemplateMapIncrementalBuild(incrementalFileShapes, paths, to);
+		} else {
+			await this.#addToTemplateMapFullBuild(paths, to);
 		}
-
-		// Full Build
-		let ret = await this._addToTemplateMapFullBuild(paths, to);
-
-		// write new template relationships to the global dependency graph for next time
-		this.templateMap.addAllToGlobalDependencyGraph();
-
-		return ret;
 	}
 
-	async _createTemplateMap(paths, to) {
+	async createTemplateMap(paths, to) {
 		this.templateMap = new TemplateMap(this.templateConfig);
 
-		await this._addToTemplateMap(paths, to);
+		await this.#addToTemplateMap(paths, to);
 		await this.templateMap.cache();
 
 		// Return is used by tests
 		return this.templateMap;
 	}
 
-	async _generateTemplate(mapEntry, to) {
+	async #generateTemplate(mapEntry, to) {
 		let tmpl = mapEntry.template;
 
 		return tmpl.generateMapEntry(mapEntry, to).then((pages) => {
@@ -418,28 +425,28 @@ class TemplateWriter {
 
 		return this.#passthroughManager.copyAll(templateExtensionPaths).catch((e) => {
 			this.errorHandler.warn(e, "Error with passthrough copy");
-			return Promise.reject(new EleventyPassthroughCopyError("Having trouble copying", e));
+			return Promise.reject(new PassthroughCopyError("Having trouble copying", e));
 		});
 	}
 
 	async generateTemplates(paths, to = "fs") {
 		let promises = [];
 		// TODO optimize await here
-		await this._createTemplateMap(paths, to);
+		await this.createTemplateMap(paths, to);
 		debug("Template map created.");
 
 		let usedTemplateContentTooEarlyMap = [];
 		for (let mapEntry of this.templateMap.getMap()) {
 			promises.push(
-				this._generateTemplate(mapEntry, to).catch(function (e) {
+				this.#generateTemplate(mapEntry, to).catch(function (e) {
 					// Premature templateContent in layout render, this also happens in
 					// TemplateMap.populateContentDataInMap for non-layout content
-					if (EleventyErrorUtil.isPrematureTemplateContentError(e)) {
+					if (ErrorUtil.isPrematureTemplateContentError(e)) {
 						usedTemplateContentTooEarlyMap.push(mapEntry);
 					} else {
 						let outputPaths = `"${mapEntry._pages.map((page) => page.outputPath).join(`", "`)}"`;
 						return Promise.reject(
-							new EleventyTemplateError(
+							new TemplateError(
 								`Having trouble writing to ${outputPaths} from "${mapEntry.inputPath}"`,
 								e,
 							),
@@ -451,9 +458,9 @@ class TemplateWriter {
 
 		for (let mapEntry of usedTemplateContentTooEarlyMap) {
 			promises.push(
-				this._generateTemplate(mapEntry, to).catch(function (e) {
+				this.#generateTemplate(mapEntry, to).catch(function (e) {
 					return Promise.reject(
-						new EleventyTemplateError(
+						new TemplateError(
 							`Having trouble writing to (second pass) "${mapEntry.outputPath}" from "${mapEntry.inputPath}"`,
 							e,
 						),
@@ -486,12 +493,12 @@ class TemplateWriter {
 		let paths = await this._getAllPaths();
 
 		// This must happen before writePassthroughCopy
-		this.templateConfig.userConfig.emit("eleventy#beforerender");
+		this.templateConfig.userConfig.emit("buildawesome#beforerender");
 
 		let aggregatePassthroughCopyPromise = this.writePassthroughCopy(paths);
 
 		let templatesPromise = Promise.all(await this.generateTemplates(paths)).then((results) => {
-			this.templateConfig.userConfig.emit("eleventy#render");
+			this.templateConfig.userConfig.emit("buildawesome#render");
 
 			return results;
 		});
@@ -529,11 +536,6 @@ class TemplateWriter {
 		);
 	}
 
-	setVerboseOutput(isVerbose) {
-		this.isVerbose = isVerbose;
-		this.errorHandler.isVerbose = isVerbose;
-	}
-
 	setDryRun(isDryRun) {
 		this.isDryRun = Boolean(isDryRun);
 	}
@@ -541,16 +543,14 @@ class TemplateWriter {
 	setRunInitialBuild(runInitialBuild) {
 		this.isRunInitialBuild = runInitialBuild;
 	}
-	setIncrementalBuild(isIncremental) {
-		this.isIncremental = isIncremental;
+
+	setIncrementalFiles(files = []) {
+		this.#incrementalFiles = files;
+		this.#passthroughManager?.setIncrementalFiles(files);
 	}
-	setIncrementalFile(incrementalFile) {
-		this.incrementalFile = incrementalFile;
-		this.#passthroughManager?.setIncrementalFile(incrementalFile);
-	}
-	resetIncrementalFile() {
-		this.incrementalFile = null;
-		this.#passthroughManager?.resetIncrementalFile();
+	resetIncremental() {
+		this.#incrementalFiles = [];
+		this.#passthroughManager?.resetIncremental();
 	}
 
 	getMetadata() {

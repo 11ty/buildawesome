@@ -162,7 +162,7 @@ export default class WatchTargets {
 			}
 		}
 
-		eventBus.emit("eleventy.importCacheReset", paths);
+		eventBus.emit("buildawesome.importcachereset", paths);
 	}
 
 	getNewTargetsSinceLastReset() {

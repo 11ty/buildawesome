@@ -1,16 +1,15 @@
 import test from "ava";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 
-test("#3808 addCollection in eleventy.before", async (t) => {
+test("#3808 addCollection in buildawesome.before", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addTemplate("post1.md", "# Post1");
-      eleventyConfig.addTemplate("post2.md", "# Post2");
-      eleventyConfig.addTemplate("index.njk", "{{ collections.posts.length }}");
+    config($config) {
+      $config.addTemplate("post1.md", "# Post1");
+      $config.addTemplate("post2.md", "# Post2");
+      $config.addTemplate("index.njk", "{{ collections.posts.length }}");
 
-      eleventyConfig.on("eleventy.before", async () => {
-      // eleventyConfig.on("eleventy.beforeConfig", async (eleventyConfig) => {
-        eleventyConfig.addCollection("posts", async collectionApi => {
+      $config.on("buildawesome.before", async () => {
+        $config.addCollection("posts", async collectionApi => {
           return collectionApi.getFilteredByGlob("**/post*.md");
         });
       })
@@ -23,33 +22,33 @@ test("#3808 addCollection in eleventy.before", async (t) => {
 });
 
 // /* broken */
-// export default function(eleventyConfig) {
-//   eleventyConfig.on("eleventy.before", async () => {
-//     eleventyConfig.addCollection("posts", collectionApi => {
+// export default function($config) {
+//   $config.on("buildawesome.before", async () => {
+//     $config.addCollection("posts", collectionApi => {
 //       return collectionApi.getFilteredByGlob("**/post*.md");
 //     });
 //   })
 // }
 
 // /* works */
-// export default function(eleventyConfig) {
-//   eleventyConfig.on("eleventy.beforeConfig", async (eleventyConfig) => {
-//     eleventyConfig.addCollection("posts", collectionApi => {
+// export default function($config) {
+//   $config.on("buildawesome.beforeConfig", async ($config) => {
+//     $config.addCollection("posts", collectionApi => {
 //       return collectionApi.getFilteredByGlob("**/post*.md");
 //     });
 //   })
 // }
 
 // /* works */
-// export default async function(eleventyConfig) {
-//   eleventyConfig.addCollection("posts", collectionApi => {
+// export default async function($config) {
+//   $config.addCollection("posts", collectionApi => {
 //     return collectionApi.getFilteredByGlob("**/post*.md");
 //   });
 // }
 
 // /* works */
-// export default function(eleventyConfig) {
-//   eleventyConfig.addCollection("posts", async collectionApi => {
+// export default function($config) {
+//   $config.addCollection("posts", async collectionApi => {
 //     return collectionApi.getFilteredByGlob("**/post*.md");
 //   });
 // }

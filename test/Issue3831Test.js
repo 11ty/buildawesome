@@ -1,14 +1,14 @@
 import test from "ava";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 
 test("#3831 Computed Data regression", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addGlobalData("eleventyComputed", {
+    config($config) {
+      $config.addGlobalData("eleventyComputed", {
         first_letter: function (data) { return data.title[0] }
       });
 
-      eleventyConfig.addTemplate("index.njk", `---
+      $config.addTemplate("index.njk", `---
 title: "Title"
 metadata:
   url: "/url/"

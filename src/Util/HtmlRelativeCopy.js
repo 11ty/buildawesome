@@ -112,6 +112,7 @@ class HtmlRelativeCopy {
 		}
 
 		// Relative to source file’s input path
+		// Maybe use ProjectDirectories.relativeToProjectRoot()
 		let source = this.getFilePathRelativeToProjectRoot(fileRef, tmplInputPath);
 		if (!this.isCopyableTarget(source)) {
 			return;
@@ -140,7 +141,7 @@ class HtmlRelativeCopy {
 		// We use a Set here to allow passthrough copy manager to properly error on conflicts upstream
 		// Only errors when different inputs write to the same output
 		// Also errors if attempts to write outside the output folder.
-		this.#userConfig.emit("eleventy#copy", {
+		this.#userConfig.emit("buildawesome#copy", {
 			source,
 			target,
 			options: this.#copyOptions,

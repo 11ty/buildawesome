@@ -1,12 +1,12 @@
 import test from "ava";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 
 test("#3823 addCollection -> pagination over `collections`", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addTemplate("post1.md", "# Post1");
-      eleventyConfig.addTemplate("post2.md", "# Post2");
-      eleventyConfig.addTemplate("index.njk", `---
+    config($config) {
+      $config.addTemplate("post1.md", "# Post1");
+      $config.addTemplate("post2.md", "# Post2");
+      $config.addTemplate("index.njk", `---
 pagination:
   data: collections
   size: 1
@@ -17,7 +17,7 @@ pagination:
 ---
 {{ tag }}`);
 
-      eleventyConfig.addCollection("posts", async collectionApi => {
+      $config.addCollection("posts", async collectionApi => {
         return collectionApi.getFilteredByGlob("**/post*.md");
       });
     }

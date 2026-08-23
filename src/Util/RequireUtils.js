@@ -1,9 +1,12 @@
 import { createRequire } from "node:module";
 
-// important to clear the require.cache in CJS projects
-const require = createRequire(import.meta.url);
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import/with#browser_compatibility
+import corePackageJson from "../../package.json" with { type: "json" };
 
-export const eleventyPackageJson = require("../../package.json");
+// important to clear the require.cache in CJS projects
+export { corePackageJson };
+
+const require = createRequire(import.meta.url);
 
 export function clearRequireCache(absolutePath) {
 	// ESM Eleventy when using `import()` on a CJS project file still adds to require.cache

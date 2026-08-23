@@ -1,2 +1,2 @@
 // generic config file
-export default function(eleventyConfig) {};
+export default function($config) {};

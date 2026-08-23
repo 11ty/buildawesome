@@ -1,32 +1,34 @@
 {
 	"name": "@11ty/eleventy",
-	"version": "4.0.0-alpha.6",
-	"description": "A simpler static site generator.",
+	"version": "4.0.0-alpha.10",
+	"description": "A simpler way to build awesome web sites.",
 	"publishConfig": {
 		"access": "public",
 		"provenance": true
 	},
 	"type": "module",
-	"main": "./src/Eleventy.js",
+	"main": "./src/Core.js",
 	"exports": {
 		".": {
-			"import": "./src/Eleventy.js",
-			"require": "./src/EleventyCommonJs.cjs"
+			"import": "./src/Core.js",
+			"require": "./src/RequireEsmFeatureTest.cjs"
 		},
 		"./UserConfig": {
-			"types": "./src/UserConfig.js"
+			"types": "./types/UserConfig.d.ts"
 		},
-		"./utils/git": "./src/Util/Git.js"
+		"./utils/git": "./src/Util/Git.js",
+		"./cli": "./cmd.cjs"
 	},
 	"bin": {
 		"eleventy": "cmd.cjs"
 	},
 	"license": "MIT",
 	"engines": {
-		"node": ">=20.19"
+		"node": ">=22.15"
 	},
 	"workspaces": [
-		"packages/client"
+		"packages/browser",
+		"packages/build-awesome"
 	],
 	"funding": {
 		"type": "opencollective",
@@ -52,24 +54,24 @@
 	],
 	"scripts": {
 		"default": "npm run test",
-		"test": "npm run test:server && npm run test:client",
+		"test": "npm run test:server && npm run test:browser",
 		"test:server": "npm run test:node && npm run test:ava",
 		"test:ava": "ava --verbose --timeout 20s",
-		"test:node": "node --test test_node/tests.js",
-		"test:client": "cross-env CI=true npm run test --workspaces",
+		"test:node": "node --test 'test_node/**/*test.js'",
+		"test:browser": "cross-env CI=true npm run test --workspaces",
 		"format": "prettier . --write",
 		"check": "eslint src",
-		"check-types": "tsc",
-		"nano-staged": "nano-staged",
+		"typescript": "tsc && node scripts/prune-types.js",
 		"coverage": "npx c8 ava && npx c8 report --reporter=json-summary && cp coverage/coverage-summary.json docs/_data/coverage.json && node cmd.cjs --config=docs/eleventy.coverage.js",
+		"nano-staged": "nano-staged",
 		"prepare": "simple-git-hooks"
 	},
-	"author": "Zach Leatherman <zachleatherman@gmail.com> (https://zachleat.com/)",
+	"author": "Zach Leatherman (https://zachleat.com/)",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/11ty/eleventy.git"
+		"url": "git+https://github.com/11ty/buildawesome.git"
 	},
-	"bugs": "https://github.com/11ty/eleventy/issues",
+	"bugs": "https://github.com/11ty/buildawesome/issues",
 	"homepage": "https://www.11ty.dev/",
 	"ava": {
 		"environmentVariables": {},
@@ -96,77 +98,72 @@
 		"pre-push": "npm test"
 	},
 	"devDependencies": {
-		"@11ty/eleventy-img": "^6.0.4",
-		"@11ty/eleventy-plugin-rss": "^2.0.4",
+		"@11ty/eleventy-img": "^7.0.0",
+		"@11ty/eleventy-plugin-rss": "^3.0.0",
 		"@11ty/eleventy-plugin-syntaxhighlight": "^5.0.2",
 		"@11ty/eleventy-plugin-webc": "^0.12.0-beta.7",
-		"@eslint/js": "^9.39.2",
+		"@eslint/js": "^10.0.1",
 		"@iarna/toml": "^2.2.5",
 		"@mdx-js/node-loader": "^3.1.1",
-		"@stylistic/eslint-plugin-js": "^4.4.1",
-		"@types/node": "^25.1.0",
-		"@vue/server-renderer": "^3.5.27",
+		"@stylistic/eslint-plugin": "^5.10.0",
+		"@types/node": "^26.2.0",
+		"@vue/server-renderer": "^3.5.41",
 		"@zachleat/noop": "^1.0.7",
-		"ava": "^6.4.1",
-		"c8": "^10.1.3",
+		"ava": "^8.0.1",
+		"c8": "^12.0.0",
 		"cross-env": "^10.1.0",
-		"eslint": "^9.39.2",
+		"eslint": "^10.8.1",
 		"eslint-config-prettier": "^10.1.8",
-		"globals": "^17.2.0",
-		"jsx-async-runtime": "^2.0.2",
+		"globals": "^17.11.0",
+		"jsx-async-runtime": "^2.2.0",
 		"luxon": "^3.7.2",
 		"markdown-it-abbr": "^2.0.0",
-		"markdown-it-emoji": "^3.0.0",
-		"marked": "^17.0.1",
-		"nano-staged": "^0.9.0",
-		"prettier": "^3.8.1",
+		"markdown-it-emoji": "^3.1.0",
+		"marked": "^18.0.10",
+		"nano-staged": "^1.0.2",
+		"prettier": "^3.9.6",
 		"pretty": "^2.0.0",
-		"react": "^19.2.4",
-		"react-dom": "^19.2.4",
-		"rimraf": "^6.1.2",
-		"sass": "^1.97.3",
+		"react": "^19.2.8",
+		"react-dom": "^19.2.8",
+		"sass": "^1.102.0",
 		"simple-git-hooks": "^2.13.1",
-		"tsx": "^4.21.0",
-		"typescript": "^5.9.3",
-		"vue": "^3.5.27",
-		"zod": "^4.3.6",
+		"tsx": "^4.23.12",
+		"typescript": "7.0.2",
+		"vue": "^3.5.41",
+		"zod": "^4.4.3",
 		"zod-validation-error": "^5.0.0"
 	},
 	"dependencies": {
 		"@11ty/dependency-tree": "^4.0.2",
 		"@11ty/dependency-tree-esm": "^2.0.4",
 		"@11ty/dependency-tree-typescript": "^1.0.0",
-		"@11ty/eleventy-dev-server": "^3.0.0-alpha.6",
-		"@11ty/eleventy-plugin-bundle": "^3.0.7",
+		"@11ty/eleventy-dev-server": "^3.0.0-alpha.10",
+		"@11ty/eleventy-plugin-bundle": "^4.0.2",
 		"@11ty/eleventy-utils": "^2.0.7",
-		"@11ty/gray-matter": "^2.0.1",
+		"@11ty/gray-matter": "^3.0.0",
 		"@11ty/lodash-custom": "^4.17.21",
 		"@11ty/node-version-check": "^1.0.1",
-		"@11ty/nunjucks": "^4.0.0-alpha.1",
+		"@11ty/nunjucks": "^4.0.0-alpha.3",
 		"@11ty/parse-date-strings": "^2.0.6",
-		"@11ty/posthtml-urls": "^1.0.2",
-		"@11ty/recursive-copy": "^5.0.0",
+		"@11ty/posthtml-urls": "^1.0.3",
+		"@11ty/recursive-copy": "^5.0.2",
 		"@sindresorhus/slugify": "^3.0.0",
 		"bcp-47-normalize": "^2.3.0",
 		"chokidar": "^5.0.0",
-		"debug": "^4.4.3",
 		"dependency-graph": "^1.0.0",
-		"entities": "^7.0.1",
+		"entities": "^8.0.0",
 		"import-module-string": "^2.0.3",
-		"iso-639-1": "^3.1.5",
+		"iso-639-1": "^3.1.6",
 		"kleur": "^4.1.5",
-		"liquidjs": "^10.24.0",
-		"markdown-it": "^14.1.0",
+		"liquidjs": "^10.29.0",
+		"markdown-it": "^14.3.0",
 		"minimist": "^1.2.8",
-		"moo": "^0.5.2",
-		"node-retrieve-globals": "^6.0.1",
-		"picomatch": "^4.0.3",
+		"moo": "0.5.2",
+		"obug": "^2.1.4",
+		"picomatch": "^4.0.5",
 		"posthtml": "^0.16.7",
 		"posthtml-match-helper": "^2.0.3",
-		"semver": "^7.7.3",
-		"tinyglobby": "^0.2.15"
-	},
-	"overrides": {
-		"fdir": "6.4.6"
+		"semver": "^7.8.5",
+		"tinyglobby": "^0.2.17"
 	}
 }

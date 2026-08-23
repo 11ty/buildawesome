@@ -1,12 +1,12 @@
 import test from "ava";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 
 test("Empty collections api #3467 (return undefined)", async (t) => {
 	let elev = new Eleventy("./test/stubs-virtual", "./test/stubs-virtual/_site", {
-		config: function (eleventyConfig) {
-			eleventyConfig.addTemplate("virtual.md", `# Hello`);
+		config: function ($config) {
+			$config.addTemplate("virtual.md", `# Hello`);
 
-      eleventyConfig.addCollection("brokenCollection", function(collection) {
+      $config.addCollection("brokenCollection", function(collection) {
         // returns nothing
       });
 		},
@@ -21,10 +21,10 @@ test("Empty collections api #3467 (return undefined)", async (t) => {
 
 test("Empty collections api #3467 (return false)", async (t) => {
 	let elev = new Eleventy("./test/stubs-virtual", "./test/stubs-virtual/_site", {
-		config: function (eleventyConfig) {
-			eleventyConfig.addTemplate("virtual.md", `# Hello`);
+		config: function ($config) {
+			$config.addTemplate("virtual.md", `# Hello`);
 
-      eleventyConfig.addCollection("brokenCollection", function(collection) {
+      $config.addCollection("brokenCollection", function(collection) {
         return false;
       });
 		},
@@ -39,10 +39,10 @@ test("Empty collections api #3467 (return false)", async (t) => {
 
 test("Empty collections api #3467 (return empty string)", async (t) => {
 	let elev = new Eleventy("./test/stubs-virtual", "./test/stubs-virtual/_site", {
-		config: function (eleventyConfig) {
-			eleventyConfig.addTemplate("virtual.md", `# Hello`);
+		config: function ($config) {
+			$config.addTemplate("virtual.md", `# Hello`);
 
-      eleventyConfig.addCollection("brokenCollection", function(collection) {
+      $config.addCollection("brokenCollection", function(collection) {
         return "";
       });
 		},

@@ -1,5 +1,5 @@
 import test from "ava";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 
 test("Custom Front Matter Parsing Options (using JavaScript node-retrieve-globals)", async (t) => {
   let elev = new Eleventy("./test/stubs/script-frontmatter/test.njk", "./_site");
@@ -14,8 +14,8 @@ test("Custom Front Matter Parsing Options (using JavaScript node-retrieve-global
 
 test("Custom Front Matter Parsing Options (using JavaScript node-retrieve-globals), override project-wide front matter default.", async (t) => {
   let elev = new Eleventy("./test/stubs/script-frontmatter/test-default.njk", "./_site", {
-    config: (eleventyConfig) => {
-      eleventyConfig.setFrontMatterParsingOptions({
+    config: ($config) => {
+      $config.setFrontMatterParsingOptions({
         language: "js",
       });
     },
@@ -43,8 +43,8 @@ test("Custom Front Matter Parsing Options (using backwards-compatible `js` inste
 // https://github.com/11ty/eleventy/issues/3917
 test("Issue #3917 previous JS object front matter shouldn’t have had implicit exports turned on", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
-    config: function(eleventyConfig) {
-      eleventyConfig.addTemplate("test.njk", `---js
+    config: function($config) {
+      $config.addTemplate("test.njk", `---js
 {
   eleventyComputed: {
     summary: async function (data) {

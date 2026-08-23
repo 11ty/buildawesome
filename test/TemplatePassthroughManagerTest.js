@@ -1,14 +1,13 @@
 import test from "ava";
 import fs from "fs";
-import { rimrafSync } from "rimraf";
 
 import TemplatePassthroughManager from "../src/TemplatePassthroughManager.js";
 import TemplateConfig from "../src/TemplateConfig.js";
 import FileSystemSearch from "../src/FileSystemSearch.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 import ProjectDirectories from "../src/Util/ProjectDirectories.js";
 
-import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback, getEleventyFilesInstance } from "./_testHelpers.js";
+import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback, getEleventyFilesInstance, deleteDirectory } from "./_testHelpers.js";
 
 test("Get paths from Config", async (t) => {
   let eleventyConfig = new TemplateConfig();
@@ -19,10 +18,10 @@ test("Get paths from Config", async (t) => {
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
 
-  t.deepEqual(mgr.getConfigPaths(), [{ inputPath: "./img", outputPath: true, copyOptions: {} }]);
+  t.deepEqual(mgr.getConfigPaths(), [{ inputPath: "./img", outputPath: true, isDynamicPattern: false, copyOptions: {} }]);
 });
 
-test("isPassthroughCopyFile", async (t) => {
+test("filterToPassthroughCopyFilesOnly", async (t) => {
   let eleventyConfig = new TemplateConfig();
   eleventyConfig.userConfig.passthroughCopies = {
     img: { outputPath: true },
@@ -31,29 +30,25 @@ test("isPassthroughCopyFile", async (t) => {
   await eleventyConfig.init();
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
-  mgr.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  mgr.extensionMap = new ExtensionMap(eleventyConfig);
 
-  t.false(mgr.isPassthroughCopyFile([]));
-  t.false(mgr.isPassthroughCopyFile([], ""));
-  t.false(mgr.isPassthroughCopyFile([], null));
+  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([]), []);
+  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], ""), []);
+  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], null), []);
 
-  t.truthy(mgr.isPassthroughCopyFile([], "./img/test.png"));
-  t.deepEqual(mgr.isPassthroughCopyFile([], "./img/test.png"), {
-    inputPath: "./img",
-    outputPath: true,
-    copyOptions: {},
-  });
+  // eligible via config
+  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], "./img/test.png"), [{ copyOptions: {}, inputPath: "./img", isDynamicPattern: false, outputPath: true }]);
+  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], "./fonts/Roboto.woff"), [{ copyOptions: {}, inputPath: "./fonts", isDynamicPattern: false, outputPath: true }]);
 
-  t.truthy(mgr.isPassthroughCopyFile([], "./fonts/Roboto.woff"));
-  t.deepEqual(mgr.isPassthroughCopyFile([], "./fonts/Roboto.woff"), {
-    inputPath: "./fonts",
-    outputPath: true,
-    copyOptions: {},
-  });
+  // when multiple paths are eligible via config, only return one path for both
+  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], ["./img/test.png", "./img/test2.png"]), [{ copyOptions: {}, inputPath: "./img", isDynamicPattern: false, outputPath: true }]);
 
-  t.false(mgr.isPassthroughCopyFile([], "./docs/test.njk"));
-  t.false(mgr.isPassthroughCopyFile([], "./other-dir/test.png"));
-  t.true(mgr.isPassthroughCopyFile(["hi", "./other-dir/test.png"], "./other-dir/test.png"));
+  // not eligible via config
+  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], "./docs/test.njk"), []);
+  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], "./other-dir/test.png"), []);
+
+  // not eligible via config, eligible via unknown engine listed in path
+  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly(["hi", "./other-dir/test.png"], "./other-dir/test.png"), ["./other-dir/test.png"]);
 });
 
 test("Get glob paths from config", async (t) => {
@@ -79,7 +74,7 @@ test("Get file paths", async (t) => {
   await eleventyConfig.init();
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
-  mgr.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  mgr.extensionMap = new ExtensionMap(eleventyConfig);
 
   t.deepEqual(mgr.getNonTemplatePaths(["test.png"]), ["test.png"]);
 });
@@ -89,7 +84,7 @@ test("Get file paths (filter out real templates)", async (t) => {
   await eleventyConfig.init();
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
-  mgr.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  mgr.extensionMap = new ExtensionMap(eleventyConfig);
   mgr.extensionMap.setFormats(["njk"]);
 
   t.deepEqual(mgr.getNonTemplatePaths(["test.njk"]), []);
@@ -100,7 +95,7 @@ test("Get file paths (filter out real templates), multiple", async (t) => {
   await eleventyConfig.init();
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
-  mgr.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  mgr.extensionMap = new ExtensionMap(eleventyConfig);
   mgr.extensionMap.setFormats(["njk"]);
 
   t.deepEqual(mgr.getNonTemplatePaths(["test.njk", "test.png"]), ["test.png"]);
@@ -111,7 +106,7 @@ test("Get file paths with a js file (filter out real templates), multiple", asyn
   await eleventyConfig.init();
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
-  mgr.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  mgr.extensionMap = new ExtensionMap(eleventyConfig);
   mgr.extensionMap.setFormats(["njk"]);
 
   t.deepEqual(mgr.getNonTemplatePaths(["test.njk", "test.js"]), ["test.js"]);
@@ -123,7 +118,7 @@ test("Get file paths (one image path)", async (t) => {
   await eleventyConfig.init();
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
-  mgr.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  mgr.extensionMap = new ExtensionMap(eleventyConfig);
 
   t.deepEqual(mgr.getNonTemplatePaths(["test.png"]), ["test.png"]);
 });
@@ -178,7 +173,7 @@ test("getAllNormalizedPaths", async (t) => {
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
   t.deepEqual(mgr.getAllNormalizedPaths(), [
-    { inputPath: "./img", outputPath: true, copyOptions: {} },
+    { inputPath: "./img", outputPath: true, isDynamicPattern: false, copyOptions: {} },
   ]);
 });
 
@@ -193,9 +188,9 @@ test("getAllNormalizedPaths with globs", async (t) => {
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
   t.deepEqual(mgr.getAllNormalizedPaths(), [
-    { inputPath: "./img", outputPath: true, copyOptions: {} },
-    { inputPath: "./img/**", outputPath: "", copyOptions: {} },
-    { inputPath: "./img/*.js", outputPath: "", copyOptions: {} },
+    { inputPath: "./img", outputPath: true, isDynamicPattern: false, copyOptions: {} },
+    { inputPath: "./img/**", outputPath: "", isDynamicPattern: true, copyOptions: {} },
+    { inputPath: "./img/*.js", outputPath: "", isDynamicPattern: true, copyOptions: {} },
   ]);
 });
 
@@ -239,7 +234,7 @@ test("Look for uniqueness on template passthrough paths #1677", async (t) => {
     message: `Multiple passthrough copy files are trying to write to the same output file (./test/stubs/template-passthrough-duplicates/_site/avatar.png). ./test/stubs/template-passthrough-duplicates/input/avatar.png and ./test/stubs/template-passthrough-duplicates/input/src/views/avatar.png`
   });
 
-  rimrafSync("test/stubs/template-passthrough-duplicates/_site/");
+  deleteDirectory("test/stubs/template-passthrough-duplicates/_site/");
 });
 
 test("Incremental passthrough, issue #3285", async (t) => {
@@ -248,8 +243,9 @@ test("Incremental passthrough, issue #3285", async (t) => {
   await eleventyConfig.init();
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
-  mgr.setIncrementalFile("./test/stubs-3285/src/scripts/hello-world.js");
+  mgr.setIncrementalFiles(["./test/stubs-3285/src/scripts/hello-world.js"]);
+
   t.deepEqual(mgr.getAllNormalizedPaths([]), [
-    { copyOptions: {}, inputPath: "./test/stubs-3285/src/scripts", outputPath: "scripts" },
+    { copyOptions: {}, inputPath: "./test/stubs-3285/src/scripts", outputPath: "scripts", isDynamicPattern: false },
   ]);
 });

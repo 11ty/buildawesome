@@ -4,7 +4,7 @@ import { renderToString } from "@vue/server-renderer";
 import * as sass from "sass";
 
 import TemplateRender from "../src/TemplateRender.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 
 import getNewTemplate from "./_getNewTemplateForTests.js";
 import { renderTemplate } from "./_getRenderedTemplates.js";
@@ -19,7 +19,7 @@ async function getNewTemplateRender(name, inputDir, eleventyConfig, extensionMap
 
 
   if (!extensionMap) {
-    extensionMap = new EleventyExtensionMap(eleventyConfig);
+    extensionMap = new ExtensionMap(eleventyConfig);
     extensionMap.setFormats([]);
   }
 
@@ -324,7 +324,7 @@ test.skip("Breaking Change (3.0): Two simple aliases to JavaScript Render", asyn
     }
   );
 
-  let map = new EleventyExtensionMap(eleventyConfig); // reuse this
+  let map = new ExtensionMap(eleventyConfig); // reuse this
   map.setFormats([]);
 
   let tr = await getNewTemplateRender("./test/stubs/string.11ty.custom", null, eleventyConfig, map);
@@ -363,7 +363,7 @@ test("Double override (one simple alias to custom) works fine", async (t) => {
     }
   );
 
-  let map = new EleventyExtensionMap(eleventyConfig); // reuse this
+  let map = new ExtensionMap(eleventyConfig); // reuse this
   // map.setFormats(["11ty.possum", "11ty.custom"]);
   map.setFormats(["customhtml"]);
 
@@ -393,7 +393,7 @@ test("Double override (two simple aliases)", async (t) => {
     }
   );
 
-  let map = new EleventyExtensionMap(eleventyConfig); // reuse this
+  let map = new ExtensionMap(eleventyConfig); // reuse this
   // map.setFormats(["11ty.possum", "11ty.custom"]);
   map.setFormats(["customhtml"]);
 
@@ -444,7 +444,7 @@ test("Double override (two complex aliases) is supported as of 3.0", async (t) =
     }
   );
 
-  let map = new EleventyExtensionMap(eleventyConfig); // reuse this
+  let map = new ExtensionMap(eleventyConfig); // reuse this
   map.setFormats(["possum", "11ty.custom"]);
 
   let tr = await getNewTemplateRender(

@@ -1,8 +1,13 @@
 docs
-docs-src
 test
 test_node
 coverage
 eslint.config.js
 .*
-packages/client/
+packages/*
+scripts
+tsconfig.json
+update-package-json.js
+# Files bundled for @11ty/client and @11ty/client/core-fs (saves ~6kB)
+# **/*.client.js
+# **/*.core.js

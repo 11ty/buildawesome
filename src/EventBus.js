@@ -1,8 +1,7 @@
-import debugUtil from "debug";
-
+import { createDebug } from "./Util/DebugLogUtil.js";
 import EventEmitter from "./Util/AsyncEventEmitter.js";
 
-const debug = debugUtil("Eleventy:EventBus");
+const debug = createDebug("EventBus");
 
 /**
  * @module 11ty/eleventy/EventBus

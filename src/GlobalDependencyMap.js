@@ -1,11 +1,11 @@
-import debugUtil from "debug";
 import { TemplatePath } from "@11ty/eleventy-utils";
 
+import { createDebug } from "./Util/DebugLogUtil.js";
 import JavaScriptDependencies from "./Util/JavaScriptDependencies.js";
 import PathNormalizer from "./Util/PathNormalizer.js";
 import { TemplateDepGraph } from "./Util/TemplateDepGraph.js";
 
-const debug = debugUtil("Eleventy:Dependencies");
+const debug = createDebug("Dependencies");
 
 class GlobalDependencyMap {
 	// dependency-graph requires these keys to be alphabetic strings
@@ -411,10 +411,12 @@ class GlobalDependencyMap {
 		return false;
 	}
 
-	isFileUsedBy(parent, child, includeLayouts) {
-		if (this.hasDependency(parent, child, includeLayouts)) {
-			// child is used by parent
-			return true;
+	areFilesUsedBy(parents, child, includeLayouts) {
+		for (let p of parents) {
+			if (this.hasDependency(p, child, includeLayouts)) {
+				// child is used by parent
+				return true;
+			}
 		}
 		return false;
 	}

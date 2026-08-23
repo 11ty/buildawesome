@@ -5,8 +5,7 @@ import test from "node:test";
 import fs from "node:fs";
 import assert from "node:assert";
 
-import Eleventy from "../../src/Eleventy.js";
-import { withResolvers } from "../../src/Util/PromiseUtil.js";
+import Eleventy from "../../src/Core.js";
 
 // This tests Eleventy Watch and the file system!
 
@@ -38,7 +37,7 @@ test(
 
 		let runs = comparisonStrings.map((str) => {
 			return {
-				...withResolvers(),
+				...Promise.withResolvers(),
 				input: getInputContent(str),
 				expected: getOutputContent(str),
 			};
@@ -57,7 +56,7 @@ test(
 		let elev = new Eleventy(ROOT_DIR, OUTPUT_DIR, {
 			configPath: ROOT_DIR + "eleventy.config.js",
 			config(eleventyConfig) {
-				eleventyConfig.on("eleventy.afterwatch", () => {
+				eleventyConfig.on("buildawesome.afterwatch", () => {
 					let { resolve } = runs[index];
 					index++;
 					resolve();

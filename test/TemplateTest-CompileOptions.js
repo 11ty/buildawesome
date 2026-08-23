@@ -1,7 +1,7 @@
 import test from "ava";
 
 import TemplateData from "../src/Data/TemplateData.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 
 import getNewTemplate from "./_getNewTemplateForTests.js";
 import { renderTemplate } from "./_getRenderedTemplates.js";
@@ -36,7 +36,7 @@ test("Custom extension (.txt) with custom permalink compile function", async (t)
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -78,7 +78,7 @@ test("Custom extension with and compileOptions.permalink = false", async (t) => 
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -120,7 +120,7 @@ test("Custom extension with and opt-out of permalink compilation", async (t) => 
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -170,7 +170,7 @@ test("Custom extension (.txt) with custom permalink compile function but no perm
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -218,7 +218,7 @@ test("Custom extension (.txt) with custom permalink compile function (that retur
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -266,7 +266,7 @@ test("Custom extension (.txt) with custom permalink compile function that return
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -307,7 +307,7 @@ test("Custom extension (.txt) that returns undefined from compile", async (t) =>
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(

@@ -1,9 +1,9 @@
-import { EleventyLoadContent } from "./Require.js";
+import { LoadContent } from "./Require.js";
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import/with#browser_compatibility
-import eleventyPackageJson from "../../package.json" with { type: "json" };
+import corePackageJson from "../../package.json" with { type: "json" };
 
 // We *could* prune everything but `name`, `version`, and `type` here but esbuild will still bundle the entire package.json
-export { eleventyPackageJson };
+export { corePackageJson };
 
 // noop
 export function clearRequireCache() {}
@@ -15,7 +15,7 @@ export function requireCommonJsTypeScript() {
 
 export function importJsonSync(path) {
 	// should not be a no-op
-	let rawInput = EleventyLoadContent(path);
+	let rawInput = LoadContent(path);
 	if (!rawInput) {
 		// should not error when file exists but is _empty_
 		return;

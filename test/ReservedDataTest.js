@@ -1,6 +1,6 @@
 import test from "ava";
 import ReservedData from "../src/Util/ReservedData.js";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 
 test("No reserved Keys", t => {
   t.deepEqual(ReservedData.getReservedKeys({ key: {} }).sort(), []);
@@ -29,57 +29,57 @@ test("`page` subkeys", t => {
 test("Eleventy freeze data set via config API throws error (page)", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
     configPath: "./test/stubs-virtual/eleventy.config.js",
-    config: eleventyConfig => {
-      eleventyConfig.addGlobalData("page", "lol no");
-      eleventyConfig.addTemplate("index.html", ``);
+    config: $config => {
+      $config.addGlobalData("page", "lol no");
+      $config.addTemplate("index.html", ``);
     }
   });
   elev.disableLogger();
 
   await t.throwsAsync(() => elev.toJSON(), {
-    message: 'You attempted to set one of Eleventy’s reserved data property names: page (source: ./test/stubs-virtual/eleventy.config.js). You can opt-out of this behavior with `eleventyConfig.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with Eleventy’s reserved property names (e.g. `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
+    message: 'You attempted to set one of Build Awesome’s reserved data property names: page (source: ./test/stubs-virtual/eleventy.config.js). You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
   });
 });
 
 test("Eleventy freeze data set via config API throws error (eleventy)", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
     configPath: "./test/stubs-virtual/eleventy.config.js",
-    config: eleventyConfig => {
-      eleventyConfig.addGlobalData("eleventy", "lol no");
-      eleventyConfig.addTemplate("index.html", ``);
+    config: $config => {
+      $config.addGlobalData("eleventy", "lol no");
+      $config.addTemplate("index.html", ``);
     }
   });
   elev.disableLogger();
 
   await t.throwsAsync(() => elev.toJSON(), {
-    message: 'You attempted to set one of Eleventy’s reserved data property names: eleventy (source: ./test/stubs-virtual/eleventy.config.js). You can opt-out of this behavior with `eleventyConfig.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with Eleventy’s reserved property names (e.g. `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
+    message: 'You attempted to set one of Build Awesome’s reserved data property names: eleventy (source: ./test/stubs-virtual/eleventy.config.js). You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
   });
 });
 
 test("Eleventy freeze data set global data file throws error (page)", async (t) => {
   let elev = new Eleventy({
     input: "./test/stubs-freeze/page/",
-    config: eleventyConfig => {
-      eleventyConfig.addTemplate("index.html", ``);
+    config: $config => {
+      $config.addTemplate("index.html", ``);
     }
   });
   elev.disableLogger();
 
   await t.throwsAsync(() => elev.toJSON(), {
-    message: 'You attempted to set one of Eleventy’s reserved data property names: page.url (source: ./test/stubs-freeze/page/_data/page.js). You can opt-out of this behavior with `eleventyConfig.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with Eleventy’s reserved property names (e.g. `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
+    message: 'You attempted to set one of Build Awesome’s reserved data property names: page.url (source: ./test/stubs-freeze/page/_data/page.js). You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
   });
 });
 
 test("Eleventy freeze data set global data file throws error (eleventy)", async (t) => {
   let elev = new Eleventy({
     input: "./test/stubs-freeze/eleventy/",
-    config: eleventyConfig => {
-      eleventyConfig.addTemplate("index.html", ``);
+    config: $config => {
+      $config.addTemplate("index.html", ``);
     }
   });
   elev.disableLogger();
 
   await t.throwsAsync(() => elev.toJSON(), {
-    message: 'You attempted to set one of Eleventy’s reserved data property names: eleventy (source: ./test/stubs-freeze/eleventy/_data/eleventy.js). You can opt-out of this behavior with `eleventyConfig.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with Eleventy’s reserved property names (e.g. `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
+    message: 'You attempted to set one of Build Awesome’s reserved data property names: eleventy (source: ./test/stubs-freeze/eleventy/_data/eleventy.js). You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
   });
 });

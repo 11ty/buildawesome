@@ -1,7 +1,7 @@
 import test from "ava";
 
 import { default as HtmlBasePlugin, applyBaseToUrl } from "../src/Plugins/HtmlBasePlugin.js";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 
 function getContentFor(results, filename) {
@@ -246,9 +246,9 @@ test("Using the filter directly", async (t) => {
 test("Using the HTML base plugin (default values)", async (t) => {
   let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin);
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin);
     },
   });
   await elev.initializeConfig();
@@ -286,9 +286,9 @@ test("Using the HTML base plugin with pathPrefix: /test/", async (t) => {
     pathPrefix: "/test/",
 
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin);
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin);
     },
   });
 
@@ -327,9 +327,9 @@ test("Using the HTML base plugin with pathPrefix: /test/ and base: http://exampl
     pathPrefix: "/test/",
 
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin, {
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin, {
         baseHref: "http://example.com/",
       });
     },
@@ -368,9 +368,9 @@ test("Using the HTML base plugin with pathPrefix: /test/ and base: http://exampl
 test("Using the HTML base plugin strips extra path in full URL base (default pathPrefix)", async (t) => {
   let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin, {
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin, {
         baseHref: "http://example.com/hello/", // extra path will be stripped
       });
     },
@@ -411,9 +411,9 @@ test("Using the HTML base plugin strips extra path in full URL base (pathPrefix:
     pathPrefix: "/test/",
 
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin, {
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin, {
         baseHref: "http://example.com/hello/", // extra path will be stripped
       });
     },
@@ -454,9 +454,9 @@ test("Opt out of the transform with falsy extensions list", async (t) => {
     pathPrefix: "/test/",
 
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin, {
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin, {
         extensions: false,
       });
     },
@@ -497,9 +497,9 @@ test("Base plugin with permalink: false, #2602", async (t) => {
     pathPrefix: "/test/",
 
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin);
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin);
     },
   });
 
@@ -537,9 +537,9 @@ test("Using the HTML base plugin with pathPrefix: /test/ and transformed attribu
     pathPrefix: "/test/",
 
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin);
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin);
     },
   });
 
@@ -576,14 +576,14 @@ test("HTML base plugin only adds once (unique)", async (t) => {
   t.plan(2);
   let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
     configPath: false,
-    config: function (eleventyConfig) {
+    config: function ($config) {
       // Runs before defaultConfig.js
-      t.is(eleventyConfig.plugins.length, 0);
-      eleventyConfig.addPlugin(HtmlBasePlugin);
-      eleventyConfig.addPlugin(HtmlBasePlugin);
-      eleventyConfig.addPlugin(HtmlBasePlugin);
-      eleventyConfig.addPlugin(HtmlBasePlugin);
-      t.is(eleventyConfig.plugins.length, 1);
+      t.is($config.plugins.length, 0);
+      $config.addPlugin(HtmlBasePlugin);
+      $config.addPlugin(HtmlBasePlugin);
+      $config.addPlugin(HtmlBasePlugin);
+      $config.addPlugin(HtmlBasePlugin);
+      t.is($config.plugins.length, 1);
     },
   });
   await elev.init();
@@ -593,21 +593,21 @@ test("HTML base plugin can resolve by name", async (t) => {
   t.plan(2);
   let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
     configPath: false,
-    config: async function (eleventyConfig) {
+    config: async function ($config) {
       // Runs before defaultConfig.js
-      t.is(eleventyConfig.plugins.length, 0);
+      t.is($config.plugins.length, 0);
 
-      let plugin = await eleventyConfig.resolvePlugin("@11ty/eleventy/html-base-plugin");
-      eleventyConfig.addPlugin(plugin);
+      let plugin = await $config.resolvePlugin("@11ty/eleventy/html-base-plugin");
+      $config.addPlugin(plugin);
 
       // does not add duplicate
-      eleventyConfig.addPlugin(plugin);
+      $config.addPlugin(plugin);
 
       // does not add duplicate even with a different reference
-      eleventyConfig.addPlugin(HtmlBasePlugin);
-      eleventyConfig.addPlugin(HtmlBasePlugin);
+      $config.addPlugin(HtmlBasePlugin);
+      $config.addPlugin(HtmlBasePlugin);
 
-      t.is(eleventyConfig.plugins.length, 1);
+      t.is($config.plugins.length, 1);
     },
   });
   await elev.init();
@@ -618,9 +618,9 @@ test("Using recognizeNoValueAttribute for boolean attributes without quotes #276
     input: "./test/stubs-virtual/",
     pathPrefix: "/prefixed/",
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addTemplate("index.njk", `---
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addTemplate("index.njk", `---
 permalink: /deep/
 ---
 <!doctype html>
@@ -632,7 +632,7 @@ permalink: /deep/
 <link rel="stylesheet" href="/test.css">
 </head>
 </html>`)
-      eleventyConfig.addPlugin(HtmlBasePlugin);
+      $config.addPlugin(HtmlBasePlugin);
     },
   });
 

@@ -1,10 +1,10 @@
 import test from "ava";
 
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 import TemplateData from "../src/Data/TemplateData.js";
 import Pagination from "../src/Plugins/Pagination.js";
 import FileSystemSearch from "../src/FileSystemSearch.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 import getNewTemplate from "./_getNewTemplateForTests.js";
 import { getRenderedTemplates as getRenderedTmpls, renderTemplate } from "./_getRenderedTemplates.js";
 import { getTemplateConfigInstance } from "./_testHelpers.js";
@@ -131,15 +131,15 @@ test("Paginate data in frontmatter", async (t) => {
 });
 
 test("Paginate external data file", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
+  let $config = await getTemplateConfigInstance({
     dir: {
       input: "test/stubs",
       output: "dist",
     }
   });
 
-  let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  let dataObj = new TemplateData($config);
+  dataObj.extensionMap = new ExtensionMap($config);
   dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
   await dataObj.getGlobalData();
@@ -150,7 +150,7 @@ test("Paginate external data file", async (t) => {
     "./dist",
     dataObj,
     null,
-    eleventyConfig
+    $config
   );
 
   let data = await tmpl.getData();
@@ -354,15 +354,15 @@ test("Template with Pagination", async (t) => {
 });
 
 test("Issue 135", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
+  let $config = await getTemplateConfigInstance({
     dir: {
       input: "test/stubs",
       output: "dist",
     }
   });
 
-  let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  let dataObj = new TemplateData($config);
+  dataObj.extensionMap = new ExtensionMap($config);
   dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
   await dataObj.getGlobalData();
@@ -373,7 +373,7 @@ test("Issue 135", async (t) => {
     "./dist",
     dataObj,
     null,
-    eleventyConfig
+    $config
   );
 
   let data = await tmpl.getData();
@@ -507,7 +507,7 @@ test("Page over an object (filtered, string)", async (t) => {
 });
 
 test("Pagination with deep data merge #147", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
+  let $config = await getTemplateConfigInstance({
     dir: {
       input: "test/stubs",
       output: "dist",
@@ -520,7 +520,7 @@ test("Pagination with deep data merge #147", async (t) => {
     "./dist",
     null,
     null,
-    eleventyConfig
+    $config
   );
   tmpl.config.keys.layout = "layout";
 
@@ -580,7 +580,7 @@ test("Paginate data in frontmatter (reversed)", async (t) => {
 });
 
 test("No circular dependency (does not throw)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance();
+  let $config = await getTemplateConfigInstance();
 
   new Pagination(
     null,
@@ -594,7 +594,7 @@ test("No circular dependency (does not throw)", async (t) => {
       },
       tags: ["tag2"],
     },
-    eleventyConfig
+    $config
   );
 
   t.true(true);
@@ -602,7 +602,7 @@ test("No circular dependency (does not throw)", async (t) => {
 
 test("Circular dependency (pagination iterates over tag1 but also supplies pages to tag1)", async (t) => {
   await t.throwsAsync(async () => {
-    let eleventyConfig = await getTemplateConfigInstance();
+    let $config = await getTemplateConfigInstance();
 
     new Pagination(
       null,
@@ -617,13 +617,13 @@ test("Circular dependency (pagination iterates over tag1 but also supplies pages
         },
         tags: ["tag1"],
       },
-      eleventyConfig
+      $config
     );
   });
 });
 
 test("Circular dependency but should not error because it uses eleventyExcludeFromCollections", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance();
+  let $config = await getTemplateConfigInstance();
 
   new Pagination(
     null,
@@ -639,7 +639,7 @@ test("Circular dependency but should not error because it uses eleventyExcludeFr
       },
       tags: ["tag1"],
     },
-    eleventyConfig
+    $config
   );
 
   t.true(true);
@@ -692,15 +692,15 @@ test("Pagination `before` Callback with `reverse: true` (test order of operation
 });
 
 test("Pagination new v0.10.0 href/hrefs", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
+  let $config = await getTemplateConfigInstance({
     dir: {
       input: "test/stubs",
       output: "dist",
     }
   });
 
-  let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  let dataObj = new TemplateData($config);
+  dataObj.extensionMap = new ExtensionMap($config);
   dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
   await dataObj.getGlobalData();
@@ -711,7 +711,7 @@ test("Pagination new v0.10.0 href/hrefs", async (t) => {
     "./dist",
     dataObj,
     null,
-    eleventyConfig
+    $config
   );
 
   let data = await tmpl.getData();
@@ -730,15 +730,15 @@ test("Pagination new v0.10.0 href/hrefs", async (t) => {
 });
 
 test("Pagination new v0.10.0 page/pages", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
+  let $config = await getTemplateConfigInstance({
     dir: {
       input: "test/stubs",
       output: "dist",
     }
   });
 
-  let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  let dataObj = new TemplateData($config);
+  dataObj.extensionMap = new ExtensionMap($config);
   dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
   await dataObj.getGlobalData();
@@ -749,7 +749,7 @@ test("Pagination new v0.10.0 page/pages", async (t) => {
     "./dist",
     dataObj,
     null,
-    eleventyConfig
+    $config
   );
 
   let data = await tmpl.getData();
@@ -796,15 +796,15 @@ test("Pagination make sure pageNumber is numeric for {{ pageNumber + 1 }} Issue 
 });
 
 test("Pagination mutable global data", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
+  let $config = await getTemplateConfigInstance({
     dir: {
       input: "test/stubs/paged-global-data-mutable/",
       output: "dist",
     }
   });
 
-  let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  let dataObj = new TemplateData($config);
+  dataObj.extensionMap = new ExtensionMap($config);
   dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
   await dataObj.getGlobalData();
@@ -815,7 +815,7 @@ test("Pagination mutable global data", async (t) => {
     "./dist",
     dataObj,
     null,
-    eleventyConfig
+    $config
   );
 
   let data = await tmpl.getData();
@@ -840,15 +840,15 @@ test("Pagination mutable global data", async (t) => {
 });
 
 test("Pagination template/dir data files run once, Issue 919", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
+  let $config = await getTemplateConfigInstance({
     dir: {
       input: "test/stubs-919",
       output: "dist",
     }
   });
 
-  let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  let dataObj = new TemplateData($config);
+  dataObj.extensionMap = new ExtensionMap($config);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -857,7 +857,7 @@ test("Pagination template/dir data files run once, Issue 919", async (t) => {
     "./dist",
     dataObj,
     null,
-    eleventyConfig
+    $config
   );
 
   let data = await tmpl.getData();

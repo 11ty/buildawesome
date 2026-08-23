@@ -1,11 +1,11 @@
 import test from "ava";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 
 test("#434 Using `with context` to access collections", async (t) => {
 	let elev = new Eleventy("test/noop", false, {
-		config(eleventyConfig) {
-			eleventyConfig.setIncludesDirectory("../stubs-434/_includes/");
-			eleventyConfig.addTemplate("index.njk", `{% import "macros.njk" as forms with context %}{{ forms.label('test') }}`);
+		config($config) {
+			$config.setIncludesDirectory("../stubs-434/_includes/");
+			$config.addTemplate("index.njk", `{% import "macros.njk" as forms with context %}{{ forms.label('test') }}`);
 		}
 	});
 
@@ -16,17 +16,17 @@ test("#434 Using `with context` to access collections", async (t) => {
 
 test("#434 (not ideal) Filters in macros cannot access global data", async (t) => {
 	let elev = new Eleventy("test/noop", false, {
-		config(eleventyConfig) {
-			eleventyConfig.setIncludesDirectory("../stubs-434/_includes/");
+		config($config) {
+			$config.setIncludesDirectory("../stubs-434/_includes/");
 
       // This doesn’t work to fetch collections from macros
-			eleventyConfig.addFilter("getCollection", function(name) {
+			$config.addFilter("getCollection", function(name) {
 				return this.collections?.[name] ||
 					this.ctx?.collections?.[name] ||
 					this.context?.environments?.collections?.[name];
 			});
 
-			eleventyConfig.addTemplate("index.njk", `{% import "macros-filter.njk" as forms %}{{ forms.label('test') }}`);
+			$config.addTemplate("index.njk", `{% import "macros-filter.njk" as forms %}{{ forms.label('test') }}`);
 		}
 	});
 

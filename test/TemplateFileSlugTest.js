@@ -1,7 +1,7 @@
 import test from "ava";
 
 import TemplateFileSlug from "../src/TemplateFileSlug.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 
 import { getTemplateConfigInstance } from "./_testHelpers.js";
 
@@ -12,7 +12,7 @@ async function getNewSlugInstance(path, inputDir) {
     }
   });
 
-  let extensionMap = new EleventyExtensionMap(eleventyConfig);
+  let extensionMap = new ExtensionMap(eleventyConfig);
   extensionMap.setFormats([]);
   let fs = new TemplateFileSlug(path, extensionMap, eleventyConfig);
   return fs;

@@ -1,13 +1,13 @@
 export default function (config) {
 	config.addFilter("url", () => {
 		throw new Error(
-			"The `url` filter is not included with the `@11ty/client` bundle. Use the `@11ty/client/eleventy` bundle.",
+			"The `url` filter is not included with the `@11ty/client` bundle. Use the `@11ty/client/core-fs` bundle.",
 		);
 	});
 
 	config.addFilter("inputPathToUrl", () => {
 		throw new Error(
-			"The `inputPathToUrl` filter is not included with the `@11ty/client` bundle. Use the larger `@11ty/client/eleventy` bundle.",
+			"The `inputPathToUrl` filter is not included with the `@11ty/client` bundle. Use the larger `@11ty/client/core-fs` bundle.",
 		);
 	});
 

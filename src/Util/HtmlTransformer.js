@@ -12,11 +12,17 @@ export class HtmlTransformer {
 
 	constructor() {
 		// execution order is important (not order of addition/object key order)
+		/** @type {object} */
 		this.callbacks = {};
+
+		/** @type {object} */
 		this.posthtmlProcessOptions = {
+			xmlMode: false,
 			recognizeNoValueAttribute: true,
 			closingSingleTag: "closeAs",
 		};
+
+		/** @type {object} */
 		this.plugins = {};
 	}
 

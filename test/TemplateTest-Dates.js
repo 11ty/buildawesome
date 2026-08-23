@@ -10,7 +10,7 @@ async function getRenderedData(tmpl, pageNumber = 0) {
 test("getMappedDate (empty, assume created)", async (t) => {
   let tmpl = await getNewTemplate("./test/stubs/dates/file1.md", "./test/stubs/", "./dist");
   let data = await getRenderedData(tmpl);
-  let date = await tmpl.getMappedDate(data);
+  let date = await tmpl.getMappedDate(data.date, data.page);
 
   t.true(date instanceof Date);
   t.truthy(date.getTime());
@@ -19,7 +19,7 @@ test("getMappedDate (empty, assume created)", async (t) => {
 test("getMappedDate (explicit date, yaml String)", async (t) => {
   let tmpl = await getNewTemplate("./test/stubs/dates/file2.md", "./test/stubs/", "./dist");
   let data = await getRenderedData(tmpl);
-  let date = await tmpl.getMappedDate(data);
+  let date = await tmpl.getMappedDate(data.date, data.page);
 
   t.true(date instanceof Date);
   t.truthy(date.getTime());
@@ -29,7 +29,7 @@ test("getMappedDate (explicit date, yaml String)", async (t) => {
 test("getMappedDate (explicit date, yaml Date)", async (t) => {
   let tmpl = await getNewTemplate("./test/stubs/dates/file2b.md", "./test/stubs/", "./dist");
   let data = await getRenderedData(tmpl);
-  let date = await tmpl.getMappedDate(data);
+  let date = await tmpl.getMappedDate(data.date, data.page);
 
   t.true(date instanceof Date);
   t.truthy(date.getTime());
@@ -39,11 +39,11 @@ test("getMappedDate (explicit date, yaml Date)", async (t) => {
 test("getMappedDate (explicit date, yaml Date and string should be the same)", async (t) => {
   let tmplA = await getNewTemplate("./test/stubs/dates/file2.md", "./test/stubs/", "./dist");
   let dataA = await getRenderedData(tmplA);
-  let stringDate = await tmplA.getMappedDate(dataA);
+  let stringDate = await tmplA.getMappedDate(dataA.date, dataA.page);
 
   let tmplB = await getNewTemplate("./test/stubs/dates/file2b.md", "./test/stubs/", "./dist");
   let dataB = await getRenderedData(tmplB);
-  let yamlDate = await tmplB.getMappedDate(dataB);
+  let yamlDate = await tmplB.getMappedDate(dataB.date, dataB.page);
 
   t.truthy(stringDate);
   t.truthy(yamlDate);
@@ -53,7 +53,7 @@ test("getMappedDate (explicit date, yaml Date and string should be the same)", a
 test("getMappedDate (modified date)", async (t) => {
   let tmpl = await getNewTemplate("./test/stubs/dates/file3.md", "./test/stubs/", "./dist");
   let data = await getRenderedData(tmpl);
-  let date = await tmpl.getMappedDate(data);
+  let date = await tmpl.getMappedDate(data.date, data.page);
 
   t.true(date instanceof Date);
   t.truthy(date.getTime());
@@ -62,7 +62,7 @@ test("getMappedDate (modified date)", async (t) => {
 test("getMappedDate (created date)", async (t) => {
   let tmpl = await getNewTemplate("./test/stubs/dates/file4.md", "./test/stubs/", "./dist");
   let data = await getRenderedData(tmpl);
-  let date = await tmpl.getMappedDate(data);
+  let date = await tmpl.getMappedDate(data.date, data.page);
 
   t.true(date instanceof Date);
   t.truthy(date.getTime());
@@ -75,7 +75,7 @@ test("getMappedDate (falls back to filename date)", async (t) => {
     "./dist"
   );
   let data = await getRenderedData(tmpl);
-  let date = await tmpl.getMappedDate(data);
+  let date = await tmpl.getMappedDate(data.date, data.page);
 
   t.true(date instanceof Date);
   t.truthy(date.getTime());
@@ -89,7 +89,7 @@ test("getMappedDate (found multiple dates, picks first)", async (t) => {
     "./dist"
   );
   let data = await getRenderedData(tmpl);
-  let date = await tmpl.getMappedDate(data);
+  let date = await tmpl.getMappedDate(data.date, data.page);
 
   t.true(date instanceof Date);
   t.truthy(date.getTime());

@@ -1,9 +1,9 @@
 import test from "ava";
 import { Liquid, Drop } from "liquidjs";
 
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 import TemplateRender from "../src/TemplateRender.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 
 import { getTemplateConfigInstance } from "./_testHelpers.js";
 import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
@@ -16,7 +16,7 @@ async function getNewTemplateRender(name, inputDir, userConfig = {}) {
 	}, null, userConfig);
 
   let tr = new TemplateRender(name, eleventyConfig);
-  tr.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  tr.extensionMap = new ExtensionMap(eleventyConfig);
   tr.extensionMap.engineManager = new TemplateEngineManager(eleventyConfig);
   tr.extensionMap.setFormats([]);
   await tr.init();
@@ -1047,12 +1047,12 @@ test("Liquid Parse for Symbols", async (t) => {
 
 test("Eleventy shortcode uses new built-in Liquid argument parsing behavior (spaces)", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
-    config: eleventyConfig => {
-      eleventyConfig.setLiquidParameterParsing("builtin");
-      eleventyConfig.addShortcode("test", (...args) => {
+    config: $config => {
+      $config.setLiquidParameterParsing("builtin");
+      $config.addShortcode("test", (...args) => {
         return JSON.stringify(args);
       })
-      eleventyConfig.addTemplate("index.liquid", `{% test abc def %}`, {
+      $config.addTemplate("index.liquid", `{% test abc def %}`, {
         abc: 123,
         def: 456
       });
@@ -1066,12 +1066,12 @@ test("Eleventy shortcode uses new built-in Liquid argument parsing behavior (spa
 
 test("Eleventy shortcode uses new built-in Liquid argument parsing behavior (commas)", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
-    config: eleventyConfig => {
-      eleventyConfig.setLiquidParameterParsing("builtin");
-      eleventyConfig.addShortcode("test", (...args) => {
+    config: $config => {
+      $config.setLiquidParameterParsing("builtin");
+      $config.addShortcode("test", (...args) => {
         return JSON.stringify(args);
       })
-      eleventyConfig.addTemplate("index.liquid", `{% test abc, def %}`, {
+      $config.addTemplate("index.liquid", `{% test abc, def %}`, {
         abc: 123,
         def: 456
       });
@@ -1085,12 +1085,12 @@ test("Eleventy shortcode uses new built-in Liquid argument parsing behavior (com
 
 test("Eleventy shortcode uses new built-in Liquid argument parsing behavior (commas, no spaces)", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
-    config: eleventyConfig => {
-      eleventyConfig.setLiquidParameterParsing("builtin");
-      eleventyConfig.addShortcode("test", (...args) => {
+    config: $config => {
+      $config.setLiquidParameterParsing("builtin");
+      $config.addShortcode("test", (...args) => {
         return JSON.stringify(args);
       })
-      eleventyConfig.addTemplate("index.liquid", `{% test abc,def %}`, {
+      $config.addTemplate("index.liquid", `{% test abc,def %}`, {
         abc: 123,
         def: 456
       });
@@ -1104,12 +1104,12 @@ test("Eleventy shortcode uses new built-in Liquid argument parsing behavior (com
 
 test("Eleventy paired shortcode uses new built-in Liquid argument parsing behavior (spaces)", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
-    config: eleventyConfig => {
-      eleventyConfig.setLiquidParameterParsing("builtin");
-      eleventyConfig.addPairedShortcode("test", (...args) => {
+    config: $config => {
+      $config.setLiquidParameterParsing("builtin");
+      $config.addPairedShortcode("test", (...args) => {
         return JSON.stringify(args);
       })
-      eleventyConfig.addTemplate("index.liquid", `{% test abc def %}hi{% endtest %}`, {
+      $config.addTemplate("index.liquid", `{% test abc def %}hi{% endtest %}`, {
         abc: 123,
         def: 456
       });
@@ -1123,12 +1123,12 @@ test("Eleventy paired shortcode uses new built-in Liquid argument parsing behavi
 
 test("Eleventy paired shortcode uses new built-in Liquid argument parsing behavior (commas)", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
-    config: eleventyConfig => {
-      eleventyConfig.setLiquidParameterParsing("builtin");
-      eleventyConfig.addPairedShortcode("test", (...args) => {
+    config: $config => {
+      $config.setLiquidParameterParsing("builtin");
+      $config.addPairedShortcode("test", (...args) => {
         return JSON.stringify(args);
       })
-      eleventyConfig.addTemplate("index.liquid", `{% test abc, def %}hi{% endtest %}`, {
+      $config.addTemplate("index.liquid", `{% test abc, def %}hi{% endtest %}`, {
         abc: 123,
         def: 456
       });
@@ -1142,12 +1142,12 @@ test("Eleventy paired shortcode uses new built-in Liquid argument parsing behavi
 
 test("Eleventy paired shortcode uses new built-in Liquid argument parsing behavior (commas, no spaces)", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
-    config: eleventyConfig => {
-      eleventyConfig.setLiquidParameterParsing("builtin");
-      eleventyConfig.addPairedShortcode("test", (...args) => {
+    config: $config => {
+      $config.setLiquidParameterParsing("builtin");
+      $config.addPairedShortcode("test", (...args) => {
         return JSON.stringify(args);
       })
-      eleventyConfig.addTemplate("index.liquid", `{% test abc,def %}hi{% endtest %}`, {
+      $config.addTemplate("index.liquid", `{% test abc,def %}hi{% endtest %}`, {
         abc: 123,
         def: 456
       });
@@ -1161,8 +1161,8 @@ test("Eleventy paired shortcode uses new built-in Liquid argument parsing behavi
 
 test("jsTruthy default changed, breaking in v4 #3507", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
-    config: eleventyConfig => {
-      eleventyConfig.addTemplate("index.liquid", `{% if emptyString %}notempty{% endif %}-{% if zero %}notzero{% endif %}-{% if not emptyString %}empty{% endif %}-{% if not zero %}zero{% endif %}`, {
+    config: $config => {
+      $config.addTemplate("index.liquid", `{% if emptyString %}notempty{% endif %}-{% if zero %}notzero{% endif %}-{% if not emptyString %}empty{% endif %}-{% if not zero %}zero{% endif %}`, {
         emptyString: "",
         zero: 0
       });
@@ -1175,8 +1175,8 @@ test("jsTruthy default changed, breaking in v4 #3507", async (t) => {
 
 test("Use globals for page/eleventy/collections for use inside {% render %} #1541", async (t) => {
   let elev = new Eleventy("./test/stubs/stubs-1541/", undefined, {
-    config: eleventyConfig => {
-      eleventyConfig.addTemplate("index.liquid", `{% render "render-source.liquid" %}`);
+    config: $config => {
+      $config.addTemplate("index.liquid", `{% render "render-source.liquid" %}`);
     }
   });
 

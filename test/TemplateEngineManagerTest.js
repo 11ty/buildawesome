@@ -1,7 +1,7 @@
 import test from "ava";
 
 import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 import TemplateConfig from "../src/TemplateConfig.js";
 
 test("Unsupported engine", async (t) => {
@@ -34,7 +34,7 @@ test("Supported custom engine", async (t) => {
   });
   await eleventyConfig.init();
 
-  let extensionMap = new EleventyExtensionMap(eleventyConfig);
+  let extensionMap = new ExtensionMap(eleventyConfig);
 
   let tem = new TemplateEngineManager(eleventyConfig);
 
@@ -62,7 +62,7 @@ test("Custom engine with custom init", async (t) => {
   });
   await eleventyConfig.init();
 
-  let extensionMap = new EleventyExtensionMap(eleventyConfig);
+  let extensionMap = new ExtensionMap(eleventyConfig);
 
   // let config = eleventyConfig.getConfig();
   let tem = new TemplateEngineManager(eleventyConfig);
@@ -85,7 +85,7 @@ test("Custom engine with custom init", async (t) => {
 test("getEngineLib", async (t) => {
   let eleventyConfig = new TemplateConfig();
   await eleventyConfig.init();
-  let extensionMap = new EleventyExtensionMap(eleventyConfig);
+  let extensionMap = new ExtensionMap(eleventyConfig);
 
   let tem = new TemplateEngineManager(eleventyConfig);
   let engine = await tem.getEngine("md", extensionMap);

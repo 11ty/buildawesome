@@ -2,7 +2,7 @@ import test from "ava";
 import md from "markdown-it";
 
 import TemplateRender from "../src/TemplateRender.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
 
 import { getTemplateConfigInstance } from "./_testHelpers.js";
@@ -11,7 +11,7 @@ async function getNewTemplateRender(name, inputDir) {
   let eleventyConfig = await getTemplateConfigInstance();
 
   let tr = new TemplateRender(name, eleventyConfig);
-  tr.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  tr.extensionMap = new ExtensionMap(eleventyConfig);
   tr.extensionMap.engineManager = new TemplateEngineManager(eleventyConfig);
   tr.extensionMap.setFormats([]);
   await tr.init();

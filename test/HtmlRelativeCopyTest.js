@@ -1,25 +1,36 @@
 import test from "ava";
 import fs from "node:fs";
-import { rimrafSync } from "rimraf";
 import { TemplatePath } from "@11ty/eleventy-utils";
+import { globSync } from "tinyglobby";
 
 import { TransformPlugin as InputPathToUrlTransformPlugin } from "../src/Plugins/InputPathToUrl.js";
 import { default as HtmlBasePlugin } from "../src/Plugins/HtmlBasePlugin.js";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
+import { deleteDirectory } from "./_testHelpers.js";
 
-test.afterEach.always("Directory cleanup", () => {
-  rimrafSync("test/stubs-autocopy/_site*", { glob: true });
+test.after.always("Directory cleanup", () => {
+  let dirs = globSync("./test/stubs-autocopy/_site*", {
+    onlyDirectories: true,
+    expandDirectories: false,
+  });
+
+	for(let dir of dirs) {
+		deleteDirectory(dir);
+	}
 })
 
-test.serial("Basic usage", async (t) => {
+test("Basic usage", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site-basica", {
 		configPath: false,
-		config: function (eleventyConfig) {
-			eleventyConfig.addPassthroughCopy("**/*.png", {
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
+			$config.addPassthroughCopy("**/*.png", {
 				mode: "html-relative"
 			})
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, {
 					map: {
 						"/test/possum.png": TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.png")
@@ -27,7 +38,7 @@ test.serial("Basic usage", async (t) => {
 				})
 			});
 
-			eleventyConfig.addTemplate("test.njk", `<img src="possum.png">`)
+			$config.addTemplate("test.njk", `<img src="possum.png">`)
 		},
 	});
 
@@ -57,15 +68,18 @@ test.serial("Basic usage", async (t) => {
 	t.is(fs.existsSync("test/stubs-autocopy/_site-basica/test/index.html"), true);
 });
 
-test.serial("More complex image path (parent dir)", async (t) => {
+test("More complex image path (parent dir)", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site-basicb", {
 		configPath: false,
-		config: function (eleventyConfig) {
-			eleventyConfig.addPassthroughCopy("**/*.png", {
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
+			$config.addPassthroughCopy("**/*.png", {
 				mode: "html-relative"
 			})
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, {
 					map: {
 						"/stubs-img-transform/possum.png": TemplatePath.normalizeOperatingSystemFilePath("test/stubs-img-transform/possum.png")
@@ -73,7 +87,7 @@ test.serial("More complex image path (parent dir)", async (t) => {
 				})
 			});
 
-			eleventyConfig.addTemplate("test.njk", `<img src="../stubs-img-transform/possum.png">`)
+			$config.addTemplate("test.njk", `<img src="../stubs-img-transform/possum.png">`)
 		},
 	});
 
@@ -104,19 +118,22 @@ test.serial("More complex image path (parent dir)", async (t) => {
 	t.is(fs.existsSync("test/stubs-autocopy/_site-basicb/test/index.html"), true);
 });
 
-test.serial("No matches", async (t) => {
+test("No matches", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site2", {
 		configPath: false,
-		config: function (eleventyConfig) {
-			eleventyConfig.addPassthroughCopy("**/*.jpeg", {
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
+			$config.addPassthroughCopy("**/*.jpeg", {
 				mode: "html-relative"
 			})
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, { map: {} })
 			});
 
-			eleventyConfig.addTemplate("test.njk", `<img src="lol.lol">`)
+			$config.addTemplate("test.njk", `<img src="lol.lol">`)
 		},
 	});
 
@@ -131,19 +148,19 @@ test.serial("No matches", async (t) => {
 	t.is(fs.existsSync("test/stubs-autocopy/_site2/test/index.html"), true);
 });
 
-test.serial("Match but does not exist (throws error)", async (t) => {
+test("Match but does not exist (throws error)", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site3", {
 		configPath: false,
-		config: function (eleventyConfig) {
-			eleventyConfig.addPassthroughCopy("**/*.png", {
+		config: function ($config) {
+			$config.addPassthroughCopy("**/*.png", {
 				mode: "html-relative"
 			});
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, { map: {} })
 			});
 
-			eleventyConfig.addTemplate("test.njk", `<img src="missing.png">`)
+			$config.addTemplate("test.njk", `<img src="missing.png">`)
 		},
 	});
 
@@ -158,20 +175,23 @@ test.serial("Match but does not exist (throws error)", async (t) => {
 	t.is(fs.existsSync("test/stubs-autocopy/_site3/test/index.html"), false);
 });
 
-test.serial("Match but does not exist (no error, using `failOnError: false`)", async (t) => {
+test("Match but does not exist (no error, using `failOnError: false`)", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site4", {
 		configPath: false,
-		config: function (eleventyConfig) {
-			eleventyConfig.addPassthroughCopy("**/*.png", {
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
+			$config.addPassthroughCopy("**/*.png", {
 				mode: "html-relative",
 				failOnError: false,
 			})
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, { map: {} })
 			});
 
-			eleventyConfig.addTemplate("test.njk", `<img src="missing.png">`)
+			$config.addTemplate("test.njk", `<img src="missing.png">`)
 		},
 	});
 
@@ -186,23 +206,26 @@ test.serial("Match but does not exist (no error, using `failOnError: false`)", a
 	t.is(fs.existsSync("test/stubs-autocopy/_site4/test/index.html"), true);
 });
 
-test.serial("Copying dotfiles are not allowed", async (t) => {
+test("Copying dotfiles are not allowed", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site5", {
 		configPath: false,
-		config: function (eleventyConfig) {
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
 			// WARNING: don’t do this
-			eleventyConfig.addPassthroughCopy("**/*", {
+			$config.addPassthroughCopy("**/*", {
 				mode: "html-relative",
 				copyOptions: {
 					// debug: true,
 				}
 			});
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, { map: {} })
 			});
 
-			eleventyConfig.addTemplate("test.njk", `<img src=".gitkeep">`)
+			$config.addTemplate("test.njk", `<img src=".gitkeep">`)
 		},
 	});
 
@@ -219,23 +242,26 @@ test.serial("Copying dotfiles are not allowed", async (t) => {
 	t.is(fs.existsSync("test/stubs-autocopy/_site5/test/index.html"), true);
 });
 
-test.serial("Using with InputPathToUrl plugin", async (t) => {
+test("Using with InputPathToUrl plugin", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site6", {
 		configPath: false,
-		config: function (eleventyConfig) {
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
 			// order of addPlugin shouldn’t matter here
-			eleventyConfig.addPassthroughCopy("**/*.{html,njk}", {
+			$config.addPassthroughCopy("**/*.{html,njk}", {
 				mode: "html-relative"
 			});
 
-			eleventyConfig.addPlugin(InputPathToUrlTransformPlugin);
+			$config.addPlugin(InputPathToUrlTransformPlugin);
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, { map: {} })
 			});
 
-			eleventyConfig.addTemplate("test1.njk", `Test 1`)
-			eleventyConfig.addTemplate("test2.njk", `<a href="test1.njk">Test 2</a>`)
+			$config.addTemplate("test1.njk", `Test 1`)
+			$config.addTemplate("test2.njk", `<a href="test1.njk">Test 2</a>`)
 		},
 	});
 
@@ -252,23 +278,26 @@ test.serial("Using with InputPathToUrl plugin", async (t) => {
 	t.is(fs.existsSync("test/stubs-autocopy/_site6/test2/index.html"), true);
 });
 
-test.serial("Using with InputPathToUrl plugin (reverse addPlugin order)", async (t) => {
+test("Using with InputPathToUrl plugin (reverse addPlugin order)", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site7", {
 		configPath: false,
-		config: function (eleventyConfig) {
-			// order of addPlugin shouldn’t matter here
-			eleventyConfig.addPlugin(InputPathToUrlTransformPlugin);
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
 
-			eleventyConfig.addPassthroughCopy("**/*.{html,njk}", {
+			// order of addPlugin shouldn’t matter here
+			$config.addPlugin(InputPathToUrlTransformPlugin);
+
+			$config.addPassthroughCopy("**/*.{html,njk}", {
 				mode: "html-relative"
 			});
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, { map: {} })
 			});
 
-			eleventyConfig.addTemplate("test1.njk", `Test 1`)
-			eleventyConfig.addTemplate("test2.njk", `<a href="test1.njk">Test 2</a>`)
+			$config.addTemplate("test1.njk", `Test 1`)
+			$config.addTemplate("test2.njk", `<a href="test1.njk">Test 2</a>`)
 		},
 	});
 
@@ -284,17 +313,20 @@ test.serial("Using with InputPathToUrl plugin (reverse addPlugin order)", async 
 	t.is(fs.existsSync("test/stubs-autocopy/_site7/test2/index.html"), true);
 });
 
-test.serial("Use with HtmlBasePlugin usage", async (t) => {
+test("Use with HtmlBasePlugin usage", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site8a", {
 		configPath: false,
 		pathPrefix: "yolo",
-		config: function (eleventyConfig) {
-			eleventyConfig.addPlugin(HtmlBasePlugin);
-			eleventyConfig.addPassthroughCopy("**/*.png", {
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
+			$config.addPlugin(HtmlBasePlugin);
+			$config.addPassthroughCopy("**/*.png", {
 				mode: "html-relative"
 			});
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, {
 					map: {
 						"/test/possum.png": TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.png")
@@ -302,7 +334,7 @@ test.serial("Use with HtmlBasePlugin usage", async (t) => {
 				})
 			});
 
-			eleventyConfig.addTemplate("test.njk", `<img src="possum.png"><img src="/test/possum.png">`)
+			$config.addTemplate("test.njk", `<img src="possum.png"><img src="/test/possum.png">`)
 		},
 	});
 
@@ -332,25 +364,28 @@ test.serial("Use with HtmlBasePlugin usage", async (t) => {
 	t.is(fs.existsSync("test/stubs-autocopy/_site8a/test/index.html"), true);
 });
 
-test.serial("Using with InputPathToUrl plugin and HtmlBasePlugin", async (t) => {
+test("Using with InputPathToUrl plugin and HtmlBasePlugin", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site8b", {
 		configPath: false,
 		pathPrefix: "yolo",
-		config: function (eleventyConfig) {
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
 			// order of addPlugin shouldn’t matter here
-			eleventyConfig.addPassthroughCopy("**/*.{html,njk}", {
+			$config.addPassthroughCopy("**/*.{html,njk}", {
 				mode: "html-relative"
 			});
 
-			eleventyConfig.addPlugin(InputPathToUrlTransformPlugin);
-			eleventyConfig.addPlugin(HtmlBasePlugin);
+			$config.addPlugin(InputPathToUrlTransformPlugin);
+			$config.addPlugin(HtmlBasePlugin);
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, { map: {} })
 			});
 
-			eleventyConfig.addTemplate("test1.njk", `Test 1`)
-			eleventyConfig.addTemplate("test2.njk", `<a href="test1.njk">Test 2</a>`)
+			$config.addTemplate("test1.njk", `Test 1`)
+			$config.addTemplate("test2.njk", `<a href="test1.njk">Test 2</a>`)
 		},
 	});
 
@@ -367,18 +402,21 @@ test.serial("Using with InputPathToUrl plugin and HtmlBasePlugin", async (t) => 
 	t.is(fs.existsSync("test/stubs-autocopy/_site8b/test2/index.html"), true);
 });
 
-test.serial("Multiple addPlugin calls (use both globs)", async (t) => {
+test("Multiple addPlugin calls (use both globs)", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site9", {
 		configPath: false,
-		config: function (eleventyConfig) {
-			eleventyConfig.addPassthroughCopy("**/*.jpg", {
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
+			$config.addPassthroughCopy("**/*.jpg", {
 				mode: "html-relative"
 			});
-			eleventyConfig.addPassthroughCopy("**/*.png", {
+			$config.addPassthroughCopy("**/*.png", {
 				mode: "html-relative"
 			});
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, {
 					map: {
 						"/test/possum.jpg": TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.jpg"),
@@ -387,7 +425,7 @@ test.serial("Multiple addPlugin calls (use both globs)", async (t) => {
 				})
 			});
 
-			eleventyConfig.addTemplate("test.njk", `<img src="possum.png"><img src="possum.jpg">`)
+			$config.addTemplate("test.njk", `<img src="possum.png"><img src="possum.jpg">`)
 		},
 	});
 
@@ -424,15 +462,18 @@ test.serial("Multiple addPlugin calls (use both globs)", async (t) => {
 	t.is(fs.existsSync("test/stubs-autocopy/_site9/test/index.html"), true);
 });
 
-test.serial("Array of globs", async (t) => {
+test("Array of globs", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site10", {
 		configPath: false,
-		config: function (eleventyConfig) {
-			eleventyConfig.addPassthroughCopy(["**/*.jpg", "**/*.png"], {
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
+			$config.addPassthroughCopy(["**/*.jpg", "**/*.png"], {
 				mode: "html-relative"
 			});
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, {
 					map: {
 						"/test/possum.jpg": TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.jpg"),
@@ -441,7 +482,7 @@ test.serial("Array of globs", async (t) => {
 				})
 			});
 
-			eleventyConfig.addTemplate("test.njk", `<img src="possum.png"><img src="possum.jpg">`)
+			$config.addTemplate("test.njk", `<img src="possum.png"><img src="possum.jpg">`)
 		},
 	});
 
@@ -478,27 +519,30 @@ test.serial("Array of globs", async (t) => {
 	t.is(fs.existsSync("test/stubs-autocopy/_site10/test/index.html"), true);
 });
 
-test.serial("overwrite: false", async (t) => {
+test("overwrite: false", async (t) => {
 	fs.mkdirSync("./test/stubs-autocopy/_site11/test/", { recursive: true })
 	fs.copyFileSync("./test/stubs-autocopy/possum.png", "./test/stubs-autocopy/_site11/test/possum.png");
 
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site11", {
 		configPath: false,
-		config: function (eleventyConfig) {
-			eleventyConfig.addPassthroughCopy("**/*.png", {
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
+			$config.addPassthroughCopy("**/*.png", {
 				mode: "html-relative",
 				copyOptions: {
 					overwrite: false,
 				}
 			});
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, {
 					map: {}
 				})
 			});
 
-			eleventyConfig.addTemplate("test.njk", `<img src="possum.png">`)
+			$config.addTemplate("test.njk", `<img src="possum.png">`)
 		},
 	});
 
@@ -526,20 +570,23 @@ test.serial("overwrite: false", async (t) => {
 	t.is(fs.existsSync("test/stubs-autocopy/_site11/test/index.html"), true);
 });
 
-test.serial("Input -> output remapping not yet supported (throws error)", async (t) => {
+test("Input -> output remapping not yet supported (throws error)", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site12", {
 		configPath: false,
-		config: function (eleventyConfig) {
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
 			// not yet supported
-			eleventyConfig.addPassthroughCopy({"**/*.png": "yo"}, {
+			$config.addPassthroughCopy({"**/*.png": "yo"}, {
 				mode: "html-relative"
 			});
 
-			eleventyConfig.on("eleventy.passthrough", copyMap => {
+			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, { map: {} })
 			});
 
-			eleventyConfig.addTemplate("test.njk", `<img src="missing.png">`)
+			$config.addTemplate("test.njk", `<img src="missing.png">`)
 		},
 	});
 
@@ -554,12 +601,15 @@ test.serial("Input -> output remapping not yet supported (throws error)", async 
 	t.is(fs.existsSync("test/stubs-autocopy/_site12/test/index.html"), false);
 });
 
-test.serial("Invalid copy mode throws error", async (t) => {
+test("Invalid copy mode throws error", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site13", {
 		configPath: false,
-		config: function (eleventyConfig) {
+		config: function ($config) {
+			// Node 24: workaround for re-using input directory (and not ignoring all output directories by default)
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
 			// not yet supported
-			eleventyConfig.addPassthroughCopy({"**/*.png": "yo"}, {
+			$config.addPassthroughCopy({"**/*.png": "yo"}, {
 				mode: "throw-an-error"
 			});
 		},

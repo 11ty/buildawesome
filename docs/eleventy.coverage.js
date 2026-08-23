@@ -4,8 +4,8 @@ import { TemplatePath } from "@11ty/eleventy-utils";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export default function (eleventyConfig) {
-	eleventyConfig.addFilter("removeDir", function (str) {
+export default function (config) {
+	config.addFilter("removeDir", function (str) {
 		return TemplatePath.stripLeadingSubPath(str, TemplatePath.join(__dirname, ".."));
 	});
 

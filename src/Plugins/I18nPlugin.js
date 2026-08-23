@@ -174,13 +174,13 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 	}
 
 	let extensionMap;
-	eleventyConfig.on("eleventy.extensionmap", (map) => {
+	eleventyConfig.on("buildawesome.extensionmap", (map) => {
 		extensionMap = map;
 	});
 
 	let bench = eleventyConfig.benchmarkManager.get("Aggregate");
 	let contentMaps = {};
-	eleventyConfig.on("eleventy.contentMap", function ({ urlToInputPath, inputPathToUrl }) {
+	eleventyConfig.on("buildawesome.contentmap", function ({ urlToInputPath, inputPathToUrl }) {
 		let b = bench.get("(i18n Plugin) Setting up content map.");
 		b.before();
 		contentMaps.inputPathToUrl = inputPathToUrl;

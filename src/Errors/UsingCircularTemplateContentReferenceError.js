@@ -1,5 +1,3 @@
-import EleventyBaseError from "./EleventyBaseError.js";
+import BaseError from "./BaseError.js";
 
-class UsingCircularTemplateContentReferenceError extends EleventyBaseError {}
-
-export default UsingCircularTemplateContentReferenceError;
+export default class UsingCircularTemplateContentReferenceError extends BaseError {}

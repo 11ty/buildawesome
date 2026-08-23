@@ -1,11 +1,11 @@
 import test from "ava";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 
 test("#3875 numeric tags", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addFilter("keys", (obj) => Object.keys(obj));
-      eleventyConfig.addTemplate("index.njk", "{{ collections | keys }}", {
+    config($config) {
+      $config.addFilter("keys", (obj) => Object.keys(obj));
+      $config.addTemplate("index.njk", "{{ collections | keys }}", {
         tags: [1,2,3]
       });
     }
@@ -17,9 +17,9 @@ test("#3875 numeric tags", async (t) => {
 
 test("#3875 numeric tags (via front matter)", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addFilter("keys", (obj) => Object.keys(obj));
-      eleventyConfig.addTemplate("index.njk", `---
+    config($config) {
+      $config.addFilter("keys", (obj) => Object.keys(obj));
+      $config.addTemplate("index.njk", `---
 tags:
   - 1
   - 2
@@ -35,12 +35,12 @@ tags:
 
 test("#3875 consume a numeric tag collection (njk)", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addFilter("keyTypes", (obj) => Object.keys(obj).map(entry => typeof entry).join(","));
-      eleventyConfig.addTemplate("child.njk", "", {
+    config($config) {
+      $config.addFilter("keyTypes", (obj) => Object.keys(obj).map(entry => typeof entry).join(","));
+      $config.addTemplate("child.njk", "", {
         tags: [1]
       });
-      eleventyConfig.addTemplate("index.njk", `{{ collections | keyTypes }}:{{ collections[1].length }}:{{ collections['1'].length }}`);
+      $config.addTemplate("index.njk", `{{ collections | keyTypes }}:{{ collections[1].length }}:{{ collections['1'].length }}`);
     }
   });
 
@@ -50,12 +50,12 @@ test("#3875 consume a numeric tag collection (njk)", async (t) => {
 
 test("#3875 consume a numeric tag collection (liquid)", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addFilter("keyTypes", (obj) => Object.keys(obj).map(entry => typeof entry).join(","));
-      eleventyConfig.addTemplate("child.njk", "", {
+    config($config) {
+      $config.addFilter("keyTypes", (obj) => Object.keys(obj).map(entry => typeof entry).join(","));
+      $config.addTemplate("child.njk", "", {
         tags: [1]
       });
-      eleventyConfig.addTemplate("index.liquid", `{{ collections | keyTypes }}:{{ collections[1].length }}:{{ collections['1'].length }}`);
+      $config.addTemplate("index.liquid", `{{ collections | keyTypes }}:{{ collections[1].length }}:{{ collections['1'].length }}`);
     }
   });
 
@@ -65,11 +65,11 @@ test("#3875 consume a numeric tag collection (liquid)", async (t) => {
 
 test("#3875 consume a numeric tag collection (11ty.js)", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addTemplate("child.njk", "", {
+    config($config) {
+      $config.addTemplate("child.njk", "", {
         tags: [1]
       });
-      eleventyConfig.addTemplate("index.11ty.js", {
+      $config.addTemplate("index.11ty.js", {
         render(data) {
           return `${Object.keys(data.collections).map(entry => typeof entry).join(",")}:${data.collections[1].length}:${data.collections['1'].length}`
         }

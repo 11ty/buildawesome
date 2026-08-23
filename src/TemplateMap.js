@@ -1,14 +1,16 @@
 import { isPlainObject, TemplatePath } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
 
 import TemplateCollection from "./TemplateCollection.js";
-import EleventyErrorUtil from "./Errors/EleventyErrorUtil.js";
+import ErrorUtil from "./Errors/ErrorUtil.js";
+import BaseError from "./Errors/BaseError.js";
 import UsingCircularTemplateContentReferenceError from "./Errors/UsingCircularTemplateContentReferenceError.js";
 import DuplicatePermalinkOutputError from "./Errors/DuplicatePermalinkOutputError.js";
 import TemplateData from "./Data/TemplateData.js";
 import GlobalDependencyMap from "./GlobalDependencyMap.js";
+import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
+import { createDebug } from "./Util/DebugLogUtil.js";
 
-const debug = debugUtil("Eleventy:TemplateMap");
+const debug = createDebug("TemplateMap");
 
 // These template URL filenames are allowed to exclude file extensions
 const EXTENSIONLESS_URL_ALLOWLIST = [
@@ -35,7 +37,6 @@ class TemplateMap {
 		this.inputPathMap = new Map(); // NEW: O(1) lookup Map for performance
 		this.collectionsData = null;
 		this.cached = false;
-		this.verboseOutput = true;
 		this.collection = new TemplateCollection();
 	}
 
@@ -65,24 +66,22 @@ class TemplateMap {
 		}
 
 		let data = await template.getData();
-		let entries = await template.getTemplateMapEntries(data);
+		let map = await template.getTemplateMapEntry(data);
 		let { skippedVia } = await template.runPreprocessors(data);
 
-		if (skippedVia) {
+		if (!map || skippedVia) {
 			return;
 		}
 
-		for (let map of entries) {
-			this.map.push(map);
-			this._addToInputPathMap(map); // NEW: Add to lookup Map for O(1) access
-		}
+		this.map.push(map);
+		this.#addToInputPathMap(map); // NEW: Add to lookup Map for O(1) access
 	}
 
 	getMap() {
 		return this.map;
 	}
 
-	_addToInputPathMap(mapEntry) {
+	#addToInputPathMap(mapEntry) {
 		// Store under absolute path
 		let absoluteInputPath = TemplatePath.absolutePath(mapEntry.inputPath);
 		this.inputPathMap.set(absoluteInputPath, mapEntry);
@@ -114,8 +113,9 @@ class TemplateMap {
 		let consumes = [];
 		consumes.push(this.getPaginationTagTarget(entry));
 
-		if (Array.isArray(entry.data.eleventyImport?.collections)) {
-			for (let tag of entry.data.eleventyImport.collections) {
+		let importData = ResolveConfigurationData.getValue(entry.data, this.config.keys.import);
+		if (Array.isArray(importData?.collections)) {
+			for (let tag of importData.collections) {
 				consumes.push(tag);
 			}
 		}
@@ -226,7 +226,10 @@ class TemplateMap {
 				}
 
 				if (counter === 0 || map.data.pagination?.addAllPagesToCollections) {
-					if (map.data.eleventyExcludeFromCollections !== true) {
+					if (
+						ResolveConfigurationData.getValue(map.data, "buildawesomeExcludeFromCollections") !==
+						true
+					) {
 						// is in *some* collections
 						this.collection.add(page);
 					}
@@ -286,7 +289,7 @@ class TemplateMap {
 			return this.getMapEntryForInputPath(inputPath);
 		});
 
-		await this.config.events.emitLazy("eleventy.contentMap", () => {
+		await this.config.events.emitLazy("buildawesome.contentmap", () => {
 			return {
 				inputPathToUrl: this.generateInputUrlContentMap(orderedMap),
 				urlToInputPath: this.generateUrlMap(orderedMap),
@@ -302,7 +305,7 @@ class TemplateMap {
 		this.checkForDuplicatePermalinks();
 		this.checkForMissingFileExtensions();
 
-		await this.config.events.emitLazy("eleventy.layouts", () => this.generateLayoutsMap());
+		await this.config.events.emitLazy("buildawesome.layouts", () => this.generateLayoutsMap());
 	}
 
 	generateInputUrlContentMap(orderedMap) {
@@ -348,13 +351,20 @@ class TemplateMap {
 
 			for (let pageEntry of map._pages) {
 				// Data Schema callback #879
-				if (typeof pageEntry.data[this.config.keys.dataSchema] === "function") {
+				let dataSchemaCallback = ResolveConfigurationData.getValue(
+					pageEntry.data,
+					this.config.keys.dataSchema,
+				);
+				if (dataSchemaCallback !== undefined && typeof dataSchemaCallback === "function") {
 					try {
-						await pageEntry.data[this.config.keys.dataSchema](pageEntry.data);
+						await dataSchemaCallback(pageEntry.data);
 					} catch (e) {
-						throw new Error(
-							`Error in the data schema for: ${map.inputPath} (via \`eleventyDataSchema\`)`,
-							{ cause: e },
+						let dataSchemaLocation = ResolveConfigurationData.getEligibleLocations(
+							this.config.keys.dataSchema,
+						);
+						throw new BaseError(
+							`Error in the data schema for: ${map.inputPath} (via \`${dataSchemaLocation.join("` or `")}\`)`,
+							e,
 						);
 					}
 				}
@@ -391,7 +401,7 @@ class TemplateMap {
 								await pageEntry.template.renderPageEntryWithoutLayout(pageEntry);
 						}
 					} catch (e) {
-						if (EleventyErrorUtil.isPrematureTemplateContentError(e)) {
+						if (ErrorUtil.isPrematureTemplateContentError(e)) {
 							// Add to list of templates that need to be processed again
 							usedTemplateContentTooEarlyMap.push(map);
 
@@ -416,7 +426,7 @@ class TemplateMap {
 						await pageEntry.template.renderPageEntryWithoutLayout(pageEntry);
 				}
 			} catch (e) {
-				if (EleventyErrorUtil.isPrematureTemplateContentError(e)) {
+				if (ErrorUtil.isPrematureTemplateContentError(e)) {
 					// If we still have template content errors after the second pass,
 					// it's likely a circular reference
 					throw new UsingCircularTemplateContentReferenceError(
@@ -497,7 +507,11 @@ class TemplateMap {
 		let promises = [];
 		for (let entry of this.map) {
 			for (let pageEntry of entry._pages) {
-				if (this.config.keys.computed in pageEntry.data) {
+				let computedData = ResolveConfigurationData.getValue(
+					pageEntry.data,
+					this.config.keys.computed,
+				);
+				if (computedData !== undefined) {
 					promises.push(pageEntry.template.resolveRemainingComputedData(pageEntry.data));
 				}
 			}
@@ -614,7 +628,7 @@ You *probably* want to add a file extension to your permalink so that hosts will
 
 Learn more: https://v3.11ty.dev/docs/permalinks/#trailing-slashes
 
-This is usually but not *always* an error so if you’d like to disable this error message, add \`eleventyAllowMissingExtension: true\` somewhere in the data cascade for this template or use \`eleventyConfig.configureErrorReporting({ allowMissingExtensions: true });\` to disable this feature globally.`);
+This is usually but not *always* an error so if you’d like to disable this error message, add \`eleventyAllowMissingExtension: true\` somewhere in the data cascade for this template or use \`$config.configureErrorReporting({ allowMissingExtensions: true });\` to disable this feature globally.`);
 					e.skipOriginalStack = true;
 					throw e;
 				}

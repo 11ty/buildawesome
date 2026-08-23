@@ -1,10 +1,10 @@
 const path = require("path");
 const sass = require("sass");
 
-module.exports = function (eleventyConfig) {
-  eleventyConfig.addTemplateFormats("scss");
+module.exports = function ($config) {
+  $config.addTemplateFormats("scss");
 
-  eleventyConfig.addExtension("scss", {
+  $config.addExtension("scss", {
     outputFileExtension: "css", // optional, default: "html"
 
     compile: function (inputContent, inputPath) {

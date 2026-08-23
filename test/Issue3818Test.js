@@ -1,12 +1,12 @@
 import test from "ava";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 import WebCPlugin from "@11ty/eleventy-plugin-webc";
 
 test("#3818 WebC Permalink", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addPlugin(WebCPlugin);
-      eleventyConfig.addTemplate("index.webc", `---
+    config($config) {
+      $config.addPlugin(WebCPlugin);
+      $config.addTemplate("index.webc", `---
 eleventyComputed:
   permalink: "page/<f @raw=\\"1\\" webc:nokeep></f>/"
 ---`);
@@ -20,9 +20,9 @@ eleventyComputed:
 
 test("#3818 WebC Permalink Pagination JavaScript function", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addPlugin(WebCPlugin);
-      eleventyConfig.addTemplate("index.webc", `---js
+    config($config) {
+      $config.addPlugin(WebCPlugin);
+      $config.addTemplate("index.webc", `---js
 const pagination = {
   data: "posts",
   size: 2,
@@ -60,9 +60,9 @@ function permalink(data) {
 
 test("#3818 WebC Permalink Pagination, eleventyComputed.permalink String", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addPlugin(WebCPlugin);
-      eleventyConfig.addTemplate("index.webc", `---
+    config($config) {
+      $config.addPlugin(WebCPlugin);
+      $config.addTemplate("index.webc", `---
 pagination:
   data: posts
   size: 2
@@ -98,9 +98,9 @@ eleventyComputed:
 
 test("#3818 WebC Permalink Pagination, permalink String", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addPlugin(WebCPlugin);
-      eleventyConfig.addTemplate("index.webc", `---
+    config($config) {
+      $config.addPlugin(WebCPlugin);
+      $config.addTemplate("index.webc", `---
 pagination:
   data: posts
   size: 2

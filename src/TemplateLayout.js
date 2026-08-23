@@ -1,12 +1,8 @@
 import { Merge, TemplatePath } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
 
 import TemplateLayoutPathResolver from "./TemplateLayoutPathResolver.js";
 import TemplateContent from "./TemplateContent.js";
 import layoutCache from "./LayoutCache.js";
-
-// const debug = debugUtil("Eleventy:TemplateLayout");
-const debugDev = debugUtil("Dev:Eleventy:TemplateLayout");
 
 // https://github.com/11ty/eleventy/issues/3954
 class CdataWrapper {
@@ -41,6 +37,8 @@ class CdataWrapper {
 }
 
 class TemplateLayout extends TemplateContent {
+	#dataCache;
+
 	constructor(key, extensionMap, eleventyConfig) {
 		if (!eleventyConfig || eleventyConfig.constructor.name !== "TemplateConfig") {
 			throw new Error("Expected `eleventyConfig` in TemplateLayout constructor.");
@@ -89,7 +87,6 @@ class TemplateLayout extends TemplateContent {
 			let layout = new TemplateLayout(key, extensionMap, eleventyConfig);
 
 			layoutCache.add(layout);
-			debugDev("Added %o to LayoutCache", key);
 
 			return layout;
 		}
@@ -102,6 +99,8 @@ class TemplateLayout extends TemplateContent {
 		return {
 			// Used by `TemplateLayout.getTemplate()`
 			key: this.dataKeyLayoutPath,
+
+			inputPath: this.inputPath,
 
 			// used by `this.getData()`
 			frontMatterData,
@@ -181,11 +180,11 @@ class TemplateLayout extends TemplateContent {
 	}
 
 	async getData() {
-		if (!this.dataCache) {
-			this.dataCache = this.#getData();
+		if (!this.#dataCache) {
+			this.#dataCache = this.#getData();
 		}
 
-		return this.dataCache;
+		return this.#dataCache;
 	}
 
 	async #getCachedCompiledLayoutFunction() {
@@ -232,7 +231,6 @@ class TemplateLayout extends TemplateContent {
 
 			return fns;
 		} catch (e) {
-			debugDev("Clearing LayoutCache after error.");
 			layoutCache.clear();
 			throw e;
 		}
@@ -245,7 +243,7 @@ class TemplateLayout extends TemplateContent {
 	// Inefficient? We want to compile all the templatelayouts into a single reusable callback?
 	// Trouble: layouts may need data variables present downstream/upstream
 	// This is called from Template->renderPageEntry
-	async renderPageEntry(pageEntry) {
+	async renderLayoutPageEntry(pageEntry) {
 		let pageTemplateSyntax = pageEntry.template?.getEngineNames(
 			pageEntry.data[this.config.keys.engineOverride],
 		);
@@ -253,6 +251,8 @@ class TemplateLayout extends TemplateContent {
 		let compiledFunctions = await this.getCompiledLayoutFunctions();
 
 		for (let { render, template } of compiledFunctions) {
+			await template.asyncTemplateInitialization();
+
 			let layoutTemplateSyntax = template.getEngineNames(); // templateEngineOverride not supported in layouts
 			let cdata = new CdataWrapper(pageTemplateSyntax, layoutTemplateSyntax);
 
@@ -261,7 +261,6 @@ class TemplateLayout extends TemplateContent {
 				// This should come *after* data, so `content` have override `content` props set in data cascade
 				content: cdata.wrap(templateContent),
 			};
-
 			templateContent = cdata.unwrap(await render(data));
 		}
 
@@ -271,7 +270,7 @@ class TemplateLayout extends TemplateContent {
 
 	resetCaches(types) {
 		super.resetCaches(types);
-		delete this.dataCache;
+		this.#dataCache = undefined;
 		delete this.layoutChain;
 		delete this.cachedLayoutMap;
 		delete this.cachedCompiledLayoutFunction;

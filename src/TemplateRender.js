@@ -1,10 +1,10 @@
-import debugUtil from "debug";
-import EleventyBaseError from "./Errors/EleventyBaseError.js";
+import BaseError from "./Errors/BaseError.js";
 import TemplateEngineManager from "./Engines/TemplateEngineManager.js";
+import { createDebug } from "./Util/DebugLogUtil.js";
 
-const debugConfiguration = debugUtil("Eleventy:UserConfig");
+const debugConfiguration = createDebug("UserConfig");
 
-class TemplateRenderUnknownEngineError extends EleventyBaseError {}
+class TemplateRenderUnknownEngineError extends BaseError {}
 
 // works with full path names or short engine name
 export default class TemplateRender {

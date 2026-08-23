@@ -2,7 +2,7 @@ import test from "ava";
 import Nunjucks from "@11ty/nunjucks";
 
 import TemplateRender from "../src/TemplateRender.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
 
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
@@ -18,7 +18,7 @@ async function getNewTemplateRender(name, inputDir, eleventyConfig) {
   }
 
   let tr = new TemplateRender(name, eleventyConfig);
-  tr.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  tr.extensionMap = new ExtensionMap(eleventyConfig);
   tr.extensionMap.engineManager = new TemplateEngineManager(eleventyConfig);
   tr.extensionMap.setFormats([]);
   await tr.init();
@@ -381,7 +381,7 @@ test("Nunjucks sync function Shortcode (error throwing)", async (t) => {
 
   t.true(
     error.message.indexOf(
-      "EleventyNunjucksError: Error with Nunjucks shortcode `postfixWithZach`"
+      "BuildAwesomeNunjucksError: Error with Nunjucks shortcode `postfixWithZach`"
     ) > -1
   );
   t.true(
@@ -411,7 +411,7 @@ test("Nunjucks Async function Shortcode (error throwing)", async (t) => {
   });
   t.true(
     error.message.indexOf(
-      "EleventyNunjucksError: Error with Nunjucks shortcode `postfixWithZachError`"
+      "BuildAwesomeNunjucksError: Error with Nunjucks shortcode `postfixWithZachError`"
     ) > -1
   );
   t.true(
@@ -446,7 +446,7 @@ test("Nunjucks sync function paired Shortcode (error throwing)", async (t) => {
 
   t.true(
     error.message.indexOf(
-      "EleventyNunjucksError: Error with Nunjucks paired shortcode `postfixWithZachError`"
+      "BuildAwesomeNunjucksError: Error with Nunjucks paired shortcode `postfixWithZachError`"
     ) > -1
   );
   t.true(
@@ -481,7 +481,7 @@ test("Nunjucks Async function paired Shortcode (error throwing)", async (t) => {
 
   t.true(
     error.message.indexOf(
-      "EleventyNunjucksError: Error with Nunjucks paired shortcode `postfixWithZachError`"
+      "BuildAwesomeNunjucksError: Error with Nunjucks paired shortcode `postfixWithZachError`"
     ) > -1
   );
   t.true(
@@ -1024,71 +1024,6 @@ test.skip("Weird issue with number arguments in a loop (not parsing literals pro
       list: [1, 2, 3],
     }),
     "1-12-23-3"
-  );
-});
-
-test("Use a precompiled Nunjucks template", async (t) => {
-  // custom loader object
-
-  let templateConfig = await getTemplateConfigInstanceCustomCallback(
-    {},
-    function(cfg) {
-      cfg.setNunjucksPrecompiledTemplates({
-        "RenderDirect:BQAPaWxMHTxOqfCSB_bEoWTvtWt-obPbnZTUznRl9LA": (function () {
-          function root(env, context, frame, runtime, cb) {
-            var lineno = 0;
-            var colno = 0;
-            var output = "";
-            try {
-              var parentTemplate = null;
-              var t_1;
-              t_1 = 34;
-              frame.set("nunjucksVar", t_1, true);
-              if (frame.topLevel) {
-                context.setVariable("nunjucksVar", t_1);
-              }
-              if (frame.topLevel) {
-                context.addExport("nunjucksVar", t_1);
-              }
-              output += runtime.suppressValue(
-                runtime.contextOrFrameLookup(context, frame, "hi"),
-                env.opts.autoescape
-              );
-              output += "\n";
-              output += runtime.suppressValue(
-                runtime.contextOrFrameLookup(context, frame, "nunjucksVar"),
-                env.opts.autoescape
-              );
-              if (parentTemplate) {
-                parentTemplate.rootRenderFunc(env, context, frame, runtime, cb);
-              } else {
-                cb(null, output);
-              }
-            } catch (e) {
-              cb(runtime.handleError(e, lineno, colno));
-            }
-          }
-          return {
-            root: root,
-          };
-        })(),
-      });
-    }
-  );
-  await templateConfig.init();
-
-  let tr = await getNewTemplateRender("njk", null, templateConfig);
-
-  // Just pass a unique key in here if you’re using precompiled templates via config.
-  let fn = await tr.getCompiledTemplate("RenderDirect:BQAPaWxMHTxOqfCSB_bEoWTvtWt-obPbnZTUznRl9LA");
-  t.is(
-    normalizeNewLines(
-      await fn({
-        hi: "Zach",
-      })
-    ),
-    `Zach
-34`
   );
 });
 

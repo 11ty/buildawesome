@@ -6,31 +6,26 @@ import getNewTemplate from "./_getNewTemplateForTests.js";
 
 import { getTemplateConfigInstance } from "./_testHelpers.js";
 
-async function writeMapEntries(mapEntries) {
+async function writeMapEntry(entry) {
   let promises = [];
-  for (let entry of mapEntries) {
-    if (entry.template.behavior.isWriteable()) {
-      promises.push(entry.template._write(entry.outputPath, entry.templateContent));
-    }
+  if (entry.template.behavior.isWriteable()) {
+    promises.push(entry.template._write(entry.outputPath, entry.templateContent));
   }
   return Promise.all(promises);
 }
 
-async function getTemplateMapEntriesWithContent(template, data) {
-  let entries = await template.getTemplateMapEntries(data);
+async function getTemplateMapEntryWithContent(template, data) {
+  let entry = await template.getTemplateMapEntry(data);
 
-  return Promise.all(
-    entries.map(async (entry) => {
-      entry._pages = await entry.template.getTemplates(entry.data);
-      await Promise.all(
-        entry._pages.map(async (page) => {
-          page.templateContent = await page.template.renderPageEntryWithoutLayout(page);
-          return page;
-        })
-      );
-      return entry;
+  entry._pages = await entry.template.getTemplates(entry.data);
+  await Promise.all(
+    entry._pages.map(async (page) => {
+      page.templateContent = await page.template.renderPageEntryWithoutLayout(page);
+      return page;
     })
   );
+
+  return entry;
 }
 
 test("permalink: false", async (t) => {
@@ -42,14 +37,12 @@ test("permalink: false", async (t) => {
 
   let data = await tmpl.getData();
 
-  let mapEntries = await getTemplateMapEntriesWithContent(tmpl, data);
-  for (let entry of mapEntries) {
-    t.is(entry.template.behavior.isWriteable(), false);
-    t.is(entry.data.page.url, false);
-    t.is(entry.data.page.outputPath, false);
-  }
+  let entry = await getTemplateMapEntryWithContent(tmpl, data);
+  t.is(entry.template.behavior.isWriteable(), false);
+  t.is(entry.data.page.url, false);
+  t.is(entry.data.page.outputPath, false);
 
-  await writeMapEntries(mapEntries);
+  await writeMapEntry(entry);
 
   // Input file exists (sanity check for paths)
   t.is(fs.existsSync("./test/stubs/permalink-false/"), true);
@@ -69,13 +62,12 @@ test("permalink: false inside of eleventyComputed, Issue #1754", async (t) => {
   );
 
   let data = await tmpl.getData();
-  let mapEntries = await getTemplateMapEntriesWithContent(tmpl, data);
-  for (let entry of mapEntries) {
-    t.is(entry.template.behavior.isWriteable(), false);
-    t.is(entry.data.page.url, false);
-    t.is(entry.data.page.outputPath, false);
-  }
-  await writeMapEntries(mapEntries);
+  let entry = await getTemplateMapEntryWithContent(tmpl, data);
+  t.is(entry.template.behavior.isWriteable(), false);
+  t.is(entry.data.page.url, false);
+  t.is(entry.data.page.outputPath, false);
+
+  await writeMapEntry(entry);
 
   // Input file exists (sanity check for paths)
   t.is(fs.existsSync("./test/stubs/permalink-false-computed/"), true);

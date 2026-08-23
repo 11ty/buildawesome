@@ -1,7 +1,7 @@
 import test from "ava";
 
 import TemplateLayout from "../src/TemplateLayout.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
 
 import { renderLayoutViaLayout } from "./_getRenderedTemplates.js";
@@ -16,7 +16,7 @@ async function getTemplateLayoutInstance(key, inputDir, map) {
 
   let mgr = new TemplateEngineManager(eleventyConfig);
   if (!map) {
-    map = new EleventyExtensionMap(eleventyConfig);
+    map = new ExtensionMap(eleventyConfig);
     map.setFormats(["liquid", "md", "njk", "html", "11ty.js"]);
     map.engineManager = mgr;
   }

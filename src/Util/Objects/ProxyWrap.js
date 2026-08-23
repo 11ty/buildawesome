@@ -1,7 +1,7 @@
-import debugUtil from "debug";
 import { isPlainObject } from "@11ty/eleventy-utils";
+// import { createDebug } from "../DebugLogUtil.js";
 
-const debug = debugUtil("Dev:Eleventy:Proxy");
+// const debug = createDebug("Dev:Eleventy:Proxy");
 
 const ProxySymbol = Symbol.for("11ty.ProxySymbol");
 
@@ -46,7 +46,7 @@ function wrapObject(target, fallback) {
 			return Array.from(s);
 		},
 		get(target, prop) {
-			debug("handler:get", prop);
+			// debug("handler:get", prop);
 			if (prop === ProxySymbol) {
 				return true;
 			}
@@ -65,11 +65,11 @@ function wrapObject(target, fallback) {
 					}
 
 					let ret = wrapObject(value, Reflect.get(fallback, prop));
-					debug("handler:get (primary, object)", prop);
+					// debug("handler:get (primary, object)", prop);
 					return ret;
 				}
 
-				debug("handler:get (primary)", prop);
+				// debug("handler:get (primary)", prop);
 				return value;
 			}
 
@@ -86,7 +86,7 @@ function wrapObject(target, fallback) {
 						return fallbackValue;
 					}
 
-					debug("handler:get (fallback, object)", prop);
+					// debug("handler:get (fallback, object)", prop);
 					// set empty object on primary
 					let emptyObject = {};
 					Reflect.set(target, prop, emptyObject);
@@ -94,17 +94,17 @@ function wrapObject(target, fallback) {
 					return wrapObject(emptyObject, fallbackValue);
 				}
 
-				debug("handler:get (fallback)", prop);
+				// debug("handler:get (fallback)", prop);
 				return fallbackValue;
 			}
 
 			// primary *and* fallback do _not_ have prop
-			debug("handler:get (not on primary or fallback)", prop);
+			// debug("handler:get (not on primary or fallback)", prop);
 
 			return value;
 		},
 		set(target, prop, value) {
-			debug("handler:set", prop);
+			// debug("handler:set", prop);
 
 			return Reflect.set(target, prop, value);
 		},

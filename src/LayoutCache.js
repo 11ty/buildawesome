@@ -89,7 +89,7 @@ class LayoutCache {
 
 let layoutCache = new LayoutCache();
 
-eventBus.on("eleventy.resourceModified", () => {
+eventBus.on("buildawesome.resourcemodified", () => {
 	// https://github.com/11ty/eleventy-plugin-bundle/issues/10
 	layoutCache.removeAll();
 });

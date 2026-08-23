@@ -14,14 +14,33 @@ if ! npm test; then
 	exit 1
 fi
 
-if [ -z "$NPM_PUBLISH_TAG" ]; then
-  echo 'Release error: missing NPM_PUBLISH_TAG environment variable'
+if [ -z "$NPM_BUILDAWESOME_PUBLISH_TAG" ]; then
+  echo 'Release error: missing NPM_BUILDAWESOME_PUBLISH_TAG environment variable'
 	exit 1
 fi
 
-node packages/client/update-package-json.js
-
-# Will skip publishing root if publishing workspaces fails
-if npm publish --workspaces --provenance --access=public --tag=$NPM_PUBLISH_TAG $DRY_RUN; then
-  npm publish --provenance --access=public --tag=$NPM_PUBLISH_TAG $DRY_RUN
+if [ -z "$NPM_ELEVENTY_PUBLISH_TAG" ]; then
+  echo 'Release error: missing NPM_ELEVENTY_PUBLISH_TAG environment variable'
+	exit 1
 fi
+
+# Generate types for files listed in tsconfig.json
+npm run typescript
+
+# npm stage publish requires npm 11.15 or newer.
+npm stage publish --provenance --access=public --tag=$NPM_ELEVENTY_PUBLISH_TAG $DRY_RUN
+
+# workspace: packages/browser
+node packages/browser/update-package-json.js
+npm stage publish --workspace=packages/browser --provenance --access=public --tag=$NPM_ELEVENTY_PUBLISH_TAG $DRY_RUN
+
+# workspace: packages/build-awesome
+npm run typescript --workspace=packages/build-awesome
+
+# Re-use root README
+cp README.md packages/build-awesome/README.md
+mkdir -p packages/build-awesome/docs/
+cp -R docs/*.png packages/build-awesome/docs/
+
+node packages/build-awesome/update-package-json.js
+npm stage publish --workspace=packages/build-awesome --provenance --access=public --tag=$NPM_BUILDAWESOME_PUBLISH_TAG $DRY_RUN

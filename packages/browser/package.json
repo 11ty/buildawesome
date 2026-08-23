@@ -1,0 +1,47 @@
+{
+  "name": "@11ty/client",
+  "description": "Run Build Awesome (Eleventy) in your browser.",
+  "version": "PRIVATE",
+  "private": true,
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "type": "module",
+  "main": "./dist/core-minimal.js",
+  "exports": {
+    ".": "./dist/core-minimal.js",
+    "./core-fs": "./dist/core-fs.js",
+    "./liquid": "./dist/formats/liquid.js",
+    "./njk": "./dist/formats/nunjucks.js",
+    "./md": "./dist/formats/markdown.js",
+    "./i18n": "./dist/plugins/plugin-i18n.js"
+  },
+  "files": [
+    "./dist/**/*.js"
+  ],
+  "license": "MIT",
+  "funding": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/11ty"
+  },
+  "scripts": {
+    "build": "node generate-bundle.js",
+    "test": "npm run build && npx vitest",
+    "prepare": "npm run build"
+  },
+  "author": "Zach Leatherman <zachleatherman@gmail.com> (https://zachleat.com/)",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/11ty/buildawesome.git"
+  },
+  "bugs": "https://github.com/11ty/buildawesome/issues",
+  "homepage": "https://www.11ty.dev/",
+  "devDependencies": {
+    "@11ty/package-bundler": "^0.5.6",
+    "@vitest/browser": "^4.1.10",
+    "@vitest/browser-playwright": "^4.1.10",
+    "playwright": "^1.62.0",
+    "vitest": "^4.1.10"
+  }
+}

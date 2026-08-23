@@ -1,5 +1,3 @@
-import EleventyBaseError from "./EleventyBaseError.js";
+import BaseError from "./BaseError.js";
 
-class TemplateContentPrematureUseError extends EleventyBaseError {}
-
-export default TemplateContentPrematureUseError;
+export default class TemplateContentPrematureUseError extends BaseError {}

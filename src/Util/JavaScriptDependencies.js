@@ -8,7 +8,7 @@ import { TemplatePath } from "@11ty/eleventy-utils";
 import { DepGraph } from "dependency-graph";
 
 import { union } from "./SetUtil.js";
-import EleventyBaseError from "../Errors/EleventyBaseError.js";
+import BaseError from "../Errors/BaseError.js";
 
 class JavaScriptDependencies {
 	static getErrorMessage(file, type) {
@@ -44,6 +44,7 @@ class JavaScriptDependencies {
 			(file) => this.getFlavor(file, isProjectUsingEsm) === "cjs",
 		);
 
+		// TODO require(esm) means some files *could* be wrong here
 		for (let file of commonJsFiles) {
 			try {
 				let modules = dependencyTree(file, {
@@ -57,7 +58,7 @@ class JavaScriptDependencies {
 					depSet.add(dep);
 				}
 			} catch (e) {
-				throw new EleventyBaseError(this.getErrorMessage(file, "CommonJS"), e);
+				throw new BaseError(this.getErrorMessage(file, "CommonJS"), e);
 			}
 		}
 
@@ -76,7 +77,7 @@ class JavaScriptDependencies {
 					depSet.add(dep);
 				}
 			} catch (e) {
-				throw new EleventyBaseError(this.getErrorMessage(file, "ESM"), e);
+				throw new BaseError(this.getErrorMessage(file, "ESM"), e);
 			}
 		}
 
@@ -99,7 +100,7 @@ class JavaScriptDependencies {
 
 				mergeGraphs(rootGraph, graph);
 			} catch (e) {
-				throw new EleventyBaseError(this.getErrorMessage(file, "ESM"), e);
+				throw new BaseError(this.getErrorMessage(file, "ESM"), e);
 			}
 		}
 

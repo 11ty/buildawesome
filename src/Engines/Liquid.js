@@ -1,12 +1,9 @@
 import moo from "moo";
 import { Tokenizer, TokenKind, evalToken, Liquid as LiquidJs } from "liquidjs";
 import { TemplatePath } from "@11ty/eleventy-utils";
-// import debugUtil from "debug";
 
 import TemplateEngine from "./TemplateEngine.js";
 import { augmentObject } from "./Util/ContextAugmenter.js";
-
-// const debug = debugUtil("Eleventy:Liquid");
 
 export default class Liquid extends TemplateEngine {
 	static argumentLexerOptions = {
@@ -64,6 +61,8 @@ export default class Liquid extends TemplateEngine {
 		 * @this {object}
 		 */
 		return function (...args) {
+			// TODO ArgumentHelper.wrapFilter(fn);
+
 			// Set this.eleventy and this.page
 			if (typeof this.context?.get === "function") {
 				augmentObject(this, {
@@ -330,6 +329,7 @@ export default class Liquid extends TemplateEngine {
 				{
 					page: data?.page,
 					eleventy: data?.eleventy,
+					buildawesome: data?.buildawesome,
 					collections: data?.collections,
 				},
 				liquidOptions?.globals,

@@ -1,28 +1,30 @@
+import { existsSync, rmSync } from "node:fs";
 import { isPlainObject } from "@11ty/eleventy-utils";
 import TemplateConfig from "../src/TemplateConfig.js";
 import ProjectDirectories from "../src/Util/ProjectDirectories.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 import TemplatePassthroughManager from "../src/TemplatePassthroughManager.js";
-import EleventyFiles from "../src/EleventyFiles.js";
+import { Files } from "../src/Files.js";
 import FileSystemSearch from "../src/FileSystemSearch.js";
 import TemplateWriter from "../src/TemplateWriter.js";
 import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
 import TemplateData from "../src/Data/TemplateData.js";
+import ConsoleLogger from "../src/Util/ConsoleLogger.js";
 
 export async function getTemplateConfigInstance(configObj, dirs, configObjOverride = undefined) {
-	let eleventyConfig;
+	let $config;
 	if(configObj instanceof TemplateConfig) {
-		eleventyConfig = configObj;
+		$config = configObj;
 		configObj = undefined;
 
 		if(!(dirs instanceof ProjectDirectories)) {
 			throw new Error("Testing error: second argument to getTemplateConfigInstance must be a ProjectDirectories instance when the first argument is a TemplateConfig instance.")
 		}
 	} else {
-		eleventyConfig = new TemplateConfig();
+		$config = new TemplateConfig();
 	}
 
-	eleventyConfig.setProjectUsingEsm(true);
+	$config.setProjectUsingEsm(true);
 
 	if(!(dirs instanceof ProjectDirectories)) {
 		dirs = new ProjectDirectories();
@@ -32,11 +34,11 @@ export async function getTemplateConfigInstance(configObj, dirs, configObjOverri
 		dirs.setViaConfigObject(configObj?.dir || {});
 	}
 
-	eleventyConfig.setDirectories(dirs);
+	$config.setDirectories(dirs);
 
-	await eleventyConfig.init(configObjOverride || configObj); // overrides
+	await $config.init(configObjOverride || configObj); // overrides
 
-	return eleventyConfig;
+	return $config;
 }
 
 export async function getTemplateConfigInstanceCustomCallback(dirObject, configCallback) {
@@ -47,22 +49,26 @@ export async function getTemplateConfigInstanceCustomCallback(dirObject, configC
 	let dirs = new ProjectDirectories();
 	dirs.setViaConfigObject(dirObject);
 
-	let eleventyConfig = await getTemplateConfigInstance(tmplCfg, dirs, {
+	let $config = await getTemplateConfigInstance(tmplCfg, dirs, {
 		dir: dirObject
 	});
-	return eleventyConfig;
+	return $config;
 }
 
 export function getTemplateWriterInstance(formats, templateConfig) {
+  let logger = new ConsoleLogger();
+  logger.isVerbose = false;
+
   let { eleventyFiles, passthroughManager } = getEleventyFilesInstance(formats, templateConfig);
   let templateWriter = new TemplateWriter(
     formats,
     null,
     templateConfig,
   );
+  templateWriter.logger = logger;
 
   let engineManager = new TemplateEngineManager(templateConfig);
-  let map = new EleventyExtensionMap(templateConfig);
+  let map = new ExtensionMap(templateConfig);
   map.engineManager = engineManager;
   map.setFormats(formats);
 
@@ -79,7 +85,7 @@ export function getTemplateWriterInstance(formats, templateConfig) {
 }
 
 export function getEleventyFilesInstance(formats, templateConfig) {
-	let map = new EleventyExtensionMap(templateConfig);
+	let map = new ExtensionMap(templateConfig);
 	map.setFormats(formats);
 
   let fss = new FileSystemSearch();
@@ -88,7 +94,7 @@ export function getEleventyFilesInstance(formats, templateConfig) {
 	mgr.extensionMap = map;
 	mgr.setFileSystemSearch(fss);
 
-	let files = new EleventyFiles(formats, templateConfig);
+	let files = new Files(formats, templateConfig);
 	files.setPassthroughManager(mgr);
 	files.setFileSystemSearch(fss);
 	files.extensionMap = map;
@@ -108,4 +114,10 @@ export function sortEleventyResults(a, b) {
     return -1;
   }
   return 0;
+}
+
+export function deleteDirectory(dir) {
+  if(existsSync(dir)) {
+    rmSync(dir, { recursive: true });
+  }
 }

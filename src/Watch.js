@@ -1,11 +1,11 @@
-import debugUtil from "debug";
 import { TemplatePath } from "@11ty/eleventy-utils";
 import chokidar from "chokidar";
 
+import { createDebug } from "./Util/DebugLogUtil.js";
 import { isGlobMatch } from "./Util/GlobMatcher.js";
 import { GlobStripper } from "./Util/GlobStripper.js";
 
-const debug = debugUtil("Eleventy:Watch");
+const debug = createDebug("Watch");
 
 export class Watch {
 	/** @type {module:chokidar} */
@@ -14,6 +14,8 @@ export class Watch {
 	#watchedGlobs = [];
 	/** @type {Set} */
 	#ignoredGlobs = [];
+	/** @type {Promise} */
+	#ready;
 
 	constructor(config) {
 		if (!config || config.constructor.name !== "TemplateConfig") {
@@ -107,19 +109,32 @@ export class Watch {
 				return path;
 			})
 			.filter(Boolean);
-
 		this.#chokidar = chokidar.watch(targets, options);
 
 		// Note: if there are no watch targets the `ready` event doesn’t fire so skip it
 		if (targets.length > 0) {
-			await new Promise((resolve) => {
+			this.#ready = await new Promise((resolve) => {
 				this.#chokidar.on("ready", () => resolve());
 			});
+		} else {
+			this.#ready = Promise.resolve();
 		}
+	}
+
+	async getWatched() {
+		if (this.#ready) {
+			await this.#ready;
+		}
+
+		return this.#chokidar.getWatched();
 	}
 
 	on(event, callback) {
 		this.#chokidar.on(event, callback);
+	}
+
+	emit(event, ...args) {
+		this.#chokidar.emit(event, ...args);
 	}
 
 	async close() {

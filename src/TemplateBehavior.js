@@ -1,5 +1,7 @@
 import { isPlainObject } from "@11ty/eleventy-utils";
 
+import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
+
 class TemplateBehavior {
 	#isRenderOptional;
 
@@ -63,9 +65,11 @@ class TemplateBehavior {
 			}
 		}
 
-		let computedKey = this.config.keys.computed;
-		if (computedKey in data && isPlainObject(data[computedKey]?.permalink)) {
-			for (let key of Object.keys(data[computedKey].permalink)) {
+		let computedData = ResolveConfigurationData.getValue(data, this.config.keys.computed);
+		let permalink = ResolveConfigurationData.getValue(computedData, this.config.keys.permalink);
+
+		if (computedData && isPlainObject(permalink)) {
+			for (let key of Object.keys(permalink)) {
 				keys.add(key);
 			}
 		}

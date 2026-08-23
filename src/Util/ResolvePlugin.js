@@ -1,6 +1,7 @@
 import HtmlBasePlugin from "../Plugins/HtmlBasePlugin.js";
 import InputPathToUrlPlugin from "../Plugins/InputPathToUrl.js";
 
+/** @param {string} name */
 export function resolvePlugin(name) {
 	let filenameLookup = {
 		// Sync, https://github.com/11ty/eleventy-plugin-rss/issues/52
