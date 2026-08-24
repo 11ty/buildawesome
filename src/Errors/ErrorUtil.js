@@ -57,6 +57,7 @@ export default class ErrorUtil {
 	}
 
 	static isPrematureTemplateContentError(e) {
+		let rootError = e;
 		let pending = [e];
 		let seen = new Set();
 
@@ -71,7 +72,8 @@ export default class ErrorUtil {
 
 			if (
 				error instanceof TemplateContentPrematureUseError ||
-				error?.message?.includes("TemplateContentPrematureUseError")
+				// Preserve the legacy Nunjucks fallback without matching unrelated nested messages.
+				(error === rootError && error?.message?.includes("TemplateContentPrematureUseError"))
 			) {
 				return true;
 			}
@@ -80,7 +82,7 @@ export default class ErrorUtil {
 				pending.push(error.cause);
 			}
 
-			// Liquid uses originalError.originalError instead of Error.cause.
+			// Liquid requires this guarded non-standard path instead of Error.cause.
 			if (
 				["RenderError", "UndefinedVariableError"].includes(error?.originalError?.name) &&
 				error?.originalError?.originalError
