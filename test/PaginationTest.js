@@ -463,6 +463,49 @@ test("Page over an object (use values)", async (t) => {
   );
 });
 
+test("Page over an object (excluded, array)", async (t) => {
+  let tmpl = await getNewTemplate(
+    "./test/stubs/paged/pagedobjectexcludearray.njk",
+    "./test/stubs/",
+    "./dist"
+  );
+
+  let data = await tmpl.getData();
+  let pages = await tmpl.getTemplates(data);
+
+  t.is(
+    (await pages[0].template.render(pages[0].data)).trim(),
+    "<ol><li>item1</li><li>item2</li><li>item3</li><li>item5</li></ol>"
+  );
+
+  t.is(
+    (await pages[1].template.render(pages[1].data)).trim(),
+    "<ol><li>item6</li><li>item7</li><li>item8</li><li>item9</li></ol>"
+  );
+});
+
+test("Page over an object (excluded, string)", async (t) => {
+  let tmpl = await getNewTemplate(
+    "./test/stubs/paged/pagedobjectexcludestring.njk",
+    "./test/stubs/",
+    "./dist"
+  );
+
+  let data = await tmpl.getData();
+  let pages = await tmpl.getTemplates(data);
+  t.is(pages.length, 2);
+
+  t.is(
+    (await pages[0].template.render(pages[0].data)).trim(),
+    "<ol><li>item1</li><li>item2</li><li>item3</li><li>item5</li></ol>"
+  );
+
+  t.is(
+    (await pages[1].template.render(pages[1].data)).trim(),
+    "<ol><li>item6</li><li>item7</li><li>item8</li><li>item9</li></ol>"
+  );
+});
+
 test("Page over an object (filtered, array)", async (t) => {
   let tmpl = await getNewTemplate(
     "./test/stubs/paged/pagedobjectfilterarray.njk",
