@@ -17,7 +17,6 @@
 			"types": "./types/UserConfig.d.ts"
 		},
 		"./utils/git": "./src/Util/Git.js",
-		"./datawriter": "./src/Data/DataWriter.js",
 		"./cli": "./cmd.cjs"
 	},
 	"bin": {
@@ -29,7 +28,8 @@
 	},
 	"workspaces": [
 		"packages/browser",
-		"packages/build-awesome"
+		"packages/build-awesome",
+		"packages/datawriter"
 	],
 	"funding": {
 		"type": "opencollective",
@@ -116,6 +116,7 @@
 		"eslint": "^10.8.1",
 		"eslint-config-prettier": "^10.1.8",
 		"globals": "^17.11.0",
+		"js-yaml": "^5.3.0",
 		"jsx-async-runtime": "^2.2.0",
 		"luxon": "^3.7.2",
 		"markdown-it-abbr": "^2.0.0",
@@ -155,8 +156,6 @@
 		"entities": "^8.0.0",
 		"import-module-string": "^2.0.3",
 		"iso-639-1": "^3.1.6",
-		"js-yaml": "^5.3.0",
-		"jsonc-parser": "^3.3.1",
 		"kleur": "^4.1.5",
 		"liquidjs": "^10.29.0",
 		"markdown-it": "^14.3.0",

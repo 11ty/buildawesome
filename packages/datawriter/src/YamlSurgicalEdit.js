@@ -9,8 +9,7 @@ import {
 	SCALAR_STYLE,
 	COLLECTION_STYLE,
 	CHOMPING_MODE,
-} from "../Adapters/Packages/yaml.js";
-import BaseError from "../Errors/BaseError.js";
+} from "./adapters/yaml.js";
 
 const { get: lodashGet } = lodash;
 
@@ -20,7 +19,9 @@ const DEFAULT_INDENT_STEP = 2;
  * Thrown when an edit cannot be made without reformatting the document.
  * `DataWriter` never reformats: it makes a surgical edit or refuses.
  */
-class DataWriterPreservationError extends BaseError {}
+class DataWriterPreservationError extends Error {
+	name = "DataWriterPreservationError";
+}
 
 /* Render a value as a single-line YAML node.
  * `dump` picks quoting for us (`yes` and `123` become quoted strings, and so on).

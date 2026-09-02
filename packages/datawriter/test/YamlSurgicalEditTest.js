@@ -1,6 +1,6 @@
 import test from "ava";
 
-import { getYamlEdit, DataWriterPreservationError } from "../src/Util/YamlSurgicalEdit.js";
+import { getYamlEdit, DataWriterPreservationError } from "../src/YamlSurgicalEdit.js";
 
 // Applies the returned span edit. Every assertion below compares the exact resulting
 // string: re-parsing and deep-comparing would pass even if formatting were destroyed.

@@ -1,13 +1,12 @@
 import test from "ava";
-import { cpSync, existsSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, readFileSync, rmSync } from "node:fs";
 
-import { DataWriter, DataWriterError, DataWriterPreservationError } from "../src/Data/DataWriter.js";
-import { deleteDirectory } from "./_testHelpers.js";
+import { DataWriter, DataWriterError, DataWriterPreservationError } from "../src/DataWriter.js";
 
 // The fixtures are mutated by these tests, so work on a copy. It has to live inside the
 // project directory: DataWriter refuses to write outside of it.
-const SOURCE_DIR = "./test/stubs-datawriter";
-const WORK_DIR = "./test/stubs-datawriter-tmp";
+const SOURCE_DIR = "./test/stubs";
+const WORK_DIR = "./test/stubs-tmp";
 
 test.before(() => {
 	deleteDirectory(WORK_DIR);
@@ -17,6 +16,12 @@ test.before(() => {
 test.after.always(() => {
 	deleteDirectory(WORK_DIR);
 });
+
+function deleteDirectory(dir) {
+	if (existsSync(dir)) {
+		rmSync(dir, { recursive: true });
+	}
+}
 
 function read(file) {
 	return readFileSync(`${WORK_DIR}/${file}`, "utf8");
@@ -155,9 +160,32 @@ test("Refuses toml front matter, naming the language", (t) => {
 /* Safety */
 
 test("Refuses a reserved data key", (t) => {
-	let error = t.throws(() => DataWriter.write(`${WORK_DIR}/data.json`, "pkg", 1));
+	let error = t.throws(() => DataWriter.write(`${WORK_DIR}/data.json`, "pkg", 1), {
+		instanceOf: DataWriterError,
+	});
 
-	t.regex(error.message, /reserved data property names/);
+	t.regex(error.message, /`pkg` is a reserved data property name/);
+});
+
+test("`page` is reserved only for the sub-properties Eleventy supplies", (t) => {
+	t.throws(() => DataWriter.write(`${WORK_DIR}/data.json`, "page.url", "/x/"), {
+		instanceOf: DataWriterError,
+	});
+
+	// `page.custom` is not one of them, so it goes through.
+	t.is(DataWriter.write(`${WORK_DIR}/data.json`, "page.custom", 1).written, true);
+});
+
+test("The reservedKeys option overrides the default list", (t) => {
+	// Opting out entirely, for consumers that are not Eleventy.
+	t.is(DataWriter.write(`${WORK_DIR}/data.json`, "pkg", 1, { reservedKeys: [] }).written, true);
+
+	// And a caller can reserve names of its own.
+	let error = t.throws(
+		() => DataWriter.write(`${WORK_DIR}/data.json`, "mine", 1, { reservedKeys: ["mine"] }),
+		{ instanceOf: DataWriterError },
+	);
+	t.regex(error.message, /`mine` is a reserved data property name/);
 });
 
 test("Refuses a write outside the project directory", (t) => {
@@ -177,8 +205,8 @@ test("Surfaces a preservation refusal from the YAML editor", (t) => {
 
 /* Package entry points */
 
-test("Is exported from the ./datawriter subpath", async (t) => {
-	let subpath = await import("@11ty/eleventy/datawriter");
+test("Is exported from the package entry point", async (t) => {
+	let pkg = await import("@awesome.me/ba-datawriter");
 
-	t.is(typeof subpath.DataWriter.write, "function");
+	t.is(typeof pkg.DataWriter.write, "function");
 });

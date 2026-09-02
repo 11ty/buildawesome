@@ -11,19 +11,36 @@ import {
 	getNodeValue,
 	modify,
 	applyEdits,
-} from "../Adapters/Packages/jsonc.js";
-import {
-	getYamlEdit,
-	DataWriterPreservationError,
-	renderInline,
-} from "../Util/YamlSurgicalEdit.js";
-import DirContains from "../Util/DirContains.js";
-import ReservedData from "../Util/ReservedData.js";
-import BaseError from "../Errors/BaseError.js";
+} from "./adapters/jsonc.js";
+import { getYamlEdit, DataWriterPreservationError, renderInline } from "./YamlSurgicalEdit.js";
+import DirContains from "./DirContains.js";
 
 const { get: lodashGet, set: lodashSet } = lodash;
 
-class DataWriterError extends BaseError {}
+class DataWriterError extends Error {
+	name = "DataWriterError";
+}
+
+/* Data properties Eleventy supplies itself. Writing one produces a file that either
+ * throws on the next build or is silently overwritten, so they are refused by default.
+ * Pass `reservedKeys` to override the list, or `[]` to disable the check entirely.
+ * Mirrors `ReservedData` in @11ty/eleventy; kept in sync by a test in that repo.
+ */
+const DEFAULT_RESERVED_KEYS = [
+	"pkg",
+	"eleventy",
+	"buildawesome",
+	"content",
+	"collections",
+	"page.date",
+	"page.inputPath",
+	"page.fileSlug",
+	"page.filePathStem",
+	"page.outputFileExtension",
+	"page.templateSyntax",
+	"page.url",
+	"page.outputPath",
+];
 
 // Reserved for a planned mode: editing the exported data object of a JS/TS data file.
 const JAVASCRIPT_EXTENSIONS = new Set(["js", "cjs", "mjs", "ts", "cts", "mts"]);
@@ -109,19 +126,16 @@ function isDeepEqual(a, b) {
 }
 
 /* Refuse anything the data cascade would throw away or overwrite on the next build. */
-function assertNotReserved(pathArray, filePath) {
+function assertNotReserved(pathArray, filePath, reservedKeys) {
 	let [first, second] = pathArray;
-	let probe = {};
 
-	if (first === "page" && second !== undefined) {
-		probe.page = { [second]: true };
-	} else {
-		probe[first] = true;
-	}
+	// `page` is reserved only for the specific sub-properties Eleventy sets.
+	let candidate = first === "page" && second !== undefined ? `page.${second}` : String(first);
 
-	let reservedNames = ReservedData.getReservedKeys(probe, ReservedData.fullProperties);
-	if (reservedNames.length > 0) {
-		throw ReservedData.getError({ reservedNames, sourceLocation: filePath });
+	if (reservedKeys.includes(candidate)) {
+		throw new DataWriterError(
+			`\`${candidate}\` is a reserved data property name, so writing it to ${filePath} would have no effect. Pass \`reservedKeys\` to change the list.`,
+		);
 	}
 }
 
@@ -276,6 +290,8 @@ function editFrontMatter(source, pathArray, value, options) {
  * @param {any} value - The new value.
  * @param {object} [options]
  * @param {"yaml"|"json"} [options.format] - Language for a front matter block being created.
+ * @param {Array<string>} [options.reservedKeys] - Property names to refuse. Defaults to the
+ * data properties Eleventy supplies itself; pass `[]` to disable the check.
  * @returns {{path: string, selector: string, value: any, previousValue: any, created: boolean, written: boolean}}
  */
 function write(filePath, selector, value, options = {}) {
@@ -286,7 +302,7 @@ function write(filePath, selector, value, options = {}) {
 	let normalized = TemplatePath.addLeadingDotSlash(TemplatePath.standardizeFilePath(filePath));
 	let pathArray = toPath(selector);
 
-	assertNotReserved(pathArray, normalized);
+	assertNotReserved(pathArray, normalized, options.reservedKeys ?? DEFAULT_RESERVED_KEYS);
 	assertInsideProject(normalized);
 
 	let extension = getExtension(normalized);
@@ -333,5 +349,5 @@ function write(filePath, selector, value, options = {}) {
 }
 
 export const DataWriter = Object.freeze({ write });
-export { DataWriterError, DataWriterPreservationError, toPath };
+export { DataWriterError, DataWriterPreservationError, toPath, DEFAULT_RESERVED_KEYS };
 export default DataWriter;

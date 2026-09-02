@@ -26,7 +26,7 @@ types/
 # Ignore test files
 .cache
 test/stubs-layout-cache/_includes/*.js
-test/stubs-datawriter-tmp/
+packages/datawriter/test/stubs-tmp/
 
 # Reuse docs from root
 packages/build-awesome/README.md

@@ -1,10 +1,16 @@
-name: Publish Release to npm
+name: Publish Core and Client to npm
 on:
   release:
     types: [published]
 permissions: read-all
 jobs:
   release:
+    # Core releases are tagged `vX.Y.Z`. Workspaces versioned independently of core are
+    # tagged `<package>@X.Y.Z` and have their own workflow, so skip those releases here
+    # rather than republishing core under whatever dist-tag their version implies.
+    # Both halves matter: the `@` check rejects a package whose name begins with `v`, and
+    # the `v` check rejects any other tag that happens not to contain an `@`.
+    if: ${{ startsWith(github.event.release.tag_name, 'v') && !contains(github.event.release.tag_name, '@') }}
     # see https://github.com/11ty/buildawesome/settings/environments
     environment: GitHub Publish
     runs-on: ubuntu-latest

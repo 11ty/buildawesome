@@ -1,0 +1,48 @@
+{
+	"name": "@awesome.me/ba-datawriter",
+	"description": "Write a value into a JSON data file or a template’s front matter, preserving comments and formatting.",
+	"version": "1.0.0",
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	},
+	"type": "module",
+	"main": "./src/DataWriter.js",
+	"exports": {
+		".": "./src/DataWriter.js"
+	},
+	"files": [
+		"./src/**/*.js"
+	],
+	"license": "MIT",
+	"funding": {
+		"type": "opencollective",
+		"url": "https://opencollective.com/11ty"
+	},
+	"scripts": {
+		"test": "ava"
+	},
+	"ava": {
+		"failFast": true,
+		"files": [
+			"./test/*Test.js"
+		]
+	},
+	"author": "Zach Leatherman (https://zachleat.com/)",
+	"repository": {
+		"type": "git",
+		"url": "git://github.com/11ty/buildawesome.git"
+	},
+	"bugs": "https://github.com/11ty/buildawesome/issues",
+	"homepage": "https://build.awesome.me/",
+	"dependencies": {
+		"@11ty/eleventy-utils": "^2.0.7",
+		"@11ty/gray-matter": "^3.0.0",
+		"@11ty/lodash-custom": "^4.17.21",
+		"js-yaml": "^5.3.0",
+		"jsonc-parser": "^3.3.1"
+	},
+	"devDependencies": {
+		"ava": "^8.0.1"
+	}
+}
