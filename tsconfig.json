@@ -2,6 +2,7 @@
 	"include": [
 		// "src/Core.js",
 		"src/UserConfig.js",
+		"src/Data/DataWriter.js",
 		"src/Util/ConsoleLogger.js",
 		"src/Util/ResolvePlugin.js",
 		"src/Util/AsyncEventEmitter.js",

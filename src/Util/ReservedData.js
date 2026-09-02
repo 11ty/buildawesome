@@ -1,4 +1,7 @@
-class CoreReservedDataError extends TypeError {}
+class CoreReservedDataError extends TypeError {
+	/** @type {Array<string>|undefined} */
+	reservedNames;
+}
 
 class ReservedData {
 	static fullProperties = [
