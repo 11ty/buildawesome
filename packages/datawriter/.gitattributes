@@ -1,0 +1,4 @@
+# The test fixtures are byte-exact: the suite asserts the precise bytes DataWriter writes,
+# including line endings (see the CRLF fixtures). Git must not rewrite them on checkout, or
+# a Windows clone gets CRLF everywhere and every exact-output assertion fails.
+test/stubs/** -text

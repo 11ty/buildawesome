@@ -189,7 +189,7 @@ function resolvePath(source, root, pathArray, selector) {
 
 			if (segment >= node.items.length) {
 				throw new DataWriterPreservationError(
-					`Cannot write \`${selector}\`: index ${segment} is past the end of the sequence at \`${traversed}\`. Appending to a YAML sequence is not yet supported.`,
+					`Cannot write \`${selector}\`: index ${segment} is past the end of the sequence at \`${traversed}\`. Use the \`append\` option to add an item.`,
 				);
 			}
 
@@ -371,6 +371,46 @@ function buildInsertion(source, events, root, parent, remaining, value, selector
 	return { start: at, end: at, replacement };
 }
 
+/* Adds an item to an existing block sequence. Append lands after the last item (and after
+ * any comment trailing inside the sequence); prepend lands on the first item's line, so the
+ * new entry takes its place and everything else shifts down untouched.
+ */
+function buildSequenceInsertion(source, events, sequence, value, selector, operation) {
+	if (sequence.event.style === COLLECTION_STYLE.FLOW) {
+		throw new DataWriterPreservationError(
+			`Cannot ${operation} to \`${selector}\`: it is a flow sequence (\`[ … ]\`), and inserting into one would reformat it.`,
+		);
+	}
+
+	let first = sequence.items[0];
+	let firstOffset = first?.type === "scalar" ? first.event.valueStart : (first?.event?.start ?? -1);
+
+	if (firstOffset < 0) {
+		throw new DataWriterPreservationError(
+			`Cannot ${operation} to \`${selector}\`: the sequence has no items to take indentation from.`,
+		);
+	}
+
+	let eol = detectEol(source);
+	let indent = indentAt(source, firstOffset);
+	let line = `${indent}- ${renderInline(value)}`;
+
+	if (operation === "prepend") {
+		let at = lineStartIndex(source, firstOffset);
+		return { start: at, end: at, replacement: line + eol };
+	}
+
+	let at = insertionPoint(source, events, sequence);
+	let needsLeadingNewline = at > 0 && source[at - 1] !== "\n";
+	let needsTrailingNewline = at < source.length || source.length === 0 || source.endsWith("\n");
+
+	return {
+		start: at,
+		end: at,
+		replacement: (needsLeadingNewline ? eol : "") + line + (needsTrailingNewline ? eol : ""),
+	};
+}
+
 /**
  * Computes the smallest span of `source` that must change to set `pathArray` to `value`,
  * preserving every other byte — comments, key order, quoting and indentation included.
@@ -416,7 +456,33 @@ function getYamlEdit(source, pathArray, value, options = {}) {
 		);
 	}
 
+	let operation = options.operation ?? "set";
 	let resolved = resolvePath(source, root, pathArray, selector);
+
+	if (operation === "append" || operation === "prepend") {
+		if (!resolved.found) {
+			// Nothing there yet: create the key holding a single-item sequence.
+			let edit = buildInsertion(
+				source,
+				events,
+				root,
+				resolved.parent,
+				resolved.remaining,
+				[value],
+				selector,
+			);
+			return { ...edit, previousValue, existed: false };
+		}
+
+		if (resolved.node.type !== "sequence") {
+			throw new DataWriterPreservationError(
+				`Cannot ${operation} to \`${selector}\`: the target is a ${resolved.node.type}, not a sequence.`,
+			);
+		}
+
+		let edit = buildSequenceInsertion(source, events, resolved.node, value, selector, operation);
+		return { ...edit, previousValue, existed: true };
+	}
 
 	if (!resolved.found) {
 		let edit = buildInsertion(

@@ -1,5 +1,4 @@
 ---
-k: 1
-k: 2
+title: T
 ---
 Body

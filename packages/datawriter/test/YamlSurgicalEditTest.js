@@ -4,13 +4,13 @@ import { getYamlEdit, DataWriterPreservationError } from "../src/YamlSurgicalEdi
 
 // Applies the returned span edit. Every assertion below compares the exact resulting
 // string: re-parsing and deep-comparing would pass even if formatting were destroyed.
-function edit(source, pathArray, value) {
-	let result = getYamlEdit(source, pathArray, value);
+function edit(source, pathArray, value, operation) {
+	let result = getYamlEdit(source, pathArray, value, { operation });
 	return source.slice(0, result.start) + result.replacement + source.slice(result.end);
 }
 
-function refuses(t, source, pathArray, value, messageMatch) {
-	let error = t.throws(() => getYamlEdit(source, pathArray, value), {
+function refuses(t, source, pathArray, value, messageMatch, operation) {
+	let error = t.throws(() => getYamlEdit(source, pathArray, value, { operation }), {
 		instanceOf: DataWriterPreservationError,
 	});
 	t.regex(error.message, messageMatch);
@@ -158,8 +158,33 @@ test("Refuses to replace a block scalar with a non-string", (t) => {
 	refuses(t, "lit: |\n  a\n", ["lit"], 5, /block scalar/);
 });
 
-test("Refuses to append past the end of a sequence", (t) => {
-	refuses(t, "tags:\n  - one\n", ["tags", 5], "x", /not yet supported/);
+test("An out-of-range index points at the append option instead of guessing", (t) => {
+	refuses(t, "tags:\n  - one\n", ["tags", 5], "x", /Use the `append` option/);
+});
+
+test("Appends and prepends to a block sequence", (t) => {
+	let seq = "tags:\n  - one\n  - two\nafter: x\n";
+
+	t.is(
+		edit(seq, ["tags"], "three", "append"),
+		"tags:\n  - one\n  - two\n  - three\nafter: x\n",
+	);
+	t.is(edit(seq, ["tags"], "zero", "prepend"), "tags:\n  - zero\n  - one\n  - two\nafter: x\n");
+});
+
+test("Appending lands after a comment trailing inside the sequence", (t) => {
+	t.is(
+		edit("tags:\n  - one\n  # a note\nafter: x\n", ["tags"], "two", "append"),
+		"tags:\n  - one\n  # a note\n  - two\nafter: x\n",
+	);
+});
+
+test("Refuses to insert into a flow sequence", (t) => {
+	refuses(t, "tags: [a, b]\n", ["tags"], "c", /flow sequence/, "append");
+});
+
+test("Refuses to append to something that is not a sequence", (t) => {
+	refuses(t, "tags:\n  a: 1\n", ["tags"], "c", /not a sequence/, "append");
 });
 
 test("Refuses to index into a scalar", (t) => {

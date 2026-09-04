@@ -27,6 +27,21 @@ function read(file) {
 	return readFileSync(`${WORK_DIR}/${file}`, "utf8");
 }
 
+/* Fixture integrity
+ *
+ * Every assertion in this file compares exact bytes, so a checkout that rewrote line
+ * endings fails most of them at once with confusing diffs. `.gitattributes` marks these
+ * fixtures `-text` so Git leaves them alone; this asserts that actually held.
+ */
+test("Fixtures kept their line endings", (t) => {
+	let hasCRLF = (file) => readFileSync(`${SOURCE_DIR}/${file}`, "utf8").includes("\r\n");
+
+	t.false(hasCRLF("commented.md"), "commented.md should be LF");
+	t.false(hasCRLF("data.json"), "data.json should be LF");
+	t.true(hasCRLF("crlf-fm.md"), "crlf-fm.md should be CRLF");
+	t.true(hasCRLF("crlf.json"), "crlf.json should be CRLF");
+});
+
 /* JSON data files */
 
 test("Writes into a JSON file without disturbing anything else", (t) => {
@@ -201,6 +216,161 @@ test("Surfaces a preservation refusal from the YAML editor", (t) => {
 	t.throws(() => DataWriter.write(`${WORK_DIR}/anchors.md`, "ref", 2), {
 		instanceOf: DataWriterPreservationError,
 	});
+});
+
+/* append / prepend */
+
+test("append and prepend add to a JSON array", (t) => {
+	DataWriter.write(`${WORK_DIR}/list.json`, "entries", { a: 2 }, { append: true });
+	DataWriter.write(`${WORK_DIR}/list.json`, "entries", { a: 0 }, { prepend: true });
+
+	t.deepEqual(JSON.parse(read("list.json")).entries, [{ a: 0 }, { a: 1 }, { a: 2 }]);
+});
+
+test("append and prepend add to a YAML sequence", (t) => {
+	DataWriter.write(`${WORK_DIR}/list.md`, "entries", "last", { append: true });
+	DataWriter.write(`${WORK_DIR}/list.md`, "entries", "first", { prepend: true });
+
+	t.is(read("list.md"), "---\nentries:\n  - first\n  - one\n  - last\n---\nBody\n");
+});
+
+test("append creates the array when the key is missing", (t) => {
+	DataWriter.write(`${WORK_DIR}/list-new.json`, "entries", "first", { append: true });
+	t.deepEqual(JSON.parse(read("list-new.json")).entries, ["first"]);
+
+	DataWriter.write(`${WORK_DIR}/list-new.md`, "entries", "first", { append: true });
+	t.regex(read("list-new.md"), /entries: \[first\]/);
+});
+
+test("append refuses a flow sequence rather than reformatting it", (t) => {
+	t.throws(() => DataWriter.write(`${WORK_DIR}/flow-list.md`, "entries", "c", { append: true }), {
+		instanceOf: DataWriterPreservationError,
+		message: /flow sequence/,
+	});
+});
+
+test("append and prepend are mutually exclusive and type-checked", (t) => {
+	t.throws(
+		() => DataWriter.write(`${WORK_DIR}/list.json`, "entries", 1, { append: true, prepend: true }),
+		{ instanceOf: DataWriterError, message: /Only one of/ },
+	);
+
+	t.throws(() => DataWriter.write(`${WORK_DIR}/list.json`, "entries[0].a", 1, { append: true }), {
+		instanceOf: DataWriterError,
+		message: /not an array/,
+	});
+});
+
+test.serial("A resolver can ask for append", (t) => {
+	t.teardown(() => DataWriter.removeStorageKey("guestbook"));
+
+	DataWriter.addStorageKey("guestbook", (data) => ({
+		filePath: `${WORK_DIR}/storage-list.json`,
+		selector: "entries",
+		value: { author: data.author, message: data.body },
+		append: true,
+	}));
+
+	DataWriter.writeStorage("guestbook", DATA);
+	DataWriter.writeStorage("guestbook", { author: "Second", body: "Another" });
+
+	t.deepEqual(JSON.parse(read("storage-list.json")).entries, [
+		{ author: "A Visitor", message: "Posted from an entirely different origin." },
+		{ author: "Second", message: "Another" },
+	]);
+});
+
+/* Storage keys
+ *
+ * An app registers a resolver per storageKey; the resolver owns which file the write lands
+ * in, which property it sets, and what the incoming fields become.
+ */
+
+const DATA = {
+	author: "A Visitor",
+	body: "Posted from an entirely different origin.",
+};
+
+test.serial("Writes a data object addressed by storageKey", (t) => {
+	t.teardown(() => DataWriter.removeStorageKey("guestbook"));
+
+	DataWriter.addStorageKey("guestbook", (data) => ({
+		filePath: `${WORK_DIR}/storage.json`,
+		selector: "latest",
+		// The resolver renames `body` to `message` and adds a field of its own.
+		value: { author: data.author, message: data.body, source: "webhook" },
+	}));
+
+	let result = DataWriter.writeStorage("guestbook", DATA);
+
+	t.is(result.storageKey, "guestbook");
+	t.is(result.selector, "latest");
+	t.is(result.written, true);
+	t.deepEqual(JSON.parse(read("storage.json")).latest, {
+		author: "A Visitor",
+		message: "Posted from an entirely different origin.",
+		source: "webhook",
+	});
+});
+
+test.serial("The resolver receives the data object and its key", (t) => {
+	t.teardown(() => DataWriter.removeStorageKey("guestbook"));
+
+	let seen;
+	DataWriter.addStorageKey("guestbook", (data, storageKey) => {
+		seen = { data, storageKey };
+		return { filePath: `${WORK_DIR}/storage-args.json`, selector: "a", value: 1 };
+	});
+
+	DataWriter.writeStorage("guestbook", DATA);
+
+	t.is(seen.storageKey, "guestbook");
+	t.deepEqual(seen.data, DATA);
+});
+
+test.serial("Throws for an unregistered storage key", (t) => {
+	let error = t.throws(() => DataWriter.writeStorage("not-registered", DATA), {
+		instanceOf: DataWriterError,
+	});
+
+	t.regex(error.message, /No storage key registered for `not-registered`/);
+});
+
+test.serial("A resolver returning nothing refuses the write", (t) => {
+	t.teardown(() => DataWriter.removeStorageKey("spam"));
+
+	DataWriter.addStorageKey("spam", () => undefined);
+
+	let error = t.throws(() => DataWriter.writeStorage("spam", DATA), {
+		instanceOf: DataWriterError,
+	});
+
+	t.regex(error.message, /refused the write/);
+});
+
+test.serial("Throws without a storage key or a data object", (t) => {
+	t.throws(() => DataWriter.writeStorage("", DATA), {
+		instanceOf: DataWriterError,
+		message: /non-empty storage key/,
+	});
+
+	t.throws(() => DataWriter.writeStorage("guestbook", "not an object"), {
+		instanceOf: DataWriterError,
+		message: /Expected a data object/,
+	});
+});
+
+test.serial("Registration is validated, and keys can be listed and cleared", (t) => {
+	t.teardown(() => DataWriter.clearStorageKeys());
+
+	t.throws(() => DataWriter.addStorageKey("", () => {}), { instanceOf: DataWriterError });
+	t.throws(() => DataWriter.addStorageKey("k", "not a function"), { instanceOf: DataWriterError });
+
+	DataWriter.addStorageKey("k", () => undefined);
+	t.deepEqual(DataWriter.getStorageKeys(), ["k"]);
+
+	DataWriter.clearStorageKeys();
+	t.deepEqual(DataWriter.getStorageKeys(), []);
 });
 
 /* Package entry points */

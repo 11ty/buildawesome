@@ -33,14 +33,69 @@ language, including its `---json` tag.
 Returns `{ path, selector, value, previousValue, created, written }`. `written` is `false`
 when the value was already what you asked for — nothing is written to disk in that case.
 
+### Lists
+
+By default a value **replaces** whatever is at the selector, so writing an object drops the
+keys you did not include. Two options add to an array instead:
+
+```js
+// Adds to the array at `entries`, creating it if the key is missing.
+DataWriter.write(file, "entries", entry, { append: true });
+DataWriter.write(file, "entries", entry, { prepend: true });
+```
+
+Only one of the two may be set at a time, and the target must be an array or absent.
+Appending to a YAML flow sequence (`[a, b]`) is refused, since inserting into one would
+reformat it.
+
+A resolver can request them too:
+
+```js
+DataWriter.addStorageKey("guestbook", (data) => ({
+	filePath: "./_data/guestbook.json",
+	selector: "entries",
+	value: { author: data.author, message: data.body },
+	append: true,
+}));
+```
+
 ### Options
 
 - **`format`** — `"yaml"` (default) or `"json"`. Only applies when a front matter block is
   being created.
+- **`append`** / **`prepend`** — see above.
 - **`reservedKeys`** — property names to refuse. Defaults to the data properties Eleventy
   supplies itself (`pkg`, `eleventy`, `content`, `page.url`, …), because writing one produces
   a file that is silently overwritten on the next build. Pass `[]` to disable the check when
   using this outside of Eleventy.
+
+## Writing by storage key
+
+An app can accept writes addressed by an opaque key instead of a file path — a webhook
+receiving a guestbook entry, say. Register a resolver per key; it owns the whole
+translation, including renaming incoming fields and rewriting their values.
+
+```js
+DataWriter.addStorageKey("guestbook", (data) => ({
+	filePath: "./_data/guestbook.json",
+	selector: "latest",
+	value: {
+		author: data.author,
+		message: data.body, // renamed on the way in
+		postedAt: new Date().toISOString(),
+	},
+}));
+
+DataWriter.writeStorage("guestbook", {
+	author: "A Visitor",
+	body: "Posted from an entirely different origin.",
+});
+```
+
+Returning nothing from a resolver refuses the write, which is how config rejects data it
+does not want. An unregistered key throws. Both surface as `DataWriterError`.
+
+Also available: `removeStorageKey(key)`, `clearStorageKeys()`, `getStorageKeys()`.
 
 ## When it refuses
 

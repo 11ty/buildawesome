@@ -3,7 +3,7 @@ import path from "node:path";
 
 import matter from "@11ty/gray-matter";
 import lodash from "@11ty/lodash-custom";
-import { TemplatePath } from "@11ty/eleventy-utils";
+import { TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 
 import {
 	parseTree,
@@ -158,21 +158,49 @@ function writeToDisk(filePath, content) {
 
 /* ---------- JSON documents ---------- */
 
-/* Returns the updated text, or undefined when the value is already what was asked for. */
-function editJson(source, pathArray, value) {
+function readJson(source, pathArray) {
 	let tree = parseTree(source);
 	let node = tree ? findNodeAtLocation(tree, pathArray) : undefined;
-	let previousValue = node ? getNodeValue(node) : undefined;
+	return { node, value: node ? getNodeValue(node) : undefined };
+}
+
+/* Returns the updated text, or `unchanged` when the value is already what was asked for. */
+function editJson(source, pathArray, value, operation = "set") {
+	let { node, value: previousValue } = readJson(source, pathArray);
+	let formattingOptions = detectJsonFormatting(source);
+
+	if (operation === "append" || operation === "prepend") {
+		if (node === undefined || previousValue === undefined) {
+			// Nothing there yet: create the key holding a single-item array.
+			return {
+				previousValue,
+				updated: applyEdits(source, modify(source, pathArray, [value], { formattingOptions })),
+			};
+		}
+
+		if (!Array.isArray(previousValue)) {
+			throw new DataWriterError(
+				`Cannot ${operation} to \`${pathArray.join(".")}\`: the target is not an array.`,
+			);
+		}
+
+		let index = operation === "prepend" ? 0 : previousValue.length;
+		let edits = modify(source, [...pathArray, index], value, {
+			formattingOptions,
+			isArrayInsertion: true,
+		});
+
+		return { previousValue, updated: applyEdits(source, edits) };
+	}
 
 	if (node && isDeepEqual(previousValue, value)) {
 		return { previousValue, unchanged: true };
 	}
 
-	let edits = modify(source, pathArray, value, {
-		formattingOptions: detectJsonFormatting(source),
-	});
-
-	return { previousValue, updated: applyEdits(source, edits) };
+	return {
+		previousValue,
+		updated: applyEdits(source, modify(source, pathArray, value, { formattingOptions })),
+	};
 }
 
 /* ---------- Front matter ---------- */
@@ -250,7 +278,7 @@ function editFrontMatter(source, pathArray, value, options) {
 	let selector = options.selector;
 
 	if (language === "json") {
-		let result = editJson(block, pathArray, value);
+		let result = editJson(block, pathArray, value, options.operation);
 		if (result.unchanged) {
 			return { previousValue: result.previousValue, unchanged: true };
 		}
@@ -261,11 +289,12 @@ function editFrontMatter(source, pathArray, value, options) {
 	}
 
 	let previousValue = lodashGet(file.data, pathArray);
-	if (isDeepEqual(previousValue, value)) {
+	let isInsertion = options.operation === "append" || options.operation === "prepend";
+	if (!isInsertion && isDeepEqual(previousValue, value)) {
 		return { previousValue, unchanged: true };
 	}
 
-	let edit = getYamlEdit(block, pathArray, value, { selector });
+	let edit = getYamlEdit(block, pathArray, value, { selector, operation: options.operation });
 
 	return {
 		previousValue,
@@ -274,6 +303,22 @@ function editFrontMatter(source, pathArray, value, options) {
 			edit.replacement +
 			source.slice(blockStart + edit.end),
 	};
+}
+
+function getOperation(options, pathArray) {
+	let requested = ["append", "prepend"].filter((name) => options[name]);
+
+	if (requested.length > 1) {
+		throw new DataWriterError(
+			`Only one of \`append\` or \`prepend\` may be set (received ${requested.join(", ")}).`,
+		);
+	}
+
+	if (requested.length === 1 && pathArray.length === 0) {
+		throw new DataWriterError(`\`${requested[0]}\` needs a selector to write to.`);
+	}
+
+	return requested[0] ?? "set";
 }
 
 /* ---------- Public API ---------- */
@@ -292,6 +337,8 @@ function editFrontMatter(source, pathArray, value, options) {
  * @param {"yaml"|"json"} [options.format] - Language for a front matter block being created.
  * @param {Array<string>} [options.reservedKeys] - Property names to refuse. Defaults to the
  * data properties Eleventy supplies itself; pass `[]` to disable the check.
+ * @param {boolean} [options.append] - Add the value to the end of the array at `selector`.
+ * @param {boolean} [options.prepend] - Add the value to the start of the array at `selector`.
  * @returns {{path: string, selector: string, value: any, previousValue: any, created: boolean, written: boolean}}
  */
 function write(filePath, selector, value, options = {}) {
@@ -313,41 +360,132 @@ function write(filePath, selector, value, options = {}) {
 		);
 	}
 
+	let operation = getOperation(options, pathArray);
+
 	let exists = existsSync(normalized);
 	let source = exists ? readFileSync(normalized, "utf8") : "";
-	let result;
+	let text = exists ? source : extension === "json" ? "{}\n" : "";
 
-	if (extension === "json") {
-		let edit = editJson(exists ? source : "{}\n", pathArray, value);
-		result = { ...edit, created: !exists };
-	} else {
-		result = editFrontMatter(source, pathArray, value, { ...options, selector });
-		result.created = result.created || !exists;
-	}
+	let result =
+		extension === "json"
+			? { ...editJson(text, pathArray, value, operation), created: !exists }
+			: editFrontMatter(text, pathArray, value, { ...options, selector, operation });
+
+	let created = Boolean(result.created) || !exists;
+	let { previousValue } = result;
 
 	if (result.unchanged) {
-		return {
-			path: normalized,
-			selector,
-			value,
-			previousValue: result.previousValue,
-			created: false,
-			written: false,
-		};
+		return { path: normalized, selector, value, previousValue, created: false, written: false };
 	}
 
 	writeToDisk(normalized, result.updated);
 
+	return { path: normalized, selector, value, previousValue, created, written: true };
+}
+
+/* ---------- Storage keys ---------- */
+
+/* storageKey -> resolver. Registered by the consuming app, which owns the decision of
+ * where a given key lives on disk and how its incoming fields map onto data properties.
+ */
+const storageKeys = new Map();
+
+/**
+ * Maps a `storageKey` onto a data file location, so an app can accept a write addressed
+ * by an opaque key rather than a file path.
+ *
+ * The resolver receives the incoming data object and returns where it lands on disk.
+ *
+ * The resolver owns the whole translation: which file, which property, and what the value
+ * becomes. Returning nothing refuses the write.
+ *
+ * @param {string} storageKey
+ * @param {(data: object, storageKey: string) => ({filePath: string, selector: string, value: any, append?: boolean, prepend?: boolean}|undefined)} resolver
+ */
+function addStorageKey(storageKey, resolver) {
+	if (typeof storageKey !== "string" || storageKey.length === 0) {
+		throw new DataWriterError("Expected a non-empty storage key.");
+	}
+
+	if (typeof resolver !== "function") {
+		throw new DataWriterError(
+			`Expected a resolver function for storage key \`${storageKey}\`, received ${typeof resolver}.`,
+		);
+	}
+
+	storageKeys.set(storageKey, resolver);
+}
+
+function removeStorageKey(storageKey) {
+	return storageKeys.delete(storageKey);
+}
+
+function clearStorageKeys() {
+	storageKeys.clear();
+}
+
+function getStorageKeys() {
+	return [...storageKeys.keys()];
+}
+
+/**
+ * Writes a data object addressed by `storageKey`, using the resolver registered for it.
+ *
+ * @param {string} storageKey
+ * @param {object} data - The incoming fields, e.g. `{ author, body }`.
+ * @param {object} [options] - Passed through to `write`.
+ * @returns {{path: string, selector: string, value: any, previousValue: any, created: boolean, written: boolean, storageKey: string}}
+ */
+function writeStorage(storageKey, data, options = {}) {
+	if (typeof storageKey !== "string" || storageKey.length === 0) {
+		throw new DataWriterError("Expected a non-empty storage key.");
+	}
+
+	if (!isPlainObject(data)) {
+		throw new DataWriterError(
+			`Expected a data object for storage key \`${storageKey}\`, received ${typeof data}.`,
+		);
+	}
+
+	let resolver = storageKeys.get(storageKey);
+	if (!resolver) {
+		throw new DataWriterError(
+			`No storage key registered for \`${storageKey}\`. Registered: ${getStorageKeys().join(", ") || "(none)"}.`,
+		);
+	}
+
+	let resolved = resolver(data, storageKey);
+
+	if (!isPlainObject(resolved)) {
+		throw new DataWriterError(`The resolver for \`${storageKey}\` refused the write.`);
+	}
+
+	let { filePath, selector, value, append, prepend } = resolved;
+
+	if (typeof filePath !== "string" || typeof selector !== "string") {
+		throw new DataWriterError(
+			`The resolver for \`${storageKey}\` must return \`filePath\` and \`selector\` strings.`,
+		);
+	}
+
 	return {
-		path: normalized,
-		selector,
-		value,
-		previousValue: result.previousValue,
-		created: Boolean(result.created),
-		written: true,
+		...write(filePath, selector, value, {
+			...options,
+			...(resolved.options ?? {}),
+			...(append ? { append } : {}),
+			...(prepend ? { prepend } : {}),
+		}),
+		storageKey,
 	};
 }
 
-export const DataWriter = Object.freeze({ write });
-export { DataWriterError, DataWriterPreservationError, toPath, DEFAULT_RESERVED_KEYS };
+export const DataWriter = Object.freeze({
+	write,
+	writeStorage,
+	addStorageKey,
+	removeStorageKey,
+	clearStorageKeys,
+	getStorageKeys,
+});
+export { DataWriterError, DataWriterPreservationError, DEFAULT_RESERVED_KEYS };
 export default DataWriter;
