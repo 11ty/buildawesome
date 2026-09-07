@@ -160,7 +160,7 @@
 		"minimist": "^1.2.8",
 		"moo": "0.5.2",
 		"obug": "^2.1.4",
-		"picomatch": "^4.0.5",
+		"picomatch": "^4.0.7",
 		"posthtml": "^0.16.7",
 		"posthtml-match-helper": "^2.0.3",
 		"semver": "^7.8.5",
