@@ -9,6 +9,7 @@ import { getEnvValue } from "./Util/EnvironmentVars.cjs";
 import urlFilter from "./Filters/Url.js";
 import getLocaleCollectionItem from "./Filters/GetLocaleCollectionItem.js";
 import getCollectionItemIndex from "./Filters/GetCollectionItemIndex.js";
+import getParentDirectory from "./Filters/GetParentDirectory.js";
 import { FilterPlugin as InputPathToUrlFilterPlugin } from "./Plugins/InputPathToUrl.js";
 
 /**
@@ -101,4 +102,9 @@ export default function ($config) {
 
 		return urlFilter.call(this, url, pathPrefix);
 	});
+
+	// Returns the parent directory of a path
+	// For directories (/mydir/): returns parent (/mydir/ -> /)
+	// For files (/mydir/file.html): returns containing directory (/mydir/file.html -> /mydir/)
+	config.addFilter("getParentDirectory", getParentDirectory);
 }
