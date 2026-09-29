@@ -16,7 +16,13 @@ updates:
     versioning-strategy: increase
     allow:
       - dependency-type: "production"
+    ignore:
+      - dependency-name: "moo"
     assignees: [zachleat]
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+        patterns: ["*"]
 
   - package-ecosystem: github-actions
     directories: [".github/workflows/**"]
@@ -25,3 +31,9 @@ updates:
     cooldown:
       default-days: 7
     assignees: [zachleat]
+    groups:
+      github-actions-minor-patch:
+        update-types: ["minor", "patch"]
+        patterns: ["*"]
+      codeql-action:
+        patterns: ["github/codeql-action*"]

@@ -4,6 +4,7 @@ permissions: read-all
 jobs:
   server:
     name: Node.js v${{ matrix.node }} on ${{ matrix.os }}
+    if: ${{ !startsWith(github.ref, 'refs/heads/dependabot/github_actions/') }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -20,6 +21,7 @@ jobs:
       - run: npm run test:server
   client:
     name: Vitest on ${{ matrix.os }} (Node.js v${{ matrix.node }})
+    if: ${{ !startsWith(github.ref, 'refs/heads/dependabot/github_actions/') }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
