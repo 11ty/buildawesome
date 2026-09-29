@@ -52,7 +52,7 @@ async function exec() {
 		}
 
 		const argv = minimist(process.argv.slice(2), {
-			string: ["input", "output", "formats", "config", "pathprefix", "port", "to", "incremental", "loader"],
+			string: ["input", "output", "formats", "config", "pathprefix", "port", "to", "incremental", "loader", "reporter"],
 			boolean: [
 				"quiet",
 				"version",
@@ -97,6 +97,17 @@ async function exec() {
 			return;
 		}
 
+		let reporter;
+		if (argv.reporter) {
+			if (argv.reporter !== "ndjson") {
+				throw new SimpleError(
+					`Invalid --reporter value: ${argv.reporter}. Supported values: \`ndjson\`.`,
+				);
+			}
+			const { default: NdjsonReporter } = await import("./src/Util/NdjsonReporter.js");
+			reporter = new NdjsonReporter();
+		}
+
 		let core = new Core(argv.input, argv.output, {
 			source: "cli",
 			// --quiet and --quiet=true both resolve to true
@@ -106,7 +117,11 @@ async function exec() {
 			runMode: argv.serve ? "serve" : argv.watch ? "watch" : "build",
 			dryRun: argv.dryrun,
 			loader: argv.loader,
+			config: reporter ? (cfg) => reporter.config(cfg) : undefined,
 		});
+
+		// Before init
+		reporter?.installLogger(core);
 
 		// override with ErrorHandler instance in Core
 		handler = core.errorHandler;

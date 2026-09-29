@@ -801,6 +801,8 @@ Verbose Output: ${this.verboseMode}`;
 
 		let returnObj;
 		let hasError = false;
+		// Also used in catch
+		let eventsArg;
 		let outputMode = String(to);
 		// normalize fs:templates or fs:copy to `fs`
 		if (outputMode.includes(":")) {
@@ -809,7 +811,7 @@ Verbose Output: ${this.verboseMode}`;
 
 		try {
 			let directories = this.directories.getUserspaceInstance();
-			let eventsArg = {
+			eventsArg = {
 				directories,
 
 				// v3.0.0-alpha.6, changed to use `directories` instead (this was only used by serverless plugin)
@@ -867,6 +869,8 @@ Verbose Output: ${this.verboseMode}`;
 			// Issue #2405: Don’t change the exitCode for programmatic scripts
 			let errorSeverity = this.source === "script" ? "error" : "fatal";
 			this.errorHandler.once(errorSeverity, error, "Problem writing Eleventy templates");
+
+			await this.config.events.emit("buildawesome.aftererror", { ...eventsArg, error });
 
 			throw error;
 		} finally {

@@ -559,6 +559,9 @@ Arguments:
      --to=fs:templates
        Writes templates, skips passthrough copy
 
+     --reporter=ndjson
+       Emit build events as newline-delimited JSON on stdout (logs move to stderr)
+
      --help`;
 	}
 
