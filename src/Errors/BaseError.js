@@ -23,4 +23,13 @@ export default class BaseError extends Error {
 			this.originalError = originalError;
 		}
 	}
+
+	/**
+	 * @param {string} filePath - The file that caused the error.
+	 * @returns {this}
+	 */
+	setFilePath(filePath) {
+		this.filePath = filePath;
+		return this;
+	}
 }

@@ -449,7 +449,7 @@ class TemplateWriter {
 							new TemplateError(
 								`Having trouble writing to ${outputPaths} from "${mapEntry.inputPath}"`,
 								e,
-							),
+							).setFilePath(mapEntry.inputPath),
 						);
 					}
 				}),
@@ -463,7 +463,7 @@ class TemplateWriter {
 						new TemplateError(
 							`Having trouble writing to (second pass) "${mapEntry.outputPath}" from "${mapEntry.inputPath}"`,
 							e,
-						),
+						).setFilePath(mapEntry.inputPath),
 					);
 				}),
 			);

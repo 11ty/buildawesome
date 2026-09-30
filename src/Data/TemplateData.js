@@ -531,15 +531,24 @@ class TemplateData {
 		}
 
 		try {
+			let result;
 			if (readFile) {
-				return parser(rawInput, path);
+				result = parser(rawInput, path);
 			} else {
 				// path as a first argument is when `read: false`
 				// path as a second argument is for consistency with `read: true` API
-				return parser(path, path);
+				result = parser(path, path);
 			}
+
+			// Await inside try so async parser rejections are wrapped too
+			if (typeof result?.then === "function") {
+				return await result;
+			}
+			return result;
 		} catch (e) {
-			throw new TemplateDataParseError(`Having trouble parsing data file ${path}`, e);
+			throw new TemplateDataParseError(`Having trouble parsing data file ${path}`, e).setFilePath(
+				path,
+			);
 		}
 	}
 

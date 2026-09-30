@@ -15,6 +15,16 @@ function toManifestEntry(result) {
 	};
 }
 
+/** @param {Error} error */
+function findFilePath(error) {
+	// Template errors may be wrapped more than once
+	for (let e = error; e; e = e.cause) {
+		if (e.filePath) {
+			return e.filePath;
+		}
+	}
+}
+
 /** Build events on stdout, logs on stderr (--reporter=ndjson) */
 class NdjsonReporter {
 	/** @type {number|undefined} */
@@ -62,7 +72,7 @@ class NdjsonReporter {
 				error: {
 					message: error?.message,
 					name: error?.name,
-					inputPath: error?.inputPath,
+					filePath: findFilePath(error),
 				},
 			});
 		});

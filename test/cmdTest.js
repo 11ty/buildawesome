@@ -100,6 +100,7 @@ test("Test command line --reporter=ndjson template error", async (t) => {
         let buildError = events.find((e) => e.type === "build.error");
         t.is(buildError.ok, false);
         t.is(typeof buildError.error.message, "string");
+        t.is(buildError.error.filePath, "./test/stubs/ndjson-broken/index.njk");
         resolve();
       }
     );
@@ -114,6 +115,21 @@ test("Test command line --reporter=ndjson rejects --to=json", async (t) => {
         t.is(error.code, 1);
         t.is(stdout, "");
         t.true(stderr.includes("not compatible with --to=json"));
+        resolve();
+      }
+    );
+  });
+});
+
+test("Test command line --reporter=ndjson data file error", async (t) => {
+  await new Promise((resolve) => {
+    exec(
+      "node ./cmd.cjs --input=test/stubs/ndjson-broken-data --formats=md --reporter=ndjson --dryrun",
+      (error, stdout, stderr) => {
+        t.is(error.code, 1);
+        let events = parseEvents(stdout);
+        let buildError = events.find((e) => e.type === "build.error");
+        t.is(buildError.error.filePath, "./test/stubs/ndjson-broken-data/_data/bad.json");
         resolve();
       }
     );
