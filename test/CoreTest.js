@@ -272,6 +272,24 @@ test("Eleventy set input/output, one file input exitCode (cli)", async (t) => {
   process.exitCode = previousExitCode;
 });
 
+test("setReporter config re-runs for each new user config", async (t) => {
+  let elev = new Eleventy("./test/noop/", "./test/noop/_site");
+  let configs = [];
+  elev.setReporter({
+    config(userConfig) {
+      configs.push(userConfig);
+    },
+  });
+
+  await elev.init();
+  t.is(configs.length, 1);
+
+  await elev.resetConfig();
+  await elev.init();
+  t.is(configs.length, 2);
+  t.not(configs[0], configs[1]);
+});
+
 test("Throwing buildawesome.aftererror listener does not mask the original error", async (t) => {
   let elev = new Eleventy("./test/stubs/exitCode/failure.njk", "./test/stubs/exitCode/_site", {
     source: "script",

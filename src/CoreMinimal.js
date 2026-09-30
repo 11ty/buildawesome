@@ -60,6 +60,8 @@ export class CoreMinimal {
 	#isEsm;
 	/** @type {string} */
 	#activeConfigurationPath;
+	/** @type {object|undefined} */
+	#reporter;
 
 	// Support both new Eleventy(options) and new Eleventy(input, output, options)
 	#normalizeConstructorArguments(...args) {
@@ -267,6 +269,11 @@ export class CoreMinimal {
 		}
 
 		this.eleventyConfig.userConfig.directories = this.directories;
+
+		// Re-runs on config resets in watch mode
+		if (this.#reporter) {
+			await this.#reporter.config(this.eleventyConfig.userConfig);
+		}
 
 		/* Programmatic API config, this runs before the default config is initialized */
 		if (this.options.config && typeof this.options.config === "function") {
@@ -565,6 +572,20 @@ Verbose Output: ${this.verboseMode}`;
 
 	disableLogger() {
 		this.logger.overrideLogger(false);
+	}
+
+	/**
+	 * Call before init().
+	 *
+	 * @param {{ config: Function, getLogger?: Function }} reporter
+	 */
+	setReporter(reporter) {
+		this.#reporter = reporter;
+
+		let logger = reporter.getLogger?.();
+		if (logger) {
+			this.logger.overrideLogger(logger);
+		}
 	}
 
 	/** @type {ErrorHandler} */

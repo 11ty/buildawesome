@@ -1,3 +1,5 @@
+import { Console } from "node:console";
+
 // Bump on a breaking change
 const SCHEMA_VERSION = 1;
 
@@ -78,8 +80,8 @@ export class NdjsonReporter {
 		});
 	}
 
-	/** @param {object} core */
-	installLogger(core) {
-		core.logger.overrideLogger(new console.Console(process.stderr, process.stderr));
+	// Keeps stdout clean for events
+	getLogger() {
+		return new Console(process.stderr, process.stderr);
 	}
 }

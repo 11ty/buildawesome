@@ -107,7 +107,7 @@ async function exec() {
 			if (argv.to === "json") {
 				throw new SimpleError("--reporter=ndjson is not compatible with --to=json.");
 			}
-			const { NdjsonReporter } = await import("./src/Util/NdjsonReporter.js");
+			const { NdjsonReporter } = await import("./src/Reporters/NdjsonReporter.js");
 			reporter = new NdjsonReporter();
 		}
 
@@ -120,11 +120,12 @@ async function exec() {
 			runMode: argv.serve ? "serve" : argv.watch ? "watch" : "build",
 			dryRun: argv.dryrun,
 			loader: argv.loader,
-			config: reporter ? (cfg) => reporter.config(cfg) : undefined,
 		});
 
 		// Before init
-		reporter?.installLogger(core);
+		if (reporter) {
+			core.setReporter(reporter);
+		}
 
 		// override with ErrorHandler instance in Core
 		handler = core.errorHandler;
