@@ -870,7 +870,15 @@ Verbose Output: ${this.verboseMode}`;
 			let errorSeverity = this.source === "script" ? "error" : "fatal";
 			this.errorHandler.once(errorSeverity, error, "Problem writing Eleventy templates");
 
-			await this.config.events.emit("buildawesome.aftererror", { ...eventsArg, error });
+			// Don’t let a failing listener mask the original error
+			try {
+				await this.config.events.emit("buildawesome.aftererror", { ...eventsArg, error });
+			} catch (listenerError) {
+				this.errorHandler.warn(
+					listenerError,
+					"Problem in `buildawesome.aftererror` event listener",
+				);
+			}
 
 			throw error;
 		} finally {
