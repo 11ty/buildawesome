@@ -159,7 +159,7 @@
 		"markdown-it": "^14.3.2",
 		"minimist": "^1.2.8",
 		"moo": "0.5.2",
-		"obug": "^2.2.1",
+		"obug": "^3.0.0",
 		"picomatch": "^4.0.7",
 		"posthtml": "^0.16.7",
 		"posthtml-match-helper": "^2.0.3",
