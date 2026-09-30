@@ -1489,6 +1489,50 @@ test("Throws a Premature Template Content Error from rendering (njk)", async (t)
   t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
 });
 
+test("Recognizes a Premature Template Content Error wrapped by a Nunjucks filter", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function (cfg) {
+    cfg.addFilter("renderedContent", (items) => items[0].templateContent);
+  });
+  let tmpl = await getNewTemplate(
+    "./test/stubs/prematureTemplateContent/filter.njk",
+    "./test/stubs/",
+    "./test/stubs/_site",
+    null,
+    null,
+    eleventyConfig
+  );
+
+  let data = await tmpl.getData();
+  await tmpl.getTemplateMapEntry(data);
+
+  let pageEntries = await tmpl.getTemplates({
+    page: {},
+    samples: [
+      {
+        get templateContent() {
+          throw new TemplateContentPrematureUseError(
+            "Tried to use templateContent too early (filter.njk)"
+          );
+        },
+      },
+    ],
+  });
+  let error = await t.throwsAsync(async () => {
+    await tmpl.renderPageEntry(pageEntries[0]);
+  });
+
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
+});
+
+test("Premature Template Content Error detection handles cycles", (t) => {
+  let error = new Error("Outer error");
+  let cause = new Error("Inner error");
+  error.cause = cause;
+  cause.cause = error;
+
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), false);
+});
+
 test("Throws a Premature Template Content Error (liquid)", async (t) => {
   let tmpl = await getNewTemplate(
     "./test/stubs/prematureTemplateContent/test.liquid",

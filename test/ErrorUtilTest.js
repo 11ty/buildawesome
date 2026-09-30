@@ -1,5 +1,6 @@
 import test from "ava";
 import ErrorUtil from "../src/Errors/ErrorUtil.js";
+import TemplateContentPrematureUseError from "../src/Errors/TemplateContentPrematureUseError.js";
 
 const SAMPLE_ERROR = new Error("Nothing to see here");
 
@@ -46,4 +47,21 @@ test("deconvertErrorToObject() should get message and stack from convertErrorToS
   t.is(result.name, nestingError.name);
   t.is(result.message, SAMPLE_ERROR.message);
   t.is(result.stack, SAMPLE_ERROR.stack);
+});
+
+test("isPrematureTemplateContentError() follows nested Error.cause values", (t) => {
+  let prematureError = new TemplateContentPrematureUseError("Too early");
+  let error = new Error("Outer error", {
+    cause: new Error("Inner error", { cause: prematureError }),
+  });
+
+  t.true(ErrorUtil.isPrematureTemplateContentError(error));
+});
+
+test("isPrematureTemplateContentError() ignores matching text in nested errors", (t) => {
+  let error = new Error("Outer error", {
+    cause: new Error("Documentation mentions TemplateContentPrematureUseError"),
+  });
+
+  t.false(ErrorUtil.isPrematureTemplateContentError(error));
 });
