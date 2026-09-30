@@ -23,6 +23,10 @@ updates:
       npm-minor-patch:
         update-types: ["minor", "patch"]
         patterns: ["*"]
+      npm-security:
+        applies-to: security-updates
+        update-types: ["minor", "patch"]
+        patterns: ["*"]
 
   - package-ecosystem: github-actions
     directories: [".github/workflows/**"]
