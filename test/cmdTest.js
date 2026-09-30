@@ -105,3 +105,17 @@ test("Test command line --reporter=ndjson template error", async (t) => {
     );
   });
 });
+
+test("Test command line --reporter=ndjson rejects --to=json", async (t) => {
+  await new Promise((resolve) => {
+    exec(
+      "node ./cmd.cjs --input=test/stubs/ndjson-ok --formats=md --reporter=ndjson --to=json",
+      (error, stdout, stderr) => {
+        t.is(error.code, 1);
+        t.is(stdout, "");
+        t.true(stderr.includes("not compatible with --to=json"));
+        resolve();
+      }
+    );
+  });
+});
