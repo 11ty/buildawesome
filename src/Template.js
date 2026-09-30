@@ -833,12 +833,25 @@ class Template extends TemplateContent {
 			);
 		}
 
-		let templateBenchmark = this.bench.get("Template Write");
-		templateBenchmark.before();
+		// Output hashes are only tracked in watch/serve (set by Core).
+		let outputHashes = this.eleventyConfig.isWatchOrServe()
+			? this.eleventyConfig.outputHashes
+			: undefined;
+		let changed = outputHashes ? outputHashes.update(outputPath, finalContent) : true;
 
-		this.fsManager.writeFileSync(outputPath, finalContent);
+		let skipWrite =
+			!changed &&
+			this.config.skipUnchangedWrites &&
+			this.eleventyConfig.existsCache.exists(outputPath);
 
-		templateBenchmark.after();
+		if (!skipWrite) {
+			let templateBenchmark = this.bench.get("Template Write");
+			templateBenchmark.before();
+
+			this.fsManager.writeFileSync(outputPath, finalContent);
+
+			templateBenchmark.after();
+		}
 		this.writeCount++;
 		debug(`${outputPath} ${lang.finished}.`);
 
@@ -849,6 +862,10 @@ class Template extends TemplateContent {
 			content: finalContent,
 			rawInput,
 		};
+
+		if (outputHashes) {
+			ret.changed = changed;
+		}
 
 		if (data && this.config.dataFilterSelectors?.size > 0) {
 			ret.data = this.retrieveDataForJsonOutput(data, this.config.dataFilterSelectors);
