@@ -26,7 +26,7 @@ function findFilePath(error) {
 }
 
 /** Build events on stdout, logs on stderr (--reporter=ndjson) */
-class NdjsonReporter {
+export class NdjsonReporter {
 	/** @type {number|undefined} */
 	#startedAt;
 
@@ -83,5 +83,3 @@ class NdjsonReporter {
 		core.logger.overrideLogger(new console.Console(process.stderr, process.stderr));
 	}
 }
-
-export default NdjsonReporter;

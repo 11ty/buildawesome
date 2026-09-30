@@ -107,7 +107,7 @@ async function exec() {
 			if (argv.to === "json") {
 				throw new SimpleError("--reporter=ndjson is not compatible with --to=json.");
 			}
-			const { default: NdjsonReporter } = await import("./src/Util/NdjsonReporter.js");
+			const { NdjsonReporter } = await import("./src/Util/NdjsonReporter.js");
 			reporter = new NdjsonReporter();
 		}
 
