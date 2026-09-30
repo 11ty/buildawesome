@@ -196,6 +196,7 @@ export default class UserConfig {
 		/** @type {object} */
 		this.libraryAmendments = {};
 		this.serverPassthroughCopyBehavior = "copy"; // or "passthrough"
+		this.skipUnchangedWrites = true;
 		this.urlTransforms = [];
 
 		// Defaults in `defaultConfig.js`
@@ -995,6 +996,11 @@ export default class UserConfig {
 		this.serverPassthroughCopyBehavior = behavior;
 	}
 
+	// During --watch and --serve, skip writing template output that is unchanged from the previous build
+	setSkipUnchangedWrites(skip = true) {
+		this.skipUnchangedWrites = Boolean(skip);
+	}
+
 	// Url transforms change page.url and work good with server side content-negotiation (e.g. i18n plugin)
 	addUrlTransform(callback) {
 		this.urlTransforms.push(callback);
@@ -1256,6 +1262,7 @@ export default class UserConfig {
 			dataFilterSelectors: this.dataFilterSelectors,
 			libraryAmendments: this.libraryAmendments,
 			serverPassthroughCopyBehavior: this.serverPassthroughCopyBehavior,
+			skipUnchangedWrites: this.skipUnchangedWrites,
 			urlTransforms: this.urlTransforms,
 			virtualTemplates: this.virtualTemplates,
 			// `directories` and `directoryAssignments` are merged manually prior to plugin processing

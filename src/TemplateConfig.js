@@ -144,12 +144,13 @@ class TemplateConfig {
 		this.#runMode = runMode;
 	}
 
+	isWatchOrServe() {
+		return this.#runMode === "watch" || this.#runMode === "serve";
+	}
+
 	shouldSpiderJavaScriptDependencies() {
 		// not for a standard build
-		return (
-			(this.#runMode === "watch" || this.#runMode === "serve") &&
-			this.userConfig.watchJavaScriptDependencies
-		);
+		return this.isWatchOrServe() && this.userConfig.watchJavaScriptDependencies;
 	}
 
 	/**

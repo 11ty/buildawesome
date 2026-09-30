@@ -14,7 +14,8 @@ import { createDebug } from "./Util/DebugLogUtil.js";
 import checkPassthroughCopyBehavior from "./Util/PassthroughCopyBehaviorCheck.js";
 import PathPrefixer from "./Util/PathPrefixer.js";
 import PathNormalizer from "./Util/PathNormalizer.js";
-import { isGlobMatch } from "./Util/GlobMatcher.js";
+import { isGlobMatch, isDynamicPattern } from "./Util/GlobMatcher.js";
+import { OutputHashes } from "./Util/OutputHashes.js";
 import eventBus from "./EventBus.js";
 
 const debug = createDebug("Core");
@@ -28,6 +29,13 @@ export default class Core extends CoreFs {
 
 	#watchDelay;
 	#interrupted = false;
+
+	/** @type {OutputHashes} */
+	#outputHashes = new OutputHashes();
+
+	get outputHashes() {
+		return this.#outputHashes;
+	}
 
 	get watchQueue() {
 		if (!this.#watchQueue) {
@@ -48,6 +56,9 @@ export default class Core extends CoreFs {
 		this.eleventyServe.logger = this.logger;
 		this.eleventyServe.eleventyConfig = this.eleventyConfig;
 
+		// Used by templates to detect changed output in watch/serve
+		this.eleventyConfig.outputHashes = this.#outputHashes;
+
 		/** @type {object} */
 		this.watchTargets = new WatchTargets(this.eleventyConfig);
 		this.watchTargets.add(this.config.additionalWatchTargets);
@@ -55,6 +66,8 @@ export default class Core extends CoreFs {
 
 	async resetConfig() {
 		await super.resetConfig();
+
+		this.#outputHashes.reset();
 
 		// TODO set this.eleventyServe with this.getChokidarConfig()
 		if (checkPassthroughCopyBehavior(this.config, this.runMode)) {
@@ -137,6 +150,22 @@ export default class Core extends CoreFs {
 		);
 	}
 
+	#isAdditionalWatchTarget(path) {
+		let changedPath = TemplatePath.normalize(path);
+		return this.config.additionalWatchTargets.flat().some((target) => {
+			if (typeof target !== "string") {
+				return false;
+			}
+
+			let targetPath = TemplatePath.normalize(target);
+			if (isDynamicPattern(targetPath)) {
+				return isGlobMatch(changedPath, [targetPath]);
+			}
+
+			return changedPath === targetPath || changedPath.startsWith(`${targetPath}/`);
+		});
+	}
+
 	async #rewatch() {
 		if (this.watchQueue.isBuildRunning()) {
 			// this.logger.forceLog("Waiting for previous build to finish…");
@@ -199,25 +228,45 @@ export default class Core extends CoreFs {
 				);
 			});
 
-			// Maps passthrough copy files to output URLs for CSS live reload
+			// Maps passthrough copy files to output URLs for CSS live reload (and full reloads for other changed files)
 			let stylesheetUrls = new Set();
+			let passthroughUrls = new Set();
 			for (let entry of passthroughCopyResults) {
 				for (let filepath in entry.map) {
-					if (
-						filepath.endsWith(".css") &&
-						queue.includes(TemplatePath.addLeadingDotSlash(filepath))
-					) {
-						stylesheetUrls.add(
-							"/" + TemplatePath.stripLeadingSubPath(entry.map[filepath], this.outputDir),
-						);
+					let src = TemplatePath.normalize(filepath);
+					let dest = TemplatePath.stripLeadingSubPath(entry.map[filepath], this.outputDir);
+
+					for (let queuedPath of queue) {
+						let changedPath = TemplatePath.normalize(queuedPath);
+						let url;
+						if (changedPath === src) {
+							url = "/" + dest;
+						} else if (changedPath.startsWith(`${src}/`)) {
+							// Emulated passthrough copy maps whole directories
+							url = "/" + TemplatePath.join(dest, changedPath.slice(src.length + 1));
+						} else {
+							continue;
+						}
+
+						if (changedPath.endsWith(".css")) {
+							stylesheetUrls.add(url);
+						} else {
+							passthroughUrls.add(url);
+						}
 					}
 				}
 			}
 
+			// `addWatchTarget` files can change output Eleventy doesn’t track (e.g. a bundler in `eleventy.before`)
+			let isOutputsTracked =
+				this.eleventyConfig.isWatchOrServe() &&
+				!queue.some((path) => this.#isAdditionalWatchTarget(path));
+
 			let normalizedPathPrefix = PathPrefixer.normalizePathPrefix(this.config.pathPrefix);
 			let matchingTemplates = templateResults
 				.flat()
-				.filter((entry) => Boolean(entry))
+				// Only send templates whose output changed since the previous build
+				.filter((entry) => Boolean(entry) && (!isOutputsTracked || entry.changed !== false))
 				.map((entry) => {
 					// only `url`, `inputPath`, and `content` are used: https://github.com/11ty/eleventy-dev-server/blob/1c658605f75224fdc76f68aebe7a412eeb4f1bc9/client/reload-client.js#L140
 					entry.url = PathPrefixer.joinUrlParts(normalizedPathPrefix, entry.url);
@@ -230,7 +279,10 @@ export default class Core extends CoreFs {
 				subtype: onlyCssChanges ? "css" : undefined,
 				build: {
 					stylesheets: Array.from(stylesheetUrls),
+					passthrough: Array.from(passthroughUrls),
 					templates: matchingTemplates,
+					// Signals that `templates` is filtered by changed output (not by `files`)
+					outputs: isOutputsTracked,
 				},
 			});
 		} catch (error) {
