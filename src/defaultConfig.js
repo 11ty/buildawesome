@@ -55,7 +55,8 @@ export default function (config) {
 	fullBundleDefaultConfig.call(this, config);
 
 	config.addFilter("log", (input, ...messages) => {
-		console.log(input, ...messages);
+		// Logger’s device, not the logger: keeps object inspection and ignores quiet mode
+		(config.logger?.logger ?? console).log(input, ...messages);
 		return input;
 	});
 
