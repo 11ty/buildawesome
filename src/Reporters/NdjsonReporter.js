@@ -20,7 +20,7 @@ function toIgnoreGlob(filePath) {
 		TemplatePath.relativePath(TemplatePath.absolutePath(filePath)),
 	);
 	// `watchIgnores` are globs; match this path literally
-	return relative.replace(/[*?[\]{}()!+@|]/g, "\\$&");
+	return relative.replace(/[\\*?[\]{}()!+@|]/g, "\\$&");
 }
 
 /** @param {Error} error */
