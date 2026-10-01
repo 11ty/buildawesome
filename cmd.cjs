@@ -52,7 +52,7 @@ async function exec() {
 		}
 
 		const argv = minimist(process.argv.slice(2), {
-			string: ["input", "output", "formats", "config", "pathprefix", "port", "to", "incremental", "loader", "reporter"],
+			string: ["input", "output", "formats", "config", "pathprefix", "port", "to", "incremental", "loader", "events-file"],
 			boolean: [
 				"quiet",
 				"version",
@@ -98,17 +98,15 @@ async function exec() {
 		}
 
 		let reporter;
-		if (argv.reporter) {
-			if (argv.reporter !== "ndjson") {
+		if ("events-file" in argv) {
+			// Bare flag parses as "", repeated as an array, --no-events-file as false
+			if (typeof argv["events-file"] !== "string" || !argv["events-file"]) {
 				throw new SimpleError(
-					`Invalid --reporter value: ${argv.reporter}. Supported values: \`ndjson\`.`,
+					"--events-file requires a single file path, e.g. --events-file=.events.ndjson.",
 				);
 			}
-			if (argv.to === "json") {
-				throw new SimpleError("--reporter=ndjson is not compatible with --to=json.");
-			}
 			const { NdjsonReporter } = await import("./src/Reporters/NdjsonReporter.js");
-			reporter = new NdjsonReporter();
+			reporter = new NdjsonReporter(argv["events-file"]);
 		}
 
 		let core = new Core(argv.input, argv.output, {

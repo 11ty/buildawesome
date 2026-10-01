@@ -577,15 +577,10 @@ Verbose Output: ${this.verboseMode}`;
 	/**
 	 * Call before init().
 	 *
-	 * @param {{ config: Function, getLogger?: Function }} reporter
+	 * @param {{ config: Function }} reporter
 	 */
 	setReporter(reporter) {
 		this.#reporter = reporter;
-
-		let logger = reporter.getLogger?.();
-		if (logger) {
-			this.logger.overrideLogger(logger);
-		}
 	}
 
 	/** @type {ErrorHandler} */
