@@ -145,7 +145,7 @@
 		"@11ty/node-version-check": "^1.0.1",
 		"@11ty/nunjucks": "^4.0.0-alpha.3",
 		"@11ty/parse-date-strings": "^2.0.6",
-		"@11ty/posthtml-urls": "^1.0.3",
+		"@11ty/posthtml-urls": "^2.0.0",
 		"@11ty/recursive-copy": "^5.0.2",
 		"@sindresorhus/slugify": "^3.0.1",
 		"bcp-47-normalize": "^2.3.0",
