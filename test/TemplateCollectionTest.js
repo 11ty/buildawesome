@@ -139,6 +139,79 @@ test("getFilteredByTag (added out of order, sorted)", async (t) => {
   t.deepEqual(dogs[0].template, tmpl1);
 });
 
+test("getFilteredByTag (results are cached, cache is invalidated by add)", async (t) => {
+  let $config = await getTemplateConfigInstance();
+
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl2 = await getNewTemplateByNumber(2, $config);
+  let tmpl3 = await getNewTemplateByNumber(3, $config);
+
+  let c = new Collection();
+  await addTemplate(c, tmpl1);
+
+  let posts = c.getFilteredByTag("post");
+  t.is(posts.length, 1);
+
+  await addTemplate(c, tmpl2);
+  await addTemplate(c, tmpl3);
+
+  t.is(c.getFilteredByTag("post").length, 2);
+  t.is(c.getFilteredByTag("cat").length, 2);
+  t.is(c.getFilteredByTags("post", "cat").length, 1);
+  t.is(c.getAllSorted().length, 3);
+
+  // The result returned before the additions is unaffected
+  t.is(posts.length, 1);
+});
+
+test("getFilteredByTag (results are mutable copies)", async (t) => {
+  let $config = await getTemplateConfigInstance();
+
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl3 = await getNewTemplateByNumber(3, $config);
+
+  let c = new Collection();
+  await addTemplate(c, tmpl1);
+  await addTemplate(c, tmpl3);
+
+  let posts = c.getFilteredByTag("post");
+  posts.reverse();
+  posts.pop();
+
+  let posts2 = c.getFilteredByTag("post");
+  t.is(posts2.length, 2);
+  t.deepEqual(posts2[0].template, tmpl1);
+  t.deepEqual(posts2[1].template, tmpl3);
+
+  let postsPlural = c.getFilteredByTags("post");
+  postsPlural.pop();
+  t.is(c.getFilteredByTags("post").length, 2);
+});
+
+test("getFilteredByTag (no tag name returns everything, sorted)", async (t) => {
+  let $config = await getTemplateConfigInstance();
+
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl4 = await getNewTemplateByNumber(4, $config);
+  let tmpl5 = await getNewTemplateByNumber(5, $config);
+
+  let c = new Collection();
+  await addTemplate(c, tmpl1);
+  await addTemplate(c, tmpl4);
+  await addTemplate(c, tmpl5);
+
+  let all = c.getFilteredByTag();
+  t.is(all.length, 3);
+  t.deepEqual(all[0].template, tmpl4);
+  t.deepEqual(all[1].template, tmpl1);
+  t.deepEqual(all[2].template, tmpl5);
+
+  // `all` is not a tag name, it is filtered out of the included tag names
+  t.is(c.getFilteredByTag("all").length, 0);
+  t.is(c.getFilteredByTag("unknown-tag").length, 0);
+  t.is(c.getFilteredByTags().length, 3);
+});
+
 test("getFilteredByTags", async (t) => {
   let $config = await getTemplateConfigInstance();
 
