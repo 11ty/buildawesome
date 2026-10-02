@@ -60,6 +60,8 @@ export class CoreMinimal {
 	#isEsm;
 	/** @type {string} */
 	#activeConfigurationPath;
+	/** @type {object|undefined} */
+	#reporter;
 
 	// Support both new Eleventy(options) and new Eleventy(input, output, options)
 	#normalizeConstructorArguments(...args) {
@@ -267,6 +269,11 @@ export class CoreMinimal {
 		}
 
 		this.eleventyConfig.userConfig.directories = this.directories;
+
+		// Re-runs on config resets in watch mode
+		if (this.#reporter) {
+			await this.#reporter.config(this.eleventyConfig.userConfig);
+		}
 
 		/* Programmatic API config, this runs before the default config is initialized */
 		if (this.options.config && typeof this.options.config === "function") {
@@ -567,6 +574,15 @@ Verbose Output: ${this.verboseMode}`;
 		this.logger.overrideLogger(false);
 	}
 
+	/**
+	 * Call before init().
+	 *
+	 * @param {{ config: Function }} reporter
+	 */
+	setReporter(reporter) {
+		this.#reporter = reporter;
+	}
+
 	/** @type {ErrorHandler} */
 	get errorHandler() {
 		if (!this.#errorHandler) {
@@ -801,6 +817,8 @@ Verbose Output: ${this.verboseMode}`;
 
 		let returnObj;
 		let hasError = false;
+		// Also used in catch
+		let eventsArg;
 		let outputMode = String(to);
 		// normalize fs:templates or fs:copy to `fs`
 		if (outputMode.includes(":")) {
@@ -809,7 +827,7 @@ Verbose Output: ${this.verboseMode}`;
 
 		try {
 			let directories = this.directories.getUserspaceInstance();
-			let eventsArg = {
+			eventsArg = {
 				directories,
 
 				// v3.0.0-alpha.6, changed to use `directories` instead (this was only used by serverless plugin)
@@ -867,6 +885,16 @@ Verbose Output: ${this.verboseMode}`;
 			// Issue #2405: Don’t change the exitCode for programmatic scripts
 			let errorSeverity = this.source === "script" ? "error" : "fatal";
 			this.errorHandler.once(errorSeverity, error, "Problem writing Eleventy templates");
+
+			// Don’t let a failing listener mask the original error
+			try {
+				await this.config.events.emit("buildawesome.aftererror", { ...eventsArg, error });
+			} catch (listenerError) {
+				this.errorHandler.warn(
+					listenerError,
+					"Problem in `buildawesome.aftererror` event listener",
+				);
+			}
 
 			throw error;
 		} finally {

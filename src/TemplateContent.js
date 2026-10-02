@@ -262,7 +262,7 @@ class TemplateContent {
 				throw new TemplateContentFrontMatterError(
 					`Having trouble reading front matter from template ${this.inputPath}`,
 					e,
-				);
+				).setFilePath(this.inputPath);
 			}
 
 			if (typeof fm.data?.then === "function") {
@@ -547,7 +547,7 @@ class TemplateContent {
 			throw new TemplateContentCompileError(
 				`Having trouble compiling template ${this.inputPath}`,
 				e,
-			);
+			).setFilePath(this.inputPath);
 		}
 	}
 
@@ -709,7 +709,7 @@ class TemplateContent {
 					new TemplateContentRenderError(
 						`Having trouble rendering ${engine} template ${this.inputPath}`,
 						e,
-					),
+					).setFilePath(this.inputPath),
 				);
 			}
 		}

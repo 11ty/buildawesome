@@ -611,6 +611,9 @@ Arguments:
      --to=fs:templates
        Writes templates, skips passthrough copy
 
+     --events-file=.events.ndjson
+       Write build events as newline-delimited JSON to this file (off by default)
+
      --help`;
 	}
 

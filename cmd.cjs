@@ -52,7 +52,7 @@ async function exec() {
 		}
 
 		const argv = minimist(process.argv.slice(2), {
-			string: ["input", "output", "formats", "config", "pathprefix", "port", "to", "incremental", "loader"],
+			string: ["input", "output", "formats", "config", "pathprefix", "port", "to", "incremental", "loader", "events-file"],
 			boolean: [
 				"quiet",
 				"version",
@@ -97,6 +97,18 @@ async function exec() {
 			return;
 		}
 
+		let reporter;
+		if ("events-file" in argv) {
+			// Bare flag parses as "", repeated as an array, --no-events-file as false
+			if (typeof argv["events-file"] !== "string" || !argv["events-file"]) {
+				throw new SimpleError(
+					"--events-file requires a single file path, e.g. --events-file=.events.ndjson.",
+				);
+			}
+			const { NdjsonReporter } = await import("./src/Reporters/NdjsonReporter.js");
+			reporter = new NdjsonReporter(argv["events-file"]);
+		}
+
 		let core = new Core(argv.input, argv.output, {
 			source: "cli",
 			// --quiet and --quiet=true both resolve to true
@@ -107,6 +119,11 @@ async function exec() {
 			dryRun: argv.dryrun,
 			loader: argv.loader,
 		});
+
+		// Before init
+		if (reporter) {
+			core.setReporter(reporter);
+		}
 
 		// override with ErrorHandler instance in Core
 		handler = core.errorHandler;
