@@ -41,7 +41,7 @@ test("HTML Render: Parses HTML using liquid engine (default, with data)", async 
 
 test("HTML Render: Set HTML engine to false, don’t parse", async (t) => {
   let tr = await getNewTemplateRender("html");
-  tr.setHtmlEngine(false);
+  tr.setPreprocessingEngine(false);
 
   let fn = await tr.getCompiledTemplate("<h1>{{title}}</h1>");
   t.is((await fn()).trim(), "<h1>{{title}}</h1>");
@@ -49,7 +49,7 @@ test("HTML Render: Set HTML engine to false, don’t parse", async (t) => {
 
 test("HTML Render: Pass in an override (liquid)", async (t) => {
   let tr = await getNewTemplateRender("html");
-  tr.setHtmlEngine("liquid");
+  tr.setPreprocessingEngine("liquid");
   let fn = await tr.getCompiledTemplate("<h1>{{title}}</h1>");
 
   t.is((await fn({ title: "My Title" })).trim(), "<h1>My Title</h1>");

@@ -457,8 +457,8 @@ class Template extends TemplateContent {
 		throw new Error("Internal error: `Template->renderLayout` was removed in Eleventy 3.0.");
 	}
 
-	async renderDirect(str, data, bypassMarkdown) {
-		return super.render(str, data, bypassMarkdown);
+	async renderDirect(str, data, templateOnly) {
+		return super.render(str, data, templateOnly);
 	}
 
 	// see also Eleventy->#resetFileInWatchQueue()

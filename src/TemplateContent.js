@@ -482,7 +482,7 @@ class TemplateContent {
 	}
 
 	async compile(str, options = {}) {
-		let { type, bypassMarkdown, engineOverride } = options;
+		let { type, templateOnly, engineOverride } = options;
 
 		// Must happen before cacheable fetch below
 		// Likely only necessary for Eleventy Layouts, see TemplateMap->initDependencyMap
@@ -491,11 +491,9 @@ class TemplateContent {
 		// this.templateRender is guaranteed here
 		let tr = await this.getTemplateRender();
 		if (engineOverride !== undefined) {
-			await tr.setEngineOverride(engineOverride, bypassMarkdown);
-		} else {
-			tr.setUseMarkdown(!bypassMarkdown);
+			await tr.setEngineOverride(engineOverride);
 		}
-		if (bypassMarkdown && !this.engine.needsCompilation(str)) {
+		if (templateOnly && !this.engine.needsCompilation(str)) {
 			return function () {
 				return str;
 			};
@@ -530,7 +528,7 @@ class TemplateContent {
 			templateBenchmark.before();
 			inputPathBenchmark.before();
 
-			let fn = await tr.getCompiledTemplate(str);
+			let fn = await tr.getCompiledTemplate(str, { templateOnly });
 			inputPathBenchmark.after();
 			templateBenchmark.after();
 
@@ -596,7 +594,7 @@ class TemplateContent {
 
 		return this._render(str, data, {
 			type: "Computed Data",
-			bypassMarkdown: true,
+			templateOnly: true,
 		});
 	}
 
@@ -632,14 +630,14 @@ class TemplateContent {
 
 		return this._render(permalink, data, {
 			type: "Permalink",
-			bypassMarkdown: true,
+			templateOnly: true,
 		});
 	}
 
-	async render(str, data, bypassMarkdown) {
+	async render(str, data, templateOnly) {
 		return this._render(str, data, {
 			type: "Content",
-			bypassMarkdown,
+			templateOnly,
 		});
 	}
 
@@ -660,15 +658,15 @@ class TemplateContent {
 	}
 
 	async _render(str, data, options = {}) {
-		let { bypassMarkdown, type } = options;
+		let { templateOnly, type } = options;
 
 		try {
-			if (bypassMarkdown && !this.engine.needsCompilation(str)) {
+			if (templateOnly && !this.engine.needsCompilation(str)) {
 				return str;
 			}
 
 			let fn = await this.compile(str, {
-				bypassMarkdown,
+				templateOnly,
 				engineOverride: data[this.config.keys.engineOverride],
 				type,
 			});

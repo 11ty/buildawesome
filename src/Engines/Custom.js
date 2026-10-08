@@ -111,6 +111,10 @@ export default class CustomEngine extends TemplateEngine {
 		return true;
 	}
 
+	async ready() {
+		await this._runningInit();
+	}
+
 	// If we init from multiple places, wait for the first init to finish before continuing on.
 	async _runningInit() {
 		if (this.needsInit) {

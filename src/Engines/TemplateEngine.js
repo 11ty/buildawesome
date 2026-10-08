@@ -179,6 +179,9 @@ export default class TemplateEngine {
 		return true;
 	}
 
+	// Runs at compile time for pipeline steps that compile later, during render
+	async ready() {}
+
 	/**
 	 * Make sure compile is implemented downstream.
 	 * @abstract
