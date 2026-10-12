@@ -11,7 +11,12 @@ function getFirefoxInstance() {
 
 	// macOS 27 blocks Firefox’s shared app-data folder (“Could not find profile folder”), so give each run its own home
 	let home = mkdtempSync(path.join(os.tmpdir(), "vitest-firefox-home-"));
-	process.on("exit", () => rmSync(home, { recursive: true, force: true }));
+	process.on("exit", () => {
+		// Firefox may still be writing here on exit, a leftover temp folder is harmless
+		try {
+			rmSync(home, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+		} catch {}
+	});
 
 	return {
 		browser: "firefox",
