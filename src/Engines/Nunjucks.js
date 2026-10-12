@@ -28,10 +28,10 @@ export default class Nunjucks extends TemplateEngine {
 		this.setLibrary(this.config.libraryOverrides.njk);
 	}
 
-	// v3.1.0-alpha.1 we’ve moved to use Nunjucks’ internal cache instead of Eleventy’s
-	// get cacheable() {
-	// 	return false;
-	// }
+	// Nunjucks’ internal cache only covers loader templates (includes, layouts), not compiled strings
+	get cacheable() {
+		return true;
+	}
 
 	#getFileSystemDirs() {
 		let paths = new Set();
@@ -86,7 +86,6 @@ export default class Nunjucks extends TemplateEngine {
 		this.#setEnv(override);
 
 		// Note that a new Nunjucks engine instance is created for subsequent builds
-		// Eleventy Nunjucks is set to `cacheable` false above to opt out of Eleventy cache
 		this.config.events.on("buildawesome#templatemodified", (templatePath) => {
 			// NunjucksEnvironment:
 			// loader.pathToNames: {'ABSOLUTE_PATH/src/_includes/components/possum-home.css': 'components/possum-home.css'}
