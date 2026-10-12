@@ -92,8 +92,16 @@ class Template extends TemplateContent {
 	#preprocessors;
 	#preprocessorCache;
 
+	static #isCloning = false;
+
 	constructor(templatePath, templateData, extensionMap, config) {
 		super(templatePath, config);
+
+		// `clone()` copies the remaining fields from the source template
+		if (Template.#isCloning) {
+			this.extensionMap = extensionMap;
+			return;
+		}
 
 		this.parsed = parse(templatePath);
 
@@ -109,10 +117,6 @@ class Template extends TemplateContent {
 
 		this.isDryRun = false;
 		this.writeCount = 0;
-
-		this.fileSlug = new TemplateFileSlug(this.inputPath, this.extensionMap, this.eleventyConfig);
-		this.fileSlugStr = this.fileSlug.getSlug();
-		this.filePathStem = this.fileSlug.getFullPathWithoutExtension();
 
 		this.outputFormat = "fs";
 
@@ -977,13 +981,18 @@ class Template extends TemplateContent {
 	}
 
 	async clone() {
-		// QUESTION do we need to even run the constructor here or can we simplify it even more
-		let tmpl = new Template(
-			this.inputPath,
-			this.templateData,
-			this.extensionMap,
-			this.eleventyConfig,
-		);
+		let tmpl;
+		Template.#isCloning = true;
+		try {
+			tmpl = new Template(
+				this.inputPath,
+				this.templateData,
+				this.extensionMap,
+				this.eleventyConfig,
+			);
+		} finally {
+			Template.#isCloning = false;
+		}
 
 		tmpl.logger = this.logger;
 
