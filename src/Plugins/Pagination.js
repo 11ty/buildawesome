@@ -319,13 +319,30 @@ class Pagination {
 				cloned.setExtraOutputSubdirectory(pageNumber);
 			}
 
+			let { page } = this.getOverrideDataPages(items, pageNumber);
 			let paginationData = {
+				// All keys up front (links and hrefs are filled in below) so the object keeps a compact shape
 				pagination: {
 					items: items[pageNumber],
+					page,
+					pageNumber,
+					previousPageLink: undefined,
+					previous: undefined,
+					nextPageLink: undefined,
+					next: undefined,
+					firstPageLink: undefined,
+					lastPageLink: undefined,
+					links: undefined,
+					pageLinks: undefined,
+					previousPageHref: undefined,
+					nextPageHref: undefined,
+					firstPageHref: undefined,
+					lastPageHref: undefined,
+					hrefs: undefined,
+					href: undefined,
 				},
 				page: {},
 			};
-			Object.assign(paginationData.pagination, this.getOverrideDataPages(items, pageNumber));
 
 			if (this.alias) {
 				lodashSet(paginationData, this.alias, this.getNormalizedItems(items[pageNumber]));

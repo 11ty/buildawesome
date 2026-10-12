@@ -915,3 +915,61 @@ test("Pagination and eleventyComputed data, issues #2512, #2837, #3013", async (
     );
   }
 });
+
+test("Pagination data keys and values are stable", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: (eleventyConfig) => {
+      eleventyConfig.addTemplate(
+        "paged.11ty.js",
+        ({ pagination }) =>
+          JSON.stringify({
+            keys: Object.keys(pagination),
+            pageNumber: pagination.pageNumber,
+            items: pagination.items,
+            page: pagination.page,
+            previous: pagination.previous,
+            next: pagination.next,
+            hrefs: pagination.hrefs,
+            href: pagination.href,
+          }),
+        { pagination: { data: "letters", size: 1 }, letters: ["a", "b", "c"] },
+      );
+    },
+  });
+
+  let results = await elev.toJSON();
+  let second = JSON.parse(results.find((entry) => entry.url === "/paged/1/").content);
+  t.deepEqual(second, {
+    keys: [
+      "data", "size", "alias", "pages", "items", "page", "pageNumber",
+      "previousPageLink", "previous", "nextPageLink", "next", "firstPageLink", "lastPageLink",
+      "links", "pageLinks", "previousPageHref", "nextPageHref", "firstPageHref", "lastPageHref",
+      "hrefs", "href",
+    ],
+    pageNumber: 1,
+    items: ["b"],
+    page: { previous: "a", next: "c", first: "a", last: "c" },
+    previous: "/paged/index.html",
+    next: "/paged/2/index.html",
+    hrefs: ["/paged/", "/paged/1/", "/paged/2/"],
+    href: { previous: "/paged/", next: "/paged/2/", first: "/paged/", last: "/paged/2/" },
+  });
+});
+
+test("Paginated Nunjucks templates share a compiled template but render each page", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: (eleventyConfig) => {
+      eleventyConfig.addTemplate("paged.njk", `{% set tag = "b" %}<{{ tag }}>{{ item }}</{{ tag }}>`, {
+        pagination: { data: "letters", size: 1, alias: "item" },
+        letters: ["a", "b", "c"],
+        permalink: "/{{ item }}/",
+      });
+    },
+  });
+
+  let results = await elev.toJSON();
+  t.deepEqual(
+    results.map(({ url, content }) => [url, content]).sort(),
+    [["/a/", "<b>a</b>"], ["/b/", "<b>b</b>"], ["/c/", "<b>c</b>"]],
+  );
+});
