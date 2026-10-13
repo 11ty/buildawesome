@@ -20,7 +20,8 @@ class TemplateContentCompileError extends BaseError {}
 class TemplateContentRenderError extends BaseError {}
 
 class TemplateContent {
-	#initialized = false;
+	// The template render the preprocessor engine was looked up for (engines are recreated with it)
+	#initializedFor;
 	#config;
 	#templateRender;
 	#renderPreprocessorEngine;
@@ -41,10 +42,11 @@ class TemplateContent {
 			await this.getTemplateRender();
 		}
 
-		if (this.#initialized) {
+		if (this.#initializedFor === this.#templateRender) {
 			return;
 		}
-		this.#initialized = true;
+		this.#initializedFor = this.#templateRender;
+		this.#renderPreprocessorEngine = undefined;
 
 		let preprocessorEngineName = this.templateRender.getPreprocessorEngineName();
 		if (preprocessorEngineName && this.templateRender.engine.getName() !== preprocessorEngineName) {
@@ -472,6 +474,10 @@ class TemplateContent {
 
 		let cacheable = this.isTemplateCacheable();
 		let { useCache, key } = this.engine.getCompileCacheKey(str, this.inputPath);
+		// e.g. Markdown preprocessed by Nunjucks
+		if (useCache && this.#renderPreprocessorEngine) {
+			useCache = this.#renderPreprocessorEngine.getCompileCacheKey(str, this.inputPath).useCache;
+		}
 
 		// We also tie the compile cache key to the UserConfig instance, to alleviate issues with global template cache
 		// Better to move the cache to the Eleventy instance instead, no?

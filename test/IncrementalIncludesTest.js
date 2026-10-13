@@ -409,3 +409,23 @@ test.serial("JavaScript layout dependencies are watched (#1812)", async (t) => {
   let { targets } = await elev.getWatchedTargets();
   t.true(targets.includes("./test/stubs-incremental-includes/js-layout-watched/lib/layout-helper.js"));
 });
+
+for (let includeExtension of ["njk", "md"]) {
+  test(`Markdown with Nunjucks includes a .${includeExtension} file, edited repeatedly`, async (t) => {
+    let dir = createProject(`md-njk-include-${includeExtension}`);
+    fs.writeFileSync(path.join(dir, `_includes/snippet.${includeExtension}`), "Snippet 0");
+    fs.writeFileSync(path.join(dir, "md-page.md"), `{% rendered %}{% include "snippet.${includeExtension}" %}`);
+
+    let { trigger, read } = await getWatchInstance(dir, {
+      config($config) {
+        $config.setMarkdownTemplateEngine("njk");
+        $config.addShortcode("rendered", () => "");
+      },
+    });
+
+    for (let i = 1; i <= 3; i++) {
+      await trigger(`_includes/snippet.${includeExtension}`, `Snippet ${i}`);
+      t.is(read("md-page/index.html").trim(), `<p>Snippet ${i}</p>`);
+    }
+  });
+}
