@@ -35,6 +35,7 @@ class TemplateMap {
 		this.eleventyConfig = eleventyConfig;
 		this.map = [];
 		this.inputPathMap = new Map(); // NEW: O(1) lookup Map for performance
+		this.absoluteInputPaths = new Map();
 		this.collectionsData = null;
 		this.cached = false;
 		this.collection = new TemplateCollection();
@@ -83,8 +84,17 @@ class TemplateMap {
 
 	#addToInputPathMap(mapEntry) {
 		// Store under absolute path
-		let absoluteInputPath = TemplatePath.absolutePath(mapEntry.inputPath);
-		this.inputPathMap.set(absoluteInputPath, mapEntry);
+		this.inputPathMap.set(this.#getAbsoluteInputPath(mapEntry.inputPath), mapEntry);
+	}
+
+	// Looked up many times per template, and `absolutePath` is slow
+	#getAbsoluteInputPath(inputPath) {
+		let absoluteInputPath = this.absoluteInputPaths.get(inputPath);
+		if (!absoluteInputPath) {
+			absoluteInputPath = TemplatePath.absolutePath(inputPath);
+			this.absoluteInputPaths.set(inputPath, absoluteInputPath);
+		}
+		return absoluteInputPath;
 	}
 
 	getTagTarget(str) {
@@ -335,8 +345,7 @@ class TemplateMap {
 	}
 
 	getMapEntryForInputPath(inputPath) {
-		let absoluteInputPath = TemplatePath.absolutePath(inputPath);
-		return this.inputPathMap.get(absoluteInputPath);
+		return this.inputPathMap.get(this.#getAbsoluteInputPath(inputPath));
 	}
 
 	#removeTagsFromTemplateOrder(maps) {
