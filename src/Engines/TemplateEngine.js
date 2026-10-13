@@ -203,6 +203,15 @@ export default class TemplateEngine {
 		return true;
 	}
 
+	// e.g. a template’s include, import, extends, or layout file, recorded when it is used
+	addDependency(from, to) {
+		// Skips engine names (e.g. `md`) passed in place of a file path
+		if (!from || !to || !from.includes(".")) {
+			return;
+		}
+		this.config.uses.addDependency(from, [to]);
+	}
+
 	isFileRelevantTo(inputPath, comparisonFile) {
 		return this.config.uses.isFileRelevantTo(inputPath, comparisonFile);
 	}

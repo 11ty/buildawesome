@@ -14,6 +14,8 @@ class GlobalDependencyMap {
 
 	#map;
 	#templateConfig;
+	#hasAllTemplateDependencies = false;
+	#changedFiles = [];
 	#cachedUserConfigurationCollectionApiNames;
 
 	static isCollection(entry) {
@@ -32,6 +34,37 @@ class GlobalDependencyMap {
 
 	reset() {
 		this.#map = undefined;
+		this.#hasAllTemplateDependencies = false;
+		this.#changedFiles = [];
+	}
+
+	// Files changed since the previous build, e.g. from the watch queue
+	setChangedFiles(files = []) {
+		this.#changedFiles = files;
+	}
+
+	isChangedFileUsedBy(node) {
+		return this.#changedFiles.some((file) => this.hasDependency(node, file, false));
+	}
+
+	// True once every template has rendered (and recorded its includes) without an error
+	get hasAllTemplateDependencies() {
+		return this.#hasAllTemplateDependencies;
+	}
+
+	setHasAllTemplateDependencies(hasAll) {
+		this.#hasAllTemplateDependencies = Boolean(hasAll);
+	}
+
+	// Whether any other file (transitively) uses this one, e.g. an include or layout
+	hasDependants(node) {
+		node = this.normalizeNode(node);
+		if (!node || !this.map.hasNode(node)) {
+			return false;
+		}
+		return this.map
+			.dependantsOf(node)
+			.some((entry) => !entry.startsWith(GlobalDependencyMap.COLLECTION_PREFIX));
 	}
 
 	setIsEsm(isEsm) {

@@ -7,11 +7,13 @@ import TemplateWriter from "./TemplateWriter.js";
 import ExtensionMap from "./ExtensionMap.js";
 import { ErrorHandler } from "./Errors/ErrorHandler.js";
 import TemplateConfig from "./TemplateConfig.js";
+import GlobalDependencyMap from "./GlobalDependencyMap.js";
 import TemplateEngineManager from "./Engines/TemplateEngineManager.js";
 
 /* Utils */
 import { createDebug } from "./Util/DebugLogUtil.js";
 import { readableFileSize } from "./Util/FileSize.js";
+import { isEligibleJavaScriptFileExtension } from "./Util/FilePathUtil.js";
 import simplePlural from "./Util/Pluralize.js";
 import ConsoleLogger from "./Util/ConsoleLogger.js";
 import ProjectDirectories from "./Util/ProjectDirectories.js";
@@ -774,14 +776,26 @@ Verbose Output: ${this.verboseMode}`;
 	 * If the active queue has a mix of template/non-template files (includes, etc), swap to run a full build
 	 */
 	isIncrementalBuildPossible(queuedFiles = []) {
-		let hasNonTemplateFiles = Boolean(
-			queuedFiles.find((path) => !this.directories.isTemplateFile(path)),
-		);
-		if (hasNonTemplateFiles) {
+		let uses = this.eleventyConfig.usesGraph;
+		return queuedFiles.every((path) => {
+			// e.g. an include or layout file
+			if (uses.hasDependants(path)) {
+				return this.#isTrackedTemplateDependency(path);
+			}
+			return this.directories.isTemplateFile(path);
+		});
+	}
+
+	// The dependency graph knows every template that uses this file
+	#isTrackedTemplateDependency(path) {
+		let uses = this.eleventyConfig.usesGraph;
+		if (!uses.hasAllTemplateDependencies) {
 			return false;
 		}
 
-		return true;
+		// JavaScript modules may also be used by data or configuration files
+		let isLayout = GlobalDependencyMap.isLayoutNode(uses.map, uses.normalizeNode(path));
+		return isLayout || !isEligibleJavaScriptFileExtension(TemplatePath.getExtension(path));
 	}
 
 	/**
@@ -810,10 +824,16 @@ Verbose Output: ${this.verboseMode}`;
 		}
 
 		let incrementalFiles = this.watchQueue?.getActiveQueue() || [];
-		if (this.isIncremental && this.isIncrementalBuildPossible(incrementalFiles)) {
+		let isIncrementalBuild =
+			this.isIncremental &&
+			incrementalFiles.length > 0 &&
+			this.isIncrementalBuildPossible(incrementalFiles);
+		if (isIncrementalBuild) {
 			// This really controls whether a build is incremental or not (internally)
 			this.writer.setIncrementalFiles(incrementalFiles);
 		}
+		let rendersAllTemplates = !isIncrementalBuild && this.isRunInitialBuild;
+		this.eleventyConfig.usesGraph.setChangedFiles(incrementalFiles);
 
 		let returnObj;
 		let hasError = false;
@@ -870,6 +890,10 @@ Verbose Output: ${this.verboseMode}`;
 				returnObj = [resolved.passthroughCopy, resolved.templates];
 			}
 
+			if (rendersAllTemplates) {
+				this.eleventyConfig.usesGraph.setHasAllTemplateDependencies(true);
+			}
+
 			// always reset after first build
 			this.setIgnoreInitial(false);
 			this.writer.resetIncremental();
@@ -881,6 +905,9 @@ Verbose Output: ${this.verboseMode}`;
 			this.buildCount++;
 		} catch (error) {
 			hasError = true;
+
+			// A template that failed may not have recorded all of its includes
+			this.eleventyConfig.usesGraph.setHasAllTemplateDependencies(false);
 
 			// Issue #2405: Don’t change the exitCode for programmatic scripts
 			let errorSeverity = this.source === "script" ? "error" : "fatal";
