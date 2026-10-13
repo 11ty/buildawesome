@@ -798,9 +798,13 @@ Verbose Output: ${this.verboseMode}`;
 			return false;
 		}
 
-		// JavaScript modules may also be used by data or configuration files
-		let isLayout = GlobalDependencyMap.isLayoutNode(uses.map, uses.normalizeNode(path));
-		return isLayout || !isEligibleJavaScriptFileExtension(TemplatePath.getExtension(path));
+		// Other JavaScript modules may also be used by global data or configuration files
+		let node = uses.normalizeNode(path);
+		return (
+			GlobalDependencyMap.isLayoutNode(uses.map, node) ||
+			GlobalDependencyMap.isDataFileNode(uses.map, node) ||
+			!isEligibleJavaScriptFileExtension(TemplatePath.getExtension(path))
+		);
 	}
 
 	/**

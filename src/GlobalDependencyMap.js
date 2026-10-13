@@ -10,6 +10,7 @@ const debug = createDebug("Dependencies");
 class GlobalDependencyMap {
 	// dependency-graph requires these keys to be alphabetic strings
 	static LAYOUT_KEY = "layout";
+	static DATA_FILE_KEY = "data";
 	static COLLECTION_PREFIX = "__collection:"; // must match TemplateDepGraph key
 
 	#map;
@@ -283,6 +284,21 @@ class GlobalDependencyMap {
 			}
 		}
 		return templates;
+	}
+
+	// Directory and template data files a template uses
+	addDataFiles(templatePath, dataFiles = []) {
+		this.addDependency(templatePath, dataFiles);
+		for (let file of dataFiles) {
+			this.map.setNodeData(this.normalizeNode(file), { type: GlobalDependencyMap.DATA_FILE_KEY });
+		}
+	}
+
+	static isDataFileNode(graph, node) {
+		if (!graph.hasNode(node)) {
+			return false;
+		}
+		return graph.getNodeData(node)?.type === GlobalDependencyMap.DATA_FILE_KEY;
 	}
 
 	static isLayoutNode(graph, node) {

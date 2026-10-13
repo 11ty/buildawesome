@@ -215,3 +215,51 @@ test("Passthrough copy outside the input directory is incremental", async (t) =>
 
   t.true(elev.isIncrementalBuildPossible([`./${assets}/style.css`]));
 });
+
+function addDataFiles(dir) {
+  fs.mkdirSync(path.join(dir, "blog"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "blog/blog.11tydata.json"), JSON.stringify({ name: "Blog", tags: ["blog"] }));
+  fs.writeFileSync(path.join(dir, "blog/a.njk"), "{% rendered %}A {{ name }}");
+  fs.writeFileSync(path.join(dir, "blog/b.njk"), "{% rendered %}B {{ name }}");
+  fs.writeFileSync(path.join(dir, "blog/b.11tydata.js"), `export default { suffix: "!" };`);
+  fs.writeFileSync(path.join(dir, "blog/c.njk"), "{% rendered %}C {{ suffix }}");
+  fs.writeFileSync(
+    path.join(dir, "blog-index.njk"),
+    "---\neleventyImport:\n  collections: [blog]\n---\n{% rendered %}{% for p in collections.blog %}{{ p.data.name }} {% endfor %}",
+  );
+  return dir;
+}
+
+test("Directory data change only renders templates in that directory", async (t) => {
+  let { trigger, read } = await getWatchInstance(addDataFiles(createProject("dir-data")));
+  let rendered = await trigger("blog/blog.11tydata.json", JSON.stringify({ name: "News", tags: ["blog"] }));
+  t.true(rendered.includes("blog/a.njk"));
+  t.true(rendered.includes("blog/b.njk"));
+  t.true(rendered.includes("blog/c.njk"));
+  t.false(rendered.includes("static.njk"));
+  t.is(read("blog/a/index.html"), "A News");
+});
+
+// Like a template change, consumers need `eleventyImport.collections`
+test("Directory data change re-renders templates that consume the collection", async (t) => {
+  let { trigger, read } = await getWatchInstance(addDataFiles(createProject("dir-data-collection")));
+  let rendered = await trigger("blog/blog.11tydata.json", JSON.stringify({ name: "News", tags: ["blog"] }));
+  t.true(rendered.includes("blog-index.njk"));
+  t.is(read("blog-index/index.html"), "News News News ");
+});
+
+test("Template data file change only renders that template", async (t) => {
+  let { trigger, read } = await getWatchInstance(addDataFiles(createProject("template-data")));
+  let rendered = await trigger("blog/b.11tydata.js", `export default { name: "Bee" };`);
+  t.true(rendered.includes("blog/b.njk"));
+  t.false(rendered.includes("blog/a.njk"));
+  t.false(rendered.includes("static.njk"));
+  t.is(read("blog/b/index.html"), "B Bee");
+});
+
+test("New directory data file renders the templates it applies to", async (t) => {
+  let { trigger, read } = await getWatchInstance(addDataFiles(createProject("new-data")));
+  let rendered = await trigger("blog/c.11tydata.json", JSON.stringify({ suffix: "?" }));
+  t.true(rendered.includes("blog/c.njk"));
+  t.is(read("blog/c/index.html"), "C ?");
+});

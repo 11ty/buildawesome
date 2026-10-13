@@ -495,6 +495,12 @@ class TemplateData {
 			let localDataPaths = await this.getLocalDataPaths(templatePath);
 			let importedData = await this.combineLocalData(localDataPaths);
 
+			// For incremental builds, a changed data file only affects the templates using it
+			this.config.uses?.addDataFiles(
+				templatePath,
+				localDataPaths.filter((path) => this.exists(path)),
+			);
+
 			this.#templateDirectoryData[templatePath] = importedData;
 		}
 
