@@ -403,3 +403,9 @@ test.serial("JavaScript dependency of a data file runs a full build", async (t) 
   t.true(rendered.includes("static.njk"));
   t.is(read("uses-shared/index.html"), "Shared 2");
 });
+
+test.serial("JavaScript layout dependencies are watched (#1812)", async (t) => {
+  let { elev } = await getJavaScriptWatchInstance("js-layout-watched");
+  let { targets } = await elev.getWatchedTargets();
+  t.true(targets.includes("./test/stubs-incremental-includes/js-layout-watched/lib/layout-helper.js"));
+});

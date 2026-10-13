@@ -288,6 +288,12 @@ class GlobalDependencyMap {
 		return graph.getNodeData(node)?.type === GlobalDependencyMap.LAYOUT_KEY;
 	}
 
+	getLayouts() {
+		return Array.from(this.map.nodes.keys()).filter((node) =>
+			GlobalDependencyMap.isLayoutNode(this.map, node),
+		);
+	}
+
 	getLayoutsUsedBy(node) {
 		node = this.normalizeNode(node);
 

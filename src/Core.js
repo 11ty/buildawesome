@@ -458,6 +458,16 @@ export default class Core extends CoreFs {
 		let templateFiles = await this.eleventyFiles.getWatchPathCache();
 		await this.watchTargets.addDependencies(templateFiles);
 
+		// JavaScript layouts (#1812)
+		let layoutFiles = [];
+		for (let layout of this.eleventyConfig.usesGraph.getLayouts()) {
+			let layoutPath = TemplatePath.addLeadingDotSlash(layout);
+			if (await this.extensionMap.shouldSpiderJavaScriptDependencies(layoutPath)) {
+				layoutFiles.push(layoutPath);
+			}
+		}
+		await this.watchTargets.addDependencies(layoutFiles);
+
 		// For incremental builds, a changed module only affects the templates that import it
 		for (let templateFile of templateFiles) {
 			this.eleventyConfig.usesGraph.addDependency(
