@@ -261,23 +261,17 @@ export default class ProjectDirectories {
 		return this.#dirs.output || ProjectDirectories.defaults.output;
 	}
 
+	// `filePath` is relative to the project root (e.g. a watched file) or absolute
 	isTemplateFile(filePath) {
-		let inputPath = this.getInputPath(filePath);
-		// TODO use DirContains
-		if (this.layouts && inputPath.startsWith(this.layouts)) {
-			return false;
-		}
-
-		// if this.includes is "" (and thus is the same directory as this.input)
-		// we don’t actually know if this is a template file, so defer
-		if (this.includes && this.includes !== this.input) {
-			if (inputPath.startsWith(this.includes)) {
+		let projectPath = ProjectDirectories.relativeToProjectRoot(filePath);
+		for (let dir of [this.layouts, this.includes, this.data]) {
+			// A directory that is also the input directory can’t tell us anything, so defer
+			if (dir && dir !== this.input && projectPath.startsWith(dir)) {
 				return false;
 			}
 		}
 
-		// TODO use DirContains
-		return inputPath.startsWith(this.input);
+		return projectPath.startsWith(this.input);
 	}
 
 	// for a hypothetical template file

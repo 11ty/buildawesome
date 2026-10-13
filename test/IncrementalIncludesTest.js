@@ -188,3 +188,30 @@ test("Nunjucks extends parent edit after two rebuilds is not stale (full builds)
   await trigger("_includes/base.njk", "Base 3 {% block body %}{% endblock %}");
   t.is(read("extends/index.html"), "Base 3 Body");
 });
+
+test("Global data change runs a full build", async (t) => {
+  let dir = createProject("global-data");
+  fs.mkdirSync(path.join(dir, "_data"));
+  fs.writeFileSync(path.join(dir, "_data/site.json"), JSON.stringify({ title: "A" }));
+  let { elev, trigger } = await getWatchInstance(dir);
+
+  t.false(elev.isIncrementalBuildPossible([`./${dir}/_data/site.json`]));
+  let rendered = await trigger("_data/site.json", JSON.stringify({ title: "B" }));
+  t.true(rendered.includes("static.njk"));
+});
+
+test("Passthrough copy outside the input directory is incremental", async (t) => {
+  let dir = createProject("passthrough-outside");
+  let assets = `${ROOT}/passthrough-outside-assets`;
+  fs.mkdirSync(assets, { recursive: true });
+  fs.writeFileSync(`${assets}/style.css`, "a{}");
+
+  let { elev } = await getWatchInstance(dir, {
+    config($config) {
+      $config.addShortcode("rendered", () => "");
+      $config.addPassthroughCopy({ [assets]: "assets" });
+    },
+  });
+
+  t.true(elev.isIncrementalBuildPossible([`./${assets}/style.css`]));
+});

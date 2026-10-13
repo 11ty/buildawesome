@@ -782,8 +782,13 @@ Verbose Output: ${this.verboseMode}`;
 			if (uses.hasDependants(path)) {
 				return this.#isTrackedTemplateDependency(path);
 			}
-			return this.directories.isTemplateFile(path);
+			return this.directories.isTemplateFile(path) || this.#isPassthroughCopyFile(path);
 		});
+	}
+
+	// Passthrough copy can be configured outside of the input directory
+	#isPassthroughCopyFile(path) {
+		return Boolean(this.passthroughManager?.filterToPassthroughCopyFilesOnly([], [path]).length);
 	}
 
 	// The dependency graph knows every template that uses this file

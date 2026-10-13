@@ -126,7 +126,7 @@ class TemplateWriter {
 			let virtualTemplates = Object.keys(this.config.virtualTemplates)
 				.filter((path) => {
 					// Filter out includes/layouts
-					return this.dirs.isTemplateFile(path);
+					return this.dirs.isTemplateFile(this.dirs.getInputPath(path));
 				})
 				.map((path) => {
 					let fullVirtualPath = this.dirs.getInputPath(path);
