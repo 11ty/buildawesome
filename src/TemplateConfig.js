@@ -98,8 +98,8 @@ class TemplateConfig {
 		};
 
 		this.userConfig.events.on("buildawesome#templatemodified", (inputPath, metadata = {}) => {
-			// Issue #3569, set that this file exists in the cache
-			this.#existsCache.set(inputPath, true);
+			// Issue #3569, the file may have been added (or deleted)
+			this.#existsCache.delete(inputPath);
 		});
 	}
 

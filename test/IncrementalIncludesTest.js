@@ -189,7 +189,7 @@ test("Nunjucks extends parent edit after two rebuilds is not stale (full builds)
   t.is(read("extends/index.html"), "Base 3 Body");
 });
 
-test("Global data change runs a full build", async (t) => {
+test("Global data change nothing reads runs a full build", async (t) => {
   let dir = createProject("global-data");
   fs.mkdirSync(path.join(dir, "_data"));
   fs.writeFileSync(path.join(dir, "_data/site.json"), JSON.stringify({ title: "A" }));
@@ -262,4 +262,75 @@ test("New directory data file renders the templates it applies to", async (t) =>
   let rendered = await trigger("blog/c.11tydata.json", JSON.stringify({ suffix: "?" }));
   t.true(rendered.includes("blog/c.njk"));
   t.is(read("blog/c/index.html"), "C ?");
+});
+
+function addGlobalData(dir) {
+  fs.mkdirSync(path.join(dir, "_data/site"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "_data/site.json"), JSON.stringify({ title: "Site" }));
+  fs.writeFileSync(path.join(dir, "_data/site/meta.json"), JSON.stringify({ author: "Zach" }));
+  fs.writeFileSync(path.join(dir, "_data/nav.json"), JSON.stringify([{ title: "One" }, { title: "Two" }]));
+  fs.writeFileSync(path.join(dir, "_includes/titled.njk"), "{% rendered %}<title>{{ site.title }}</title>{{ content | safe }}");
+  fs.writeFileSync(path.join(dir, "uses-site.njk"), "{% rendered %}{{ site.title }}");
+  fs.writeFileSync(path.join(dir, "uses-meta.liquid"), "{% rendered %}{{ site.meta.author }}");
+  fs.writeFileSync(path.join(dir, "uses-layout.njk"), "---\nlayout: titled.njk\n---\n{% rendered %}Body");
+  fs.writeFileSync(path.join(dir, "paged.njk"), "---\npagination:\n  data: nav\n  size: 1\n---\n{% rendered %}{{ pagination.items[0].title }}");
+  return dir;
+}
+
+test("Global data change only renders templates that read it", async (t) => {
+  let { trigger, read } = await getWatchInstance(addGlobalData(createProject("global-reads")));
+  t.deepEqual(await trigger("_data/site.json", JSON.stringify({ title: "New" })), [
+    "uses-layout.njk",
+    "uses-meta.liquid",
+    "uses-site.njk",
+  ]);
+  t.is(read("uses-site/index.html"), "New");
+  t.is(read("uses-layout/index.html"), "<title>New</title>Body");
+});
+
+test("Nested global data file renders templates that read its top-level key", async (t) => {
+  let { trigger, read } = await getWatchInstance(addGlobalData(createProject("global-nested")));
+  let rendered = await trigger("_data/site/meta.json", JSON.stringify({ author: "Z" }));
+  t.true(rendered.includes("uses-meta.liquid"));
+  t.false(rendered.includes("paged.njk"));
+  t.false(rendered.includes("static.njk"));
+  t.is(read("uses-meta/index.html"), "Z");
+});
+
+test("Global data used for pagination renders the paginated template", async (t) => {
+  let { trigger, read } = await getWatchInstance(addGlobalData(createProject("global-pagination")));
+  t.deepEqual(
+    await trigger("_data/nav.json", JSON.stringify([{ title: "Uno" }, { title: "Dos" }, { title: "Tres" }])),
+    ["paged.njk"],
+  );
+  t.is(read("paged/2/index.html"), "Tres");
+});
+
+test("Deleted global data file runs a full build", async (t) => {
+  let dir = addGlobalData(createProject("global-deleted"));
+  let { trigger, read } = await getWatchInstance(dir);
+  fs.rmSync(path.join(dir, "_data/site/meta.json"));
+  let rendered = await trigger("_data/site/meta.json");
+  t.true(rendered.includes("static.njk"));
+  t.is(read("uses-meta/index.html"), "");
+});
+
+test("Template edit keeps its data file edges for the next build", async (t) => {
+  let { trigger, read } = await getWatchInstance(addDataFiles(createProject("template-then-data")));
+  t.true((await trigger("blog/a.njk", "{% rendered %}A2 {{ name }}")).includes("blog/a.njk"));
+  let rendered = await trigger("blog/blog.11tydata.json", JSON.stringify({ name: "Later", tags: ["blog"] }));
+  t.true(rendered.includes("blog/a.njk"));
+  t.is(read("blog/a/index.html"), "A2 Later");
+});
+
+test("Global data read through a collection renders the reader", async (t) => {
+  let dir = addGlobalData(addDataFiles(createProject("collection-global")));
+  fs.writeFileSync(
+    path.join(dir, "blog-index.njk"),
+    "---\neleventyImport:\n  collections: [blog]\n---\n{% rendered %}{% for p in collections.blog %}{{ p.data.site.title }} {% endfor %}",
+  );
+  let { trigger, read } = await getWatchInstance(dir);
+  let rendered = await trigger("_data/site.json", JSON.stringify({ title: "New" }));
+  t.true(rendered.includes("blog-index.njk"));
+  t.is(read("blog-index/index.html"), "New New New ");
 });

@@ -24,6 +24,7 @@ import { FileSystemUtilities } from "./Util/FileSystemUtilities.js";
 import { TemplatePreprocessors } from "./TemplatePreprocessors.js";
 import { getDirectoryFromUrl } from "./Util/UrlUtil.js";
 import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
+import { trackGlobalDataReads } from "./Data/GlobalDataReads.js";
 
 const { set: lodashSet, get: lodashGet } = lodash;
 
@@ -499,6 +500,18 @@ class Template extends TemplateContent {
 			}
 			throw e;
 		}
+	}
+
+	// For incremental builds, a global data file change only affects the templates that read it
+	trackGlobalDataReads(data) {
+		let filesByKey = this.templateData?.getGlobalDataFilesByKey();
+		if (!filesByKey?.size) {
+			return;
+		}
+
+		trackGlobalDataReads(data, filesByKey, (files) => {
+			this.config.uses.addDataFiles(this.inputPath, files);
+		});
 	}
 
 	async getData() {

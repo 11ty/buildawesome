@@ -31,3 +31,12 @@ test("Simple check (parent directory already invalidated)", async t => {
 	t.is(cache.size, 2);
   t.is(cache.lookupCount, 2);
 });
+
+test("delete looks up the file again", t => {
+  let cache = new ExistsCache();
+  cache.set("./test/stubs/does-not-exist.md", true);
+  t.true(cache.exists("./test/stubs/does-not-exist.md"));
+
+  cache.delete("test/stubs/does-not-exist.md");
+  t.false(cache.exists("./test/stubs/does-not-exist.md"));
+});

@@ -53,6 +53,8 @@ class TemplateData {
 	// Directory data files are shared by every template in the directory
 	#dataFileContents = new Map();
 	#directoryDataPaths = new Map();
+	// Global data files for each top-level key
+	#globalDataFilesByKey = new Map();
 
 	constructor(templateConfig) {
 		if (!templateConfig || templateConfig.constructor.name !== "TemplateConfig") {
@@ -368,6 +370,12 @@ class TemplateData {
 
 			lodashSet(globalData, objectPathTarget, data);
 
+			let [key] = objectPathTarget;
+			if (!this.#globalDataFilesByKey.has(key)) {
+				this.#globalDataFilesByKey.set(key, []);
+			}
+			this.#globalDataFilesByKey.get(key).push(file);
+
 			if (this.config.freezeReservedData) {
 				ReservedData.check(globalData, file);
 			}
@@ -428,6 +436,11 @@ class TemplateData {
 
 		// OK: Shallow merge when combining rawImports (pkg) with global data files
 		return Object.assign({}, mergedGlobalData, rawImports);
+	}
+
+	// Available after `getGlobalData()`
+	getGlobalDataFilesByKey() {
+		return this.#globalDataFilesByKey;
 	}
 
 	async getGlobalData() {

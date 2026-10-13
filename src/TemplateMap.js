@@ -67,6 +67,9 @@ class TemplateMap {
 		}
 
 		let data = await template.getData();
+		// Layouts load data too, but only pages record their reads
+		template.trackGlobalDataReads(data);
+
 		let map = await template.getTemplateMapEntry(data);
 		let { skippedVia } = await template.runPreprocessors(data);
 

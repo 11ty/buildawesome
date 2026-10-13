@@ -798,6 +798,11 @@ Verbose Output: ${this.verboseMode}`;
 			return false;
 		}
 
+		// e.g. `{% if site %}` changes without reading anything from a deleted global data file
+		if (!this.eleventyConfig.existsCache.exists(path)) {
+			return false;
+		}
+
 		// Other JavaScript modules may also be used by global data or configuration files
 		let node = uses.normalizeNode(path);
 		return (
