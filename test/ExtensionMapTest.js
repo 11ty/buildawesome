@@ -147,6 +147,16 @@ test("isFullTemplateFilePath (not a passthrough copy extension)", async (t) => {
   t.false(map.isFullTemplateFilePath("passthrough.css"));
 });
 
+test("isFullTemplateFilePath with other extensions for a key", async (t) => {
+  let map = await getExtensionMap(["njk", "11ty.js"]);
+  t.true(map.isFullTemplateFilePath("template.11ty.cjs"));
+  t.true(map.isFullTemplateFilePath("template.11ty.mjs"));
+  t.true(map.isFullTemplateFilePath("template.server.js"));
+  t.true(map.isFullTemplateFilePath("template.server.mjs"));
+  t.false(map.isFullTemplateFilePath("template.js"));
+  t.false(map.isFullTemplateFilePath("template.mjs"));
+});
+
 test("getValidExtensionsForPath", async (t) => {
   let cfg = new TemplateConfig();
   cfg.userConfig.extensionMap.add({
@@ -162,6 +172,8 @@ test("getValidExtensionsForPath", async (t) => {
   t.deepEqual(map.getValidExtensionsForPath("template.pug"), []);
   t.deepEqual(map.getValidExtensionsForPath("template.liquid.js"), ["js"]);
   t.deepEqual(map.getValidExtensionsForPath("njk.liquid.11ty.js"), ["11ty.js", "js"]);
+  t.deepEqual(map.getValidExtensionsForPath("template.server.js"), ["server.js", "js"]);
+  t.deepEqual(map.getValidExtensionsForPath("template.11ty.mjs"), ["11ty.mjs"]);
 });
 
 test("shouldSpiderJavaScriptDependencies", async (t) => {
@@ -179,4 +191,6 @@ test("shouldSpiderJavaScriptDependencies", async (t) => {
   t.deepEqual(await map.shouldSpiderJavaScriptDependencies("template.css"), false);
   t.deepEqual(await map.shouldSpiderJavaScriptDependencies("template.11ty.js"), true);
   t.deepEqual(await map.shouldSpiderJavaScriptDependencies("template.js"), false);
+  t.deepEqual(await map.shouldSpiderJavaScriptDependencies("template.11ty.mjs"), true);
+  t.deepEqual(await map.shouldSpiderJavaScriptDependencies("template.server.js"), true);
 });

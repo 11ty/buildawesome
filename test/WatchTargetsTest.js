@@ -125,6 +125,17 @@ test("JavaScript addDependencies with a filter", async (t) => {
   );
 });
 
+test("JavaScript addDependencies with a filter keeps the dependency graph", async (t) => {
+  let targets = new EleventyWatchTargets();
+  await targets.addDependencies("./test/stubs/config-deps.cjs", function (path) {
+    return path.indexOf("./test/stubs/") === -1;
+  });
+  t.deepEqual(targets.getTargets(), []);
+  t.deepEqual(targets.getDependantsOf("./test/stubs/config-deps-upstream.cjs"), [
+    "./test/stubs/config-deps.cjs",
+  ]);
+});
+
 test("add, addDependencies falsy values are filtered", async (t) => {
   let targets = new EleventyWatchTargets();
   targets.add("");

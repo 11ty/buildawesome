@@ -7,6 +7,7 @@ import Serve from "./Serve.js";
 import { Watch } from "./Watch.js";
 import WatchQueue from "./WatchQueue.js";
 import WatchTargets from "./WatchTargets.js";
+import JavaScriptDependencies from "./Util/JavaScriptDependencies.js";
 import BaseError from "./Errors/BaseError.js";
 
 // Utils
@@ -32,6 +33,8 @@ export default class Core extends CoreFs {
 
 	/** @type {OutputHashes} */
 	#outputHashes = new OutputHashes();
+	/** @type {Set<string>|undefined} JavaScript modules used by configuration or data files */
+	#nonTemplateJavaScriptDependencies;
 
 	get outputHashes() {
 		return this.#outputHashes;
@@ -455,6 +458,14 @@ export default class Core extends CoreFs {
 		let templateFiles = await this.eleventyFiles.getWatchPathCache();
 		await this.watchTargets.addDependencies(templateFiles);
 
+		// For incremental builds, a changed module only affects the templates that import it
+		for (let templateFile of templateFiles) {
+			this.eleventyConfig.usesGraph.addDependency(
+				templateFile,
+				await JavaScriptDependencies.getDependencies([templateFile]),
+			);
+		}
+
 		// TODO use DirContains
 		let dataDir = TemplatePath.stripLeadingDotSlash(this.templateData.getDataDir());
 		function filterOutGlobalDataFiles(path) {
@@ -471,8 +482,25 @@ export default class Core extends CoreFs {
 		let globalDataDeps = this.templateData.getWatchPathCache();
 		await this.watchTargets.addDependencies(globalDataDeps, filterOutGlobalDataFiles);
 
-		await this.watchTargets.addDependencies(
-			await this.eleventyFiles.getWatcherTemplateJavaScriptDataFiles(),
+		let templateDataFiles = await this.eleventyFiles.getWatcherTemplateJavaScriptDataFiles();
+		await this.watchTargets.addDependencies(templateDataFiles);
+
+		let nonTemplateFiles = [
+			this.eleventyConfig.getActiveConfigPath(),
+			...(globalDataDeps ?? []),
+			...templateDataFiles,
+		].filter(Boolean);
+		this.#nonTemplateJavaScriptDependencies = new Set(
+			(await JavaScriptDependencies.getDependencies(nonTemplateFiles)).map((path) =>
+				PathNormalizer.fullNormalization(path),
+			),
+		);
+	}
+
+	isJavaScriptDependencyOfTemplatesOnly(path) {
+		return (
+			this.#nonTemplateJavaScriptDependencies !== undefined &&
+			!this.#nonTemplateJavaScriptDependencies.has(PathNormalizer.fullNormalization(path))
 		);
 	}
 

@@ -348,3 +348,58 @@ test("Collection consumers render when directory data removes the tag", async (t
   t.true(rendered.includes("blog-index.njk"));
   t.is(read("blog-index/index.html"), "");
 });
+
+function addJavaScriptTemplates(dir) {
+  fs.mkdirSync(path.join(dir, "lib"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "lib/helper.js"), `export default function() { return "Helper"; }`);
+  fs.writeFileSync(path.join(dir, "lib/shared.js"), `export default "Shared";`);
+  fs.writeFileSync(path.join(dir, "lib/layout-helper.js"), `export default "Layout";`);
+  fs.writeFileSync(
+    path.join(dir, "page.11ty.js"),
+    `import helper from "./lib/helper.js";\nexport default function() { globalThis.renderedJs?.add("page.11ty.js"); return helper(); }`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "_includes/js-layout.11ty.js"),
+    `import label from "../lib/layout-helper.js";\nexport default function(data) { return label + " " + data.content; }`,
+  );
+  fs.writeFileSync(path.join(dir, "uses-js-layout.njk"), "---\nlayout: js-layout.11ty.js\n---\n{% rendered %}Body");
+  fs.mkdirSync(path.join(dir, "_data"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "_data/shared.js"), `import shared from "../lib/shared.js";\nexport default { value: shared };`);
+  fs.writeFileSync(path.join(dir, "uses-shared.njk"), "{% rendered %}{{ shared.value }}");
+  return dir;
+}
+
+// Serial: JavaScript templates record renders on a shared global
+async function getJavaScriptWatchInstance(name) {
+  globalThis.renderedJs = new Set();
+  let instance = await getWatchInstance(addJavaScriptTemplates(createProject(name)));
+  // Watch dependencies are mapped after a build (startWatch is skipped in tests)
+  await instance.trigger("static.njk");
+  return {
+    ...instance,
+    async trigger(file, content) {
+      globalThis.renderedJs.clear();
+      let rendered = await instance.trigger(file, content);
+      return [...rendered, ...globalThis.renderedJs].sort();
+    },
+  };
+}
+
+test.serial("JavaScript template dependency change only renders templates that import it", async (t) => {
+  let { trigger, read } = await getJavaScriptWatchInstance("js-deps");
+  t.deepEqual(await trigger("lib/helper.js", `export default function() { return "Helper 2"; }`), ["page.11ty.js"]);
+  t.is(read("page/index.html"), "Helper 2");
+});
+
+test.serial("JavaScript layout dependency change only renders templates using the layout", async (t) => {
+  let { trigger, read } = await getJavaScriptWatchInstance("js-layout-deps");
+  t.deepEqual(await trigger("lib/layout-helper.js", `export default "Layout 2";`), ["uses-js-layout.njk"]);
+  t.is(read("uses-js-layout/index.html"), "Layout 2 Body");
+});
+
+test.serial("JavaScript dependency of a data file runs a full build", async (t) => {
+  let { trigger, read } = await getJavaScriptWatchInstance("js-data-deps");
+  let rendered = await trigger("lib/shared.js", `export default "Shared 2";`);
+  t.true(rendered.includes("static.njk"));
+  t.is(read("uses-shared/index.html"), "Shared 2");
+});

@@ -803,13 +803,18 @@ Verbose Output: ${this.verboseMode}`;
 			return false;
 		}
 
-		// Other JavaScript modules may also be used by global data or configuration files
 		let node = uses.normalizeNode(path);
 		return (
 			GlobalDependencyMap.isLayoutNode(uses.map, node) ||
 			GlobalDependencyMap.isDataFileNode(uses.map, node) ||
-			!isEligibleJavaScriptFileExtension(TemplatePath.getExtension(path))
+			!isEligibleJavaScriptFileExtension(TemplatePath.getExtension(path)) ||
+			this.isJavaScriptDependencyOfTemplatesOnly(path)
 		);
+	}
+
+	// A JavaScript module also used by data or configuration files needs a full build (unknown here)
+	isJavaScriptDependencyOfTemplatesOnly() {
+		return false;
 	}
 
 	/**

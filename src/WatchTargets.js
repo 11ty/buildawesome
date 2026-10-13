@@ -89,22 +89,18 @@ export default class WatchTargets {
 
 		// https://github.com/11ty/eleventy/issues/3899
 		let graph = await JavaScriptDependencies.getGraph(targets);
-		if (filterCallback) {
-			for (let node of graph.overallOrder()) {
-				if (!filterCallback(node)) {
-					graph.removeNode(node);
-				}
-			}
-		}
 
+		// The filter only applies to new watch targets: dependants of a changed file (e.g. global data files) must be in the graph to reset their import cache
 		mergeGraphs(this.graph, graph);
 
 		// The graph includes the original targets, which we do not want for addRaw
-		let rawGraph = graph.clone();
-		for (let t of targets) {
-			rawGraph.removeNode(t);
-		}
-		this.addRaw(rawGraph.overallOrder(), true);
+		let targetSet = new Set(targets);
+		this.addRaw(
+			graph
+				.overallOrder()
+				.filter((node) => !targetSet.has(node) && (!filterCallback || filterCallback(node))),
+			true,
+		);
 	}
 
 	setWriter(templateWriter) {
