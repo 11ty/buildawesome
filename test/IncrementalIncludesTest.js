@@ -334,3 +334,17 @@ test("Global data read through a collection renders the reader", async (t) => {
   t.true(rendered.includes("blog-index.njk"));
   t.is(read("blog-index/index.html"), "New New New ");
 });
+
+test("Collection consumers render when a template leaves the collection", async (t) => {
+  let { trigger, read } = await getWatchInstance(addDataFiles(createProject("collection-leave")));
+  let rendered = await trigger("blog/a.njk", "---\noverride:tags: []\n---\n{% rendered %}A {{ name }}");
+  t.true(rendered.includes("blog-index.njk"));
+  t.is(read("blog-index/index.html"), "Blog Blog ");
+});
+
+test("Collection consumers render when directory data removes the tag", async (t) => {
+  let { trigger, read } = await getWatchInstance(addDataFiles(createProject("collection-leave-data")));
+  let rendered = await trigger("blog/blog.11tydata.json", JSON.stringify({ name: "Blog" }));
+  t.true(rendered.includes("blog-index.njk"));
+  t.is(read("blog-index/index.html"), "");
+});

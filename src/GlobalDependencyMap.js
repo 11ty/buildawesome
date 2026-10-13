@@ -231,26 +231,6 @@ class GlobalDependencyMap {
 		return this.map.hasNode(this.normalizeNode(node));
 	}
 
-	findCollectionsRemovedFrom(node, collectionNames) {
-		if (!this.hasNode(node)) {
-			return new Set();
-		}
-
-		let prevDeps = this.getDependantsFor(node)
-			.map((entry) => GlobalDependencyMap.getTagName(entry))
-			.filter(Boolean);
-
-		let prevDepsSet = new Set(prevDeps);
-		let deleted = new Set();
-		for (let dep of prevDepsSet) {
-			if (!collectionNames.has(dep)) {
-				deleted.add(dep);
-			}
-		}
-
-		return deleted;
-	}
-
 	resetNode(node) {
 		node = this.normalizeNode(node);
 
