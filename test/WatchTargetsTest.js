@@ -6,7 +6,6 @@ import JavaScriptDependencies from "../src/Util/JavaScriptDependencies.js";
 
 test("Basic", (t) => {
   let targets = new EleventyWatchTargets();
-  targets.setProjectUsingEsm(true);
 
   t.deepEqual(targets.getTargets(), []);
 
@@ -16,7 +15,6 @@ test("Basic", (t) => {
 
 test("Removes duplicates", (t) => {
   let targets = new EleventyWatchTargets();
-  targets.setProjectUsingEsm(true);
 
   targets.add(".eleventy.js");
   targets.add("./.eleventy.js");
@@ -25,7 +23,6 @@ test("Removes duplicates", (t) => {
 
 test("Add array", (t) => {
   let targets = new EleventyWatchTargets();
-  targets.setProjectUsingEsm(true);
 
   targets.add([".eleventy.js", "b.js"]);
   targets.add(["b.js", "c.js"]);
@@ -34,7 +31,6 @@ test("Add array", (t) => {
 
 test("Add and make glob", (t) => {
   let targets = new EleventyWatchTargets();
-  targets.setProjectUsingEsm(true);
 
   // Note the `test` directory must exist here for this to pass.
   targets.add(["test", "test/b.js"]);
@@ -43,14 +39,13 @@ test("Add and make glob", (t) => {
 
 test("JavaScript get dependencies", async (t) => {
   t.deepEqual(
-    await JavaScriptDependencies.getDependencies(["./test/stubs/config-deps.cjs"], true),
+    await JavaScriptDependencies.getDependencies(["./test/stubs/config-deps.cjs"]),
     ["./test/stubs/config-deps-upstream.cjs"]
   );
 });
 
 test("JavaScript addDependencies", async (t) => {
   let targets = new EleventyWatchTargets();
-  targets.setProjectUsingEsm(true);
 
   await targets.addDependencies("./test/stubs/config-deps.cjs");
   t.deepEqual(targets.getTargets(), ["./test/stubs/config-deps-upstream.cjs"]);
@@ -61,7 +56,6 @@ test("JavaScript addDependencies", async (t) => {
 
 test("JavaScript addDependencies (one file has two dependencies)", async (t) => {
   let targets = new EleventyWatchTargets();
-  targets.setProjectUsingEsm(true);
 
   await targets.addDependencies("./test/stubs/dependencies/two-deps.11ty.cjs");
   t.deepEqual(targets.getTargets(), [
@@ -92,7 +86,6 @@ test("JavaScript addDependencies (one file has two dependencies)", async (t) => 
 test("JavaScript addDependencies (skip JS deps)", async (t) => {
   let templateConfig = new TemplateConfig();
   let targets = new EleventyWatchTargets(templateConfig);
-  targets.setProjectUsingEsm(true);
   targets.watchJavaScriptDependencies = false;
   await targets.addDependencies("./test/stubs/dependencies/two-deps.11ty.cjs");
 
@@ -120,7 +113,6 @@ test("JavaScript addDependencies (skip JS deps)", async (t) => {
 
 test("JavaScript addDependencies with a filter", async (t) => {
   let targets = new EleventyWatchTargets();
-  targets.setProjectUsingEsm(true);
   await targets.addDependencies("./test/stubs/config-deps.cjs", function (path) {
     return path.indexOf("./test/stubs/") === -1;
   });
@@ -135,7 +127,6 @@ test("JavaScript addDependencies with a filter", async (t) => {
 
 test("add, addDependencies falsy values are filtered", async (t) => {
   let targets = new EleventyWatchTargets();
-  targets.setProjectUsingEsm(true);
   targets.add("");
   await targets.addDependencies("");
   t.deepEqual(targets.getTargets(), []);
@@ -143,7 +134,6 @@ test("add, addDependencies falsy values are filtered", async (t) => {
 
 test("add, addDependencies file does not exist", async (t) => {
   let targets = new EleventyWatchTargets();
-  targets.setProjectUsingEsm(true);
 
   targets.add("./.eleventy-notfound.js"); // does not exist
   await targets.addDependencies("./.eleventy-notfound.js"); // does not exist
@@ -152,7 +142,6 @@ test("add, addDependencies file does not exist", async (t) => {
 
 test("getNewTargetsSinceLastReset", (t) => {
   let targets = new EleventyWatchTargets();
-  targets.setProjectUsingEsm(true);
 
   targets.add("./.eleventy-notfound.js"); // does not exist
   t.deepEqual(targets.getNewTargetsSinceLastReset(), ["./.eleventy-notfound.js"]);

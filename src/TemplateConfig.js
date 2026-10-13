@@ -184,7 +184,6 @@ class TemplateConfig {
 
 	setProjectUsingEsm(isEsmProject) {
 		this.isEsm = !!isEsmProject;
-		this.usesGraph.setIsEsm(isEsmProject);
 	}
 
 	getIsProjectUsingEsm() {
@@ -559,7 +558,6 @@ class TemplateConfig {
 	get usesGraph() {
 		if (!this.#usesGraph) {
 			this.#usesGraph = new GlobalDependencyMap();
-			this.#usesGraph.setIsEsm(this.isEsm);
 			this.#usesGraph.setTemplateConfig(this);
 		}
 		return this.#usesGraph;

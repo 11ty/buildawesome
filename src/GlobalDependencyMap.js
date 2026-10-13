@@ -67,10 +67,6 @@ class GlobalDependencyMap {
 			.some((entry) => !entry.startsWith(GlobalDependencyMap.COLLECTION_PREFIX));
 	}
 
-	setIsEsm(isEsm) {
-		this.isEsm = isEsm;
-	}
-
 	setTemplateConfig(templateConfig) {
 		this.#templateConfig = templateConfig;
 
@@ -169,7 +165,7 @@ class GlobalDependencyMap {
 			}
 
 			if (this.#templateConfig?.shouldSpiderJavaScriptDependencies()) {
-				let deps = await JavaScriptDependencies.getDependencies([layout], this.isEsm);
+				let deps = await JavaScriptDependencies.getDependencies([layout]);
 				this.addDependency(layout, deps);
 			}
 		}

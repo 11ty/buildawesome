@@ -134,12 +134,10 @@
 		"zod-validation-error": "^5.0.0"
 	},
 	"dependencies": {
-		"@11ty/dependency-tree": "^4.0.2",
-		"@11ty/dependency-tree-esm": "^2.0.4",
-		"@11ty/dependency-tree-typescript": "^1.0.0",
+		"@11ty/dependency-tree": "^5.0.0-alpha.3",
 		"@11ty/eleventy-dev-server": "^3.0.0-alpha.12",
 		"@11ty/eleventy-plugin-bundle": "^4.0.3",
-		"@11ty/eleventy-utils": "^2.0.7",
+		"@11ty/eleventy-utils": "^3.0.1",
 		"@11ty/gray-matter": "^3.0.0",
 		"@11ty/lodash-custom": "^4.17.21",
 		"@11ty/node-version-check": "^1.0.1",

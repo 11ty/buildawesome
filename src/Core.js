@@ -451,9 +451,6 @@ export default class Core extends CoreFs {
 			return;
 		}
 
-		// Lazy resolve isEsm only for --watch
-		this.watchTargets.setProjectUsingEsm(this.isEsm);
-
 		// Template files .11ty.js
 		let templateFiles = await this.eleventyFiles.getWatchPathCache();
 		await this.watchTargets.addDependencies(templateFiles);
