@@ -29,6 +29,30 @@ const { set: lodashSet, get: lodashGet } = lodash;
 
 const debug = createDebug("Template");
 
+function assertContentReady(entry, propName) {
+	if (entry.needsCheck && entry._templateContent === undefined) {
+		let suffix = `${entry.inputPath}${entry.pageNumber ? ` (page ${entry.pageNumber})` : ""}`;
+		if (entry.template.isRenderable()) {
+			throw new TemplateContentPrematureUseError(`Tried to use ${propName} too early on ${suffix}`);
+		}
+		throw new TemplateContentUnrenderedTemplateError(
+			`Tried to use ${propName} on unrendered template: ${suffix}`,
+		);
+	}
+}
+
+function getContentPipeline(entry) {
+	if (!entry.template.hasTemplateRender()) {
+		return {};
+	}
+
+	let names = entry.template.templateRender.getPipelineStepNames();
+	// The first step receives the template source
+	return Object.fromEntries(
+		names.map((name, j) => [name, j === 0 ? entry.rawInput : entry._stepInputs?.[j - 1]]),
+	);
+}
+
 // Shared across page entries so the accessor functions aren’t recreated per page
 const TEMPLATE_CONTENT_PROPERTIES = {
 	needsCheck: {
@@ -50,23 +74,30 @@ const TEMPLATE_CONTENT_PROPERTIES = {
 			this._templateContent = content;
 		},
 		get() {
-			if (this.needsCheck && this._templateContent === undefined) {
-				if (this.template.isRenderable()) {
-					// should at least warn here
-					throw new TemplateContentPrematureUseError(
-						`Tried to use templateContent too early on ${this.inputPath}${
-							this.pageNumber ? ` (page ${this.pageNumber})` : ""
-						}`,
-					);
-				} else {
-					throw new TemplateContentUnrenderedTemplateError(
-						`Tried to use templateContent on unrendered template: ${
-							this.inputPath
-						}${this.pageNumber ? ` (page ${this.pageNumber})` : ""}`,
-					);
-				}
-			}
+			assertContentReady(this, "templateContent");
 			return this._templateContent;
+		},
+	},
+	_stepInputs: {
+		enumerable: false,
+		writable: true,
+		value: undefined,
+	},
+	_contentPipeline: {
+		enumerable: false,
+		writable: true,
+		value: undefined,
+	},
+	// Content each template syntax step received, keyed by engine name, e.g. `contentPipeline.md`
+	contentPipeline: {
+		enumerable: false,
+		set(content) {
+			this._contentPipeline = content;
+		},
+		get() {
+			assertContentReady(this, "contentPipeline");
+			this._contentPipeline ??= getContentPipeline(this);
+			return this._contentPipeline;
 		},
 	},
 	// Alias for templateContent for consistency
@@ -513,8 +544,8 @@ class Template extends TemplateContent {
 		throw new Error("Internal error: `Template->renderLayout` was removed in Eleventy 3.0.");
 	}
 
-	async renderDirect(str, data, templateOnly) {
-		return super.render(str, data, templateOnly);
+	async renderDirect(str, data, templateOnly, renderContext) {
+		return super.render(str, data, templateOnly, renderContext);
 	}
 
 	// see also Eleventy->#resetFileInWatchQueue()
@@ -526,7 +557,18 @@ class Template extends TemplateContent {
 	async renderPageEntryWithoutLayout(pageEntry) {
 		// @cachedproperty
 		if (!this.#cacheRenderedPromise) {
-			this.#cacheRenderedPromise = this.renderDirect(pageEntry.rawInput, pageEntry.data);
+			let renderContext = { stepInputs: [] };
+			this.#cacheRenderedPromise = this.renderDirect(
+				pageEntry.rawInput,
+				pageEntry.data,
+				false,
+				renderContext,
+			).then((content) => {
+				pageEntry._stepInputs =
+					renderContext.stepInputs.length > 0 ? renderContext.stepInputs : undefined;
+				pageEntry._contentPipeline = undefined;
+				return content;
+			});
 			this.renderCount++;
 		}
 

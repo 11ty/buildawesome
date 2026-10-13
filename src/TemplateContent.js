@@ -634,10 +634,11 @@ class TemplateContent {
 		});
 	}
 
-	async render(str, data, templateOnly) {
+	async render(str, data, templateOnly, renderContext) {
 		return this._render(str, data, {
 			type: "Content",
 			templateOnly,
+			renderContext,
 		});
 	}
 
@@ -658,7 +659,7 @@ class TemplateContent {
 	}
 
 	async _render(str, data, options = {}) {
-		let { templateOnly, type } = options;
+		let { templateOnly, type, renderContext } = options;
 
 		try {
 			if (templateOnly && !this.engine.needsCompilation(str)) {
@@ -688,7 +689,8 @@ class TemplateContent {
 				inputPathBenchmark.before();
 			}
 
-			let rendered = await fn(data);
+			// `renderContext` collects intermediate output between pipeline steps
+			let rendered = await (renderContext ? fn(data, renderContext) : fn(data));
 
 			if (inputPathBenchmark) {
 				inputPathBenchmark.after();

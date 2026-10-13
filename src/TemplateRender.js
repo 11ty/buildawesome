@@ -222,6 +222,11 @@ export default class TemplateRender {
 		return step;
 	}
 
+	// Engine names in execution order
+	getPipelineStepNames() {
+		return [...TemplateRender.#getStepNames(this.#precedingSteps), this.engineName];
+	}
+
 	// Removes output format steps, e.g. for permalinks and computed data
 	static #getTemplateOnlySteps(steps, engineName, config) {
 		let names = [...TemplateRender.#getStepNames(steps.slice(0, -1)), engineName];
@@ -265,10 +270,11 @@ export default class TemplateRender {
 		await Promise.all(rest.map((engine) => engine.ready()));
 
 		// Later steps compile the previous step’s output on every render
-		return async function (data) {
+		return async function (data, renderContext) {
 			let fn = await fnReady;
 			let content = await fn(data);
 			for (let engine of rest) {
+				renderContext?.stepInputs?.push(content);
 				let nextFn = await engine.compile(content, inputPath);
 				content = await nextFn(data);
 			}

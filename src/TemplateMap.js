@@ -494,9 +494,14 @@ class TemplateMap {
 				// This check skips precompiled collections
 				if (entry) {
 					let index = item.pageNumber || 0;
-					let content = entry._pages[index]._templateContent;
+					let page = entry._pages[index];
+					let content = page._templateContent;
 					if (content !== undefined) {
 						item.templateContent = content;
+						// Copies of page entries (e.g. spread in a collection callback) don’t have the getter
+						if (item !== page) {
+							item.contentPipeline = page.contentPipeline;
+						}
 					}
 				}
 			}
