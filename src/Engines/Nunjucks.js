@@ -107,7 +107,9 @@ export default class Nunjucks extends TemplateEngine {
 		let engine = this;
 		env.getTemplate = function (name, ...args) {
 			// (name, eagerCompile, parentName, ignoreMissing, cb), any trailing arguments optional
-			let parentName = typeof args[1] === "string" ? args[1] : undefined;
+			// String templates have no path, so use the engine name (e.g. includes in `renderTemplate`)
+			let parentName =
+				typeof args[1] === "string" ? args[1] : args.length > 1 ? engine.name : undefined;
 			let cbIndex = args.findIndex((arg) => typeof arg === "function");
 			if (parentName && cbIndex > -1) {
 				let cb = args[cbIndex];

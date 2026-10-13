@@ -71,7 +71,8 @@ export default class Liquid extends TemplateEngine {
 				let lookup = parser.loader.lookup;
 				parser.loader.lookup = function* (...args) {
 					let filepath = yield* lookup.apply(this, args);
-					engine.addDependency(currentFile, filepath);
+					// String templates have no file, so use the engine name (e.g. includes in `renderTemplate`)
+					engine.addDependency(currentFile || engine.name, filepath);
 					return filepath;
 				};
 				// A cached parse skips the lookup

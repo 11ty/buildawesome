@@ -181,6 +181,14 @@ function RenderPlugin($config, options = {}) {
 	 * @property {boolean} [accessGlobalData] - Whether or not the template has access to the page’s data.
 	 */
 
+	// For incremental builds, the page uses what it renders
+	function addDependency(page, ...nodes) {
+		let uses = (options.templateConfig || templateConfig)?.usesGraph;
+		if (uses && page?.inputPath) {
+			uses.addDependency(page.inputPath, nodes.filter(Boolean));
+		}
+	}
+
 	options.tagName ??= "renderTemplate";
 	options.tagNameFile ??= "renderFile";
 	options.filterName ??= "renderContent";
@@ -365,7 +373,12 @@ function RenderPlugin($config, options = {}) {
 			templateLang = false;
 		}
 
-		// TODO Render plugin `templateLang` is feeding bad input paths to the addDependencies call in Custom.js
+		// Engines record a string template’s dependencies under the engine name (e.g. `njk` or `webc`)
+		let lang = templateLang || this.page?.templateSyntax;
+		if (typeof lang === "string") {
+			addDependency(this.page, lang, ...lang.split(","));
+		}
+
 		let fn = await compile.call(this, content, templateLang, {
 			templateConfig: options.templateConfig || templateConfig,
 			extensionMap,
@@ -380,6 +393,8 @@ function RenderPlugin($config, options = {}) {
 			templateConfig: options.templateConfig || templateConfig,
 			extensionMap,
 		};
+
+		addDependency(this.page, inputPath);
 
 		let fn = await compileFile.call(this, inputPath, renderFileOptions, templateLang);
 

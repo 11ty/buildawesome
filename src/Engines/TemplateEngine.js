@@ -204,9 +204,9 @@ export default class TemplateEngine {
 	}
 
 	// e.g. a template’s include, import, extends, or layout file, recorded when it is used
+	// `from` is the engine name for string templates (e.g. the Render plugin’s `renderTemplate`)
 	addDependency(from, to) {
-		// Skips engine names (e.g. `md`) passed in place of a file path
-		if (!from || !to || !from.includes(".")) {
+		if (!from || !to) {
 			return;
 		}
 		this.config.uses.addDependency(from, [to]);

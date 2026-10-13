@@ -2,6 +2,8 @@ import test from "ava";
 import fs from "node:fs";
 import path from "node:path";
 import Eleventy from "../src/Core.js";
+import RenderPlugin from "../src/Plugins/RenderPlugin.js";
+import WebCPlugin from "@11ty/eleventy-plugin-webc";
 
 const ROOT = "test/stubs-incremental-includes";
 
@@ -35,15 +37,17 @@ function createProject(name) {
 
 async function getWatchInstance(dir, options = {}) {
   let rendered = new Set();
+  let { config, ...eleventyOptions } = options;
   let elev = new Eleventy(dir, `${dir}/_site`, {
     configPath: `${dir}/eleventy.config.js`,
+    ...eleventyOptions,
     config($config) {
       $config.addShortcode("rendered", function () {
         rendered.add(this.page.inputPath);
         return "";
       });
+      config?.($config);
     },
-    ...options,
   });
   elev.disableLogger();
   elev.setIncrementalBuild(options.incremental ?? true);
@@ -208,7 +212,6 @@ test("Passthrough copy outside the input directory is incremental", async (t) =>
 
   let { elev } = await getWatchInstance(dir, {
     config($config) {
-      $config.addShortcode("rendered", () => "");
       $config.addPassthroughCopy({ [assets]: "assets" });
     },
   });
@@ -419,7 +422,6 @@ for (let includeExtension of ["njk", "md"]) {
     let { trigger, read } = await getWatchInstance(dir, {
       config($config) {
         $config.setMarkdownTemplateEngine("njk");
-        $config.addShortcode("rendered", () => "");
       },
     });
 
@@ -429,3 +431,81 @@ for (let includeExtension of ["njk", "md"]) {
     }
   });
 }
+
+async function getRenderPluginWatchInstance(name) {
+  let dir = createProject(name);
+  let outside = `${ROOT}/${name}-outside`;
+  fs.mkdirSync(outside, { recursive: true });
+  fs.writeFileSync(`${outside}/doc.md`, "# Doc 0");
+  fs.writeFileSync(path.join(dir, "_includes/partial.njk"), "Partial 0");
+  fs.writeFileSync(path.join(dir, "_includes/partial.liquid"), "Liquid partial 0");
+  fs.writeFileSync(path.join(dir, "render-file.njk"), `{% rendered %}{% renderFile "./${outside}/doc.md" %}`);
+  fs.writeFileSync(
+    path.join(dir, "render-template-njk.njk"),
+    `{% rendered %}{% renderTemplate "njk" %}{% include "partial.njk" %}{% endrenderTemplate %}`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "render-template-liquid.liquid"),
+    `{% rendered %}{% renderTemplate "liquid" %}{% include "partial.liquid" %}{% endrenderTemplate %}`,
+  );
+  // A normal page also uses the include, so it is tracked
+  fs.writeFileSync(path.join(dir, "uses-partial.njk"), `{% rendered %}{% include "partial.njk" %}`);
+  fs.writeFileSync(path.join(dir, "uses-partial-liquid.liquid"), `{% rendered %}{% include "partial.liquid" %}`);
+
+  let instance = await getWatchInstance(dir, {
+    config($config) {
+      $config.addPlugin(RenderPlugin);
+      $config.addWatchTarget(`${outside}/**/*.md`);
+    },
+  });
+  return { ...instance, outside };
+}
+
+test("renderFile renders again when the rendered file changes (#2909)", async (t) => {
+  let { trigger, read, outside, elev } = await getRenderPluginWatchInstance("render-file");
+  for (let i = 1; i <= 2; i++) {
+    fs.writeFileSync(`${outside}/doc.md`, `# Doc ${i}`);
+    await elev.triggerWatchRunForPath(`./${outside}/doc.md`);
+    t.is(read("render-file/index.html").trim(), `<h1>Doc ${i}</h1>`);
+  }
+  t.true(elev.isIncrementalBuildPossible([`./${outside}/doc.md`]));
+});
+
+test("renderTemplate includes are tracked (Nunjucks)", async (t) => {
+  let { trigger, read } = await getRenderPluginWatchInstance("render-template-njk");
+  let rendered = await trigger("_includes/partial.njk", "Partial 1");
+  t.true(rendered.includes("render-template-njk.njk"));
+  t.false(rendered.includes("static.njk"));
+  t.is(read("render-template-njk/index.html"), "Partial 1");
+});
+
+test("renderTemplate includes are tracked (Liquid)", async (t) => {
+  let { trigger, read } = await getRenderPluginWatchInstance("render-template-liquid");
+  let rendered = await trigger("_includes/partial.liquid", "Liquid partial 1");
+  t.true(rendered.includes("render-template-liquid.liquid"));
+  t.false(rendered.includes("static.njk"));
+  t.is(read("render-template-liquid/index.html"), "Liquid partial 1");
+});
+
+test("renderTemplate WebC components are tracked", async (t) => {
+  let dir = createProject("render-template-webc");
+  fs.mkdirSync(path.join(dir, "_components"));
+  fs.writeFileSync(path.join(dir, "_components/main-button.webc"), "<button>Button 0</button>");
+  fs.writeFileSync(
+    path.join(dir, "uses-webc.liquid"),
+    `{% rendered %}{% renderTemplate "webc" %}<main-button></main-button>{% endrenderTemplate %}`,
+  );
+  let { trigger, read } = await getWatchInstance(dir, {
+    config($config) {
+      $config.addPlugin(WebCPlugin, { components: `${dir}/_components/**/*.webc` });
+      $config.addPlugin(RenderPlugin);
+    },
+  });
+
+  for (let i = 1; i <= 2; i++) {
+    let rendered = await trigger("_components/main-button.webc", `<button>Button ${i}</button>`);
+    t.true(rendered.includes("uses-webc.liquid"));
+    t.false(rendered.includes("static.njk"));
+    t.is(read("uses-webc/index.html").trim(), `<button>Button ${i}</button>`);
+  }
+});
