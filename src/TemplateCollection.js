@@ -4,7 +4,7 @@ import TemplateData from "./Data/TemplateData.js";
 import Sortable from "./Util/Objects/Sortable.js";
 import { isGlobMatch } from "./Util/GlobMatcher.js";
 
-class TemplateCollection extends Sortable {
+export default class TemplateCollection extends Sortable {
 	// Both caches are invalidated in `add`, the only entry point that mutates `items`
 	#allSortedCache;
 	#tagIndexCache;
@@ -18,7 +18,6 @@ class TemplateCollection extends Sortable {
 	add(item) {
 		this.#allSortedCache = undefined;
 		this.#tagIndexCache = undefined;
-
 		super.add(item);
 	}
 
@@ -125,5 +124,3 @@ class TemplateCollection extends Sortable {
 		});
 	}
 }
-
-export default TemplateCollection;

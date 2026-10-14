@@ -10,10 +10,13 @@ const debug = createDebug("Dependencies");
 class GlobalDependencyMap {
 	// dependency-graph requires these keys to be alphabetic strings
 	static LAYOUT_KEY = "layout";
+	static DATA_FILE_KEY = "data";
 	static COLLECTION_PREFIX = "__collection:"; // must match TemplateDepGraph key
 
 	#map;
 	#templateConfig;
+	#hasAllTemplateDependencies = false;
+	#changedFiles = [];
 	#cachedUserConfigurationCollectionApiNames;
 
 	static isCollection(entry) {
@@ -32,10 +35,37 @@ class GlobalDependencyMap {
 
 	reset() {
 		this.#map = undefined;
+		this.#hasAllTemplateDependencies = false;
+		this.#changedFiles = [];
 	}
 
-	setIsEsm(isEsm) {
-		this.isEsm = isEsm;
+	// Files changed since the previous build, e.g. from the watch queue
+	setChangedFiles(files = []) {
+		this.#changedFiles = files;
+	}
+
+	isChangedFileUsedBy(node) {
+		return this.#changedFiles.some((file) => this.hasDependency(node, file, false));
+	}
+
+	// True once every template has rendered (and recorded its includes) without an error
+	get hasAllTemplateDependencies() {
+		return this.#hasAllTemplateDependencies;
+	}
+
+	setHasAllTemplateDependencies(hasAll) {
+		this.#hasAllTemplateDependencies = Boolean(hasAll);
+	}
+
+	// Whether any other file (transitively) uses this one, e.g. an include or layout
+	hasDependants(node) {
+		node = this.normalizeNode(node);
+		if (!node || !this.map.hasNode(node)) {
+			return false;
+		}
+		return this.map
+			.dependantsOf(node)
+			.some((entry) => !entry.startsWith(GlobalDependencyMap.COLLECTION_PREFIX));
 	}
 
 	setTemplateConfig(templateConfig) {
@@ -136,7 +166,7 @@ class GlobalDependencyMap {
 			}
 
 			if (this.#templateConfig?.shouldSpiderJavaScriptDependencies()) {
-				let deps = await JavaScriptDependencies.getDependencies([layout], this.isEsm);
+				let deps = await JavaScriptDependencies.getDependencies([layout]);
 				this.addDependency(layout, deps);
 			}
 		}
@@ -201,26 +231,6 @@ class GlobalDependencyMap {
 		return this.map.hasNode(this.normalizeNode(node));
 	}
 
-	findCollectionsRemovedFrom(node, collectionNames) {
-		if (!this.hasNode(node)) {
-			return new Set();
-		}
-
-		let prevDeps = this.getDependantsFor(node)
-			.map((entry) => GlobalDependencyMap.getTagName(entry))
-			.filter(Boolean);
-
-		let prevDepsSet = new Set(prevDeps);
-		let deleted = new Set();
-		for (let dep of prevDepsSet) {
-			if (!collectionNames.has(dep)) {
-				deleted.add(dep);
-			}
-		}
-
-		return deleted;
-	}
-
 	resetNode(node) {
 		node = this.normalizeNode(node);
 
@@ -256,11 +266,32 @@ class GlobalDependencyMap {
 		return templates;
 	}
 
+	// Directory and template data files a template uses
+	addDataFiles(templatePath, dataFiles = []) {
+		this.addDependency(templatePath, dataFiles);
+		for (let file of dataFiles) {
+			this.map.setNodeData(this.normalizeNode(file), { type: GlobalDependencyMap.DATA_FILE_KEY });
+		}
+	}
+
+	static isDataFileNode(graph, node) {
+		if (!graph.hasNode(node)) {
+			return false;
+		}
+		return graph.getNodeData(node)?.type === GlobalDependencyMap.DATA_FILE_KEY;
+	}
+
 	static isLayoutNode(graph, node) {
 		if (!graph.hasNode(node)) {
 			return false;
 		}
 		return graph.getNodeData(node)?.type === GlobalDependencyMap.LAYOUT_KEY;
+	}
+
+	getLayouts() {
+		return Array.from(this.map.nodes.keys()).filter((node) =>
+			GlobalDependencyMap.isLayoutNode(this.map, node),
+		);
 	}
 
 	getLayoutsUsedBy(node) {

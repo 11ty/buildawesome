@@ -1,6 +1,6 @@
 import test from "ava";
 import fs from "fs";
-import yaml from "js-yaml";
+import { load } from "js-yaml";
 
 import TemplateConfig from "../src/TemplateConfig.js";
 import FileSystemSearch from "../src/FileSystemSearch.js";
@@ -16,7 +16,7 @@ test("Local data", async (t) => {
       input: "test/stubs-630"
     },
     function(cfg) {
-      cfg.addDataExtension("yaml", { parser: (s) => yaml.load(s) });
+      cfg.addDataExtension("yaml", { parser: (s) => load(s) });
       cfg.addDataExtension("nosj", { parser: (s) => JSON.parse(s) });
     }
   );
@@ -55,7 +55,7 @@ test("Local files", async (t) => {
       input: "test/stubs-630"
     },
     function(cfg) {
-      cfg.addDataExtension("yaml", { parser: (s) => yaml.load(s) });
+      cfg.addDataExtension("yaml", { parser: (s) => load(s) });
       cfg.addDataExtension("nosj", { parser: (s) => JSON.parse(s) });
     }
   );
@@ -145,7 +145,7 @@ test("Global data", async (t) => {
       input: "test/stubs-630"
     },
     function(cfg) {
-      cfg.addDataExtension("yaml", { parser: (s) => yaml.load(s) });
+      cfg.addDataExtension("yaml", { parser: (s) => load(s) });
       cfg.addDataExtension("nosj", { parser: (s) => JSON.parse(s) });
     }
   );
@@ -188,7 +188,7 @@ test("Global data merging and priority", async (t) => {
       input: "test/stubs-630"
     },
     function(cfg) {
-      cfg.addDataExtension("yaml", { parser: (s) => yaml.load(s) });
+      cfg.addDataExtension("yaml", { parser: (s) => load(s) });
       cfg.addDataExtension("nosj", { parser: (s) => JSON.parse(s) });
     }
   );
@@ -306,4 +306,29 @@ test("Missing `parser` property to addDataExtension object throws error", async 
   }, {
     message: "Expected `parser` property in second argument object to `eleventyConfig.addDataExtension`"
   });
+});
+
+test("Async parser rejection is wrapped with the data file path", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback(
+    {
+      input: "test/stubs-630"
+    },
+    function(cfg) {
+      cfg.addDataExtension("yaml", {
+        parser: async () => {
+          throw new Error("Async parser failure");
+        },
+      });
+    }
+  );
+
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
+  dataObj.setFileSystemSearch(new FileSystemSearch());
+
+  let e = await t.throwsAsync(() => dataObj.getGlobalData());
+
+  t.true(e.message.startsWith("Having trouble parsing data file"));
+  t.true(e.filePath.endsWith(".yaml"));
 });

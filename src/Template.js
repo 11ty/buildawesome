@@ -24,10 +24,94 @@ import { FileSystemUtilities } from "./Util/FileSystemUtilities.js";
 import { TemplatePreprocessors } from "./TemplatePreprocessors.js";
 import { getDirectoryFromUrl } from "./Util/UrlUtil.js";
 import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
+import { trackGlobalDataReads } from "./Data/GlobalDataReads.js";
 
 const { set: lodashSet, get: lodashGet } = lodash;
 
 const debug = createDebug("Template");
+
+function assertContentReady(entry, propName) {
+	if (entry.needsCheck && entry._templateContent === undefined) {
+		let suffix = `${entry.inputPath}${entry.pageNumber ? ` (page ${entry.pageNumber})` : ""}`;
+		if (entry.template.isRenderable()) {
+			throw new TemplateContentPrematureUseError(`Tried to use ${propName} too early on ${suffix}`);
+		}
+		throw new TemplateContentUnrenderedTemplateError(
+			`Tried to use ${propName} on unrendered template: ${suffix}`,
+		);
+	}
+}
+
+function getContentPipeline(entry) {
+	if (!entry.template.hasTemplateRender()) {
+		return {};
+	}
+
+	let names = entry.template.templateRender.getPipelineStepNames();
+	// The first step receives the template source
+	return Object.fromEntries(
+		names.map((name, j) => [name, j === 0 ? entry.rawInput : entry._stepInputs?.[j - 1]]),
+	);
+}
+
+// Shared across page entries so the accessor functions aren’t recreated per page
+const TEMPLATE_CONTENT_PROPERTIES = {
+	needsCheck: {
+		enumerable: false,
+		writable: true,
+		value: true,
+	},
+	_templateContent: {
+		enumerable: false,
+		writable: true,
+		value: undefined,
+	},
+	templateContent: {
+		enumerable: true,
+		set(content) {
+			if (content === undefined) {
+				this.needsCheck = false;
+			}
+			this._templateContent = content;
+		},
+		get() {
+			assertContentReady(this, "templateContent");
+			return this._templateContent;
+		},
+	},
+	_stepInputs: {
+		enumerable: false,
+		writable: true,
+		value: undefined,
+	},
+	_contentPipeline: {
+		enumerable: false,
+		writable: true,
+		value: undefined,
+	},
+	// Content each template syntax step received, keyed by engine name, e.g. `contentPipeline.md`
+	contentPipeline: {
+		enumerable: false,
+		set(content) {
+			this._contentPipeline = content;
+		},
+		get() {
+			assertContentReady(this, "contentPipeline");
+			this._contentPipeline ??= getContentPipeline(this);
+			return this._contentPipeline;
+		},
+	},
+	// Alias for templateContent for consistency
+	content: {
+		enumerable: true,
+		get() {
+			return this.templateContent;
+		},
+		set() {
+			throw new Error("Setter not available for `content`. Use `templateContent` instead.");
+		},
+	},
+};
 
 class Template extends TemplateContent {
 	#logger;
@@ -40,8 +124,16 @@ class Template extends TemplateContent {
 	#preprocessors;
 	#preprocessorCache;
 
+	static #isCloning = false;
+
 	constructor(templatePath, templateData, extensionMap, config) {
 		super(templatePath, config);
+
+		// `clone()` copies the remaining fields from the source template
+		if (Template.#isCloning) {
+			this.extensionMap = extensionMap;
+			return;
+		}
 
 		this.parsed = parse(templatePath);
 
@@ -57,10 +149,6 @@ class Template extends TemplateContent {
 
 		this.isDryRun = false;
 		this.writeCount = 0;
-
-		this.fileSlug = new TemplateFileSlug(this.inputPath, this.extensionMap, this.eleventyConfig);
-		this.fileSlugStr = this.fileSlug.getSlug();
-		this.filePathStem = this.fileSlug.getFullPathWithoutExtension();
 
 		this.outputFormat = "fs";
 
@@ -414,6 +502,18 @@ class Template extends TemplateContent {
 		}
 	}
 
+	// For incremental builds, a global data file change only affects the templates that read it
+	trackGlobalDataReads(data) {
+		let filesByKey = this.templateData?.getGlobalDataFilesByKey();
+		if (!filesByKey?.size) {
+			return;
+		}
+
+		trackGlobalDataReads(data, filesByKey, (files) => {
+			this.config.uses.addDataFiles(this.inputPath, files);
+		});
+	}
+
 	async getData() {
 		if (!this.#dataCache) {
 			// @cachedproperty
@@ -457,8 +557,8 @@ class Template extends TemplateContent {
 		throw new Error("Internal error: `Template->renderLayout` was removed in Eleventy 3.0.");
 	}
 
-	async renderDirect(str, data, bypassMarkdown) {
-		return super.render(str, data, bypassMarkdown);
+	async renderDirect(str, data, templateOnly, renderContext) {
+		return super.render(str, data, templateOnly, renderContext);
 	}
 
 	// see also Eleventy->#resetFileInWatchQueue()
@@ -470,7 +570,18 @@ class Template extends TemplateContent {
 	async renderPageEntryWithoutLayout(pageEntry) {
 		// @cachedproperty
 		if (!this.#cacheRenderedPromise) {
-			this.#cacheRenderedPromise = this.renderDirect(pageEntry.rawInput, pageEntry.data);
+			let renderContext = { stepInputs: [] };
+			this.#cacheRenderedPromise = this.renderDirect(
+				pageEntry.rawInput,
+				pageEntry.data,
+				false,
+				renderContext,
+			).then((content) => {
+				pageEntry._stepInputs =
+					renderContext.stepInputs.length > 0 ? renderContext.stepInputs : undefined;
+				pageEntry._contentPipeline = undefined;
+				return content;
+			});
 			this.renderCount++;
 		}
 
@@ -658,56 +769,7 @@ class Template extends TemplateContent {
 	}
 
 	static augmentWithTemplateContentProperty(obj) {
-		return Object.defineProperties(obj, {
-			needsCheck: {
-				enumerable: false,
-				writable: true,
-				value: true,
-			},
-			_templateContent: {
-				enumerable: false,
-				writable: true,
-				value: undefined,
-			},
-			templateContent: {
-				enumerable: true,
-				set(content) {
-					if (content === undefined) {
-						this.needsCheck = false;
-					}
-					this._templateContent = content;
-				},
-				get() {
-					if (this.needsCheck && this._templateContent === undefined) {
-						if (this.template.isRenderable()) {
-							// should at least warn here
-							throw new TemplateContentPrematureUseError(
-								`Tried to use templateContent too early on ${this.inputPath}${
-									this.pageNumber ? ` (page ${this.pageNumber})` : ""
-								}`,
-							);
-						} else {
-							throw new TemplateContentUnrenderedTemplateError(
-								`Tried to use templateContent on unrendered template: ${
-									this.inputPath
-								}${this.pageNumber ? ` (page ${this.pageNumber})` : ""}`,
-							);
-						}
-					}
-					return this._templateContent;
-				},
-			},
-			// Alias for templateContent for consistency
-			content: {
-				enumerable: true,
-				get() {
-					return this.templateContent;
-				},
-				set() {
-					throw new Error("Setter not available for `content`. Use `templateContent` instead.");
-				},
-			},
-		});
+		return Object.defineProperties(obj, TEMPLATE_CONTENT_PROPERTIES);
 	}
 
 	// via TemplateWriter->createTemplate #4292 #3933
@@ -833,12 +895,25 @@ class Template extends TemplateContent {
 			);
 		}
 
-		let templateBenchmark = this.bench.get("Template Write");
-		templateBenchmark.before();
+		// Output hashes are only tracked in watch/serve (set by Core).
+		let outputHashes = this.eleventyConfig.isWatchOrServe()
+			? this.eleventyConfig.outputHashes
+			: undefined;
+		let changed = outputHashes ? outputHashes.update(outputPath, finalContent) : true;
 
-		this.fsManager.writeFileSync(outputPath, finalContent);
+		let skipWrite =
+			!changed &&
+			this.config.skipUnchangedWrites &&
+			this.eleventyConfig.existsCache.exists(outputPath);
 
-		templateBenchmark.after();
+		if (!skipWrite) {
+			let templateBenchmark = this.bench.get("Template Write");
+			templateBenchmark.before();
+
+			this.fsManager.writeFileSync(outputPath, finalContent);
+
+			templateBenchmark.after();
+		}
 		this.writeCount++;
 		debug(`${outputPath} ${lang.finished}.`);
 
@@ -849,6 +924,10 @@ class Template extends TemplateContent {
 			content: finalContent,
 			rawInput,
 		};
+
+		if (outputHashes) {
+			ret.changed = changed;
+		}
 
 		if (data && this.config.dataFilterSelectors?.size > 0) {
 			ret.data = this.retrieveDataForJsonOutput(data, this.config.dataFilterSelectors);
@@ -957,13 +1036,18 @@ class Template extends TemplateContent {
 	}
 
 	async clone() {
-		// QUESTION do we need to even run the constructor here or can we simplify it even more
-		let tmpl = new Template(
-			this.inputPath,
-			this.templateData,
-			this.extensionMap,
-			this.eleventyConfig,
-		);
+		let tmpl;
+		Template.#isCloning = true;
+		try {
+			tmpl = new Template(
+				this.inputPath,
+				this.templateData,
+				this.extensionMap,
+				this.eleventyConfig,
+			);
+		} finally {
+			Template.#isCloning = false;
+		}
 
 		tmpl.logger = this.logger;
 

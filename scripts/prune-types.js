@@ -12,7 +12,10 @@ const { default: TSCONFIG } = await importFromString(`export default ${TSCONFIG_
 const allowedSourceFiles = new Set(TSCONFIG.include);
 console.log("Allowed sources:", TSCONFIG.include);
 
-const eligible = await glob(["types/**/*.d.{ts,cts,mts}"]);
+// Hand-written, not generated
+const HANDWRITTEN_TYPES = new Set(["types/index.d.ts"]);
+
+const eligible = await glob(["types/**/*.d.{ts,cts,mts}"], { ignore: [...HANDWRITTEN_TYPES] });
 const deletedFiles = new Set();
 for (let typeFile of eligible) {
 	let srcFile = typeFile.replace("types/", "src/");

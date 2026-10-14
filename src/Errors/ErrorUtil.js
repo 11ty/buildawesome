@@ -57,13 +57,15 @@ export default class ErrorUtil {
 	}
 
 	static isPrematureTemplateContentError(e) {
-		// TODO the rest of the template engines
-		return (
-			e instanceof TemplateContentPrematureUseError ||
-			e?.cause instanceof TemplateContentPrematureUseError || // Custom (per Node-convention)
-			(["RenderError", "UndefinedVariableError"].includes(e?.originalError?.name) &&
-				e?.originalError?.originalError instanceof TemplateContentPrematureUseError) || // Liquid
-			e?.message?.includes("TemplateContentPrematureUseError") // Nunjucks
-		);
+		let seen = new Set();
+		// Liquid errors use `originalError` instead of `cause`.
+		for (let error = e; error && !seen.has(error); error = error.cause ?? error.originalError) {
+			if (error instanceof TemplateContentPrematureUseError) {
+				return true;
+			}
+			seen.add(error);
+		}
+
+		return false;
 	}
 }

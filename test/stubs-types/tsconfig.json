@@ -1,0 +1,15 @@
+{
+	"compilerOptions": {
+		"allowJs": true,
+		"checkJs": true,
+		"noEmit": true,
+		"module": "nodenext",
+		"target": "es2022",
+		"strict": true,
+		"skipLibCheck": false,
+		"verbatimModuleSyntax": true,
+		"erasableSyntaxOnly": true,
+		"types": ["node"]
+	},
+	"include": ["./*"]
+}

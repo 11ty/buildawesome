@@ -6,6 +6,7 @@ import BaseError from "../Errors/BaseError.js";
 import { ProxyWrap } from "../Util/Objects/ProxyWrap.js";
 // import { DeepFreeze } from "../Util/Objects/DeepFreeze.js";
 import TemplateData from "../Data/TemplateData.js";
+import { withoutTracking } from "../Data/GlobalDataReads.js";
 
 const { set: lodashSet, get: lodashGet, chunk: lodashChunk } = lodash;
 
@@ -281,17 +282,21 @@ class Pagination {
 			delete this.data.collections;
 		}
 
-		let parentData = DeepCopy(
-			{
-				pagination: {
-					data: this.data.pagination.data,
-					size: this.data.pagination.size,
-					alias: this.alias,
-					pages,
+		// Copying reads every key, so global data reads are tracked again on the copy
+		let parentData = withoutTracking(() =>
+			DeepCopy(
+				{
+					pagination: {
+						data: this.data.pagination.data,
+						size: this.data.pagination.size,
+						alias: this.alias,
+						pages,
+					},
 				},
-			},
-			this.data,
+				this.data,
+			),
 		);
+		this.template?.trackGlobalDataReads(parentData);
 
 		// Restore skipped collections
 		if (collections) {
@@ -319,13 +324,30 @@ class Pagination {
 				cloned.setExtraOutputSubdirectory(pageNumber);
 			}
 
+			let { page } = this.getOverrideDataPages(items, pageNumber);
 			let paginationData = {
+				// All keys up front (links and hrefs are filled in below) so the object keeps a compact shape
 				pagination: {
 					items: items[pageNumber],
+					page,
+					pageNumber,
+					previousPageLink: undefined,
+					previous: undefined,
+					nextPageLink: undefined,
+					next: undefined,
+					firstPageLink: undefined,
+					lastPageLink: undefined,
+					links: undefined,
+					pageLinks: undefined,
+					previousPageHref: undefined,
+					nextPageHref: undefined,
+					firstPageHref: undefined,
+					lastPageHref: undefined,
+					hrefs: undefined,
+					href: undefined,
 				},
 				page: {},
 			};
-			Object.assign(paginationData.pagination, this.getOverrideDataPages(items, pageNumber));
 
 			if (this.alias) {
 				lodashSet(paginationData, this.alias, this.getNormalizedItems(items[pageNumber]));

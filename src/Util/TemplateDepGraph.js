@@ -127,7 +127,16 @@ export class TemplateDepGraph extends DependencyGraph {
 		if (!this.hasNode(to)) {
 			this.addNode(to);
 		}
-		super.addDependency(from, to);
+
+		// Edges are re-added every build: check the shorter side (e.g. not every template in a collection)
+		let outgoing = this.outgoingEdges.get(from);
+		let incoming = this.incomingEdges.get(to);
+		let exists =
+			outgoing.length <= incoming.length ? outgoing.includes(to) : incoming.includes(from);
+		if (!exists) {
+			outgoing.push(to);
+			incoming.push(from);
+		}
 	}
 
 	unfilteredOrder() {
