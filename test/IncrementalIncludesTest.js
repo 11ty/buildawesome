@@ -2,6 +2,7 @@ import test from "ava";
 import fs from "node:fs";
 import path from "node:path";
 import Eleventy from "../src/Core.js";
+import PathNormalizer from "../src/Util/PathNormalizer.js";
 import RenderPlugin from "../src/Plugins/RenderPlugin.js";
 import WebCPlugin from "@11ty/eleventy-plugin-webc";
 
@@ -70,7 +71,7 @@ async function getWatchInstance(dir, options = {}) {
       rendered.clear();
       await elev.triggerWatchRunForPath(`./${dir}/${file}`);
       return Array.from(rendered)
-        .map((entry) => path.relative(dir, entry))
+        .map((entry) => PathNormalizer.normalizeSeperator(path.relative(dir, entry)))
         .sort();
     },
     read(file) {
