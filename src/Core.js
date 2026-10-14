@@ -675,6 +675,11 @@ Arguments:
 // Named export for backwards compatibility
 export { Core as Eleventy };
 
+/* Config */
+export function defineConfig(callback) {
+	return callback;
+}
+
 /* Utils */
 export { DynamicImport as ImportFile } from "./Util/Require.js";
 

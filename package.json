@@ -10,6 +10,7 @@
 	"main": "./src/Core.js",
 	"exports": {
 		".": {
+			"types": "./types/index.d.ts",
 			"import": "./src/Core.js",
 			"require": "./src/RequireEsmFeatureTest.cjs"
 		},

@@ -20,8 +20,9 @@ api-docs/
 # Ignore build output when doing manual tests
 _site/
 
-# Don’t check-in types
-types/
+# Don’t check-in generated types
+/types/*
+!/types/index.d.ts
 
 # Ignore test files
 .cache

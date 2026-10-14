@@ -632,7 +632,7 @@ export default class UserConfig {
 	}
 
 	/**
-	 * @typedef {function|Promise<function>|object} PluginDefinition
+	 * @typedef {Function|Promise<Function>|object} PluginDefinition
 	 * @property {Function} [configFunction]
 	 * @property {string} [eleventyPackage]
 	 * @property {object} [eleventyPluginOptions={}]
