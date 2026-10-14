@@ -1,6 +1,7 @@
 import test from "ava";
 import path from "node:path";
 import Eleventy from "../src/Core.js";
+import PathNormalizer from "../src/Util/PathNormalizer.js";
 
 function addMarkdownAlternate(eleventyConfig) {
 	eleventyConfig.addTemplate(
@@ -22,9 +23,9 @@ function addMarkdownAlternate(eleventyConfig) {
 					),
 			},
 			permalink: ({ source, eleventy }) =>
-				path
-					.relative(eleventy.directories.output, source.outputPath)
-					.replace(/(\/index)?\.html$/, ".md"),
+				PathNormalizer.normalizeSeperator(
+					path.relative(eleventy.directories.output, source.outputPath),
+				).replace(/(\/index)?\.html$/, ".md"),
 			eleventyExcludeFromCollections: true,
 			layout: false,
 		},
