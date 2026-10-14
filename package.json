@@ -11,8 +11,7 @@
 	"exports": {
 		".": {
 			"types": "./types/index.d.ts",
-			"import": "./src/Core.js",
-			"require": "./src/RequireEsmFeatureTest.cjs"
+			"default": "./src/Core.js"
 		},
 		"./UserConfig": {
 			"types": "./types/UserConfig.d.ts"
