@@ -661,7 +661,7 @@ class Template extends TemplateContent {
 		if (typeof obj === "function") {
 			computedData.add(parentKey, obj, declaredDependencies);
 		} else if (Array.isArray(obj) || typeof obj === "string") {
-			// Arrays are treated as one entry in the dependency graph now, Issue #3728
+			// Arrays are treated as one entry in the dependency graph, Issue #3728
 			computedData.addTemplateString(
 				parentKey,
 				async function (innerData) {
@@ -672,14 +672,9 @@ class Template extends TemplateContent {
 				this,
 			);
 		} else if (isPlainObject(obj)) {
-			// Arrays used to be computed here
 			for (let key in obj) {
-				let keys = [];
-				if (parentKey) {
-					keys.push(parentKey);
-				}
-				keys.push(key);
-				this._addComputedEntry(computedData, obj[key], keys.join("."), declaredDependencies);
+				let childKey = parentKey ? `${parentKey}.${key}` : key;
+				this._addComputedEntry(computedData, obj[key], childKey, declaredDependencies);
 			}
 		} else {
 			// Numbers, booleans, etc
@@ -692,49 +687,39 @@ class Template extends TemplateContent {
 		if (isPlainObject(computedData)) {
 			this.computedData = new ComputedData(this.config);
 
-			// Note that `permalink` is only a thing that gets consumed—it does not go directly into generated data
-			// this allows computed entries to use page.url or page.outputPath and they’ll be resolved properly
-
+			// `permalink` is consumed (not added to data) so computed entries can use page.url/page.outputPath
+			// Template strings so placeholder rendering detects a computed `permalink` dependency
 			// TODO Room for optimization here—we don’t need to recalculate `getOutputHref` and `getOutputPath`
-			// TODO Why are these using addTemplateString instead of add
+			let declaredDependencies = data.permalink ? ["permalink"] : undefined;
 			this.computedData.addTemplateString(
 				"page.url",
 				async function (data) {
 					return this.tmpl.getOutputHref(data);
 				},
-				data.permalink ? ["permalink"] : undefined,
-				false, // skip symbol resolution
+				declaredDependencies,
+				undefined,
 				this,
 			);
-
 			this.computedData.addTemplateString(
 				"page.outputPath",
 				async function (data) {
 					return this.tmpl.getOutputPath(data);
 				},
-				data.permalink ? ["permalink"] : undefined,
-				false, // skip symbol resolution
+				declaredDependencies,
+				undefined,
 				this,
 			);
 
-			// Check for reserved properties in computed data
-			let computedData = ResolveConfigurationData.getValue(data, this.config.keys.computed);
 			if (this.config.freezeReservedData) {
 				ReservedData.checkSubset(computedData);
 			}
 
-			// actually add the computed data
 			this._addComputedEntry(this.computedData, computedData);
 
-			// limited run of computed data—save the stuff that relies on collections for later.
+			// First round skips entries that depend on collections, see resolveRemainingComputedData
 			debug("First round of computed data for %o", this.inputPath);
 			await this.computedData.setupData(data, function (entry) {
 				return !this.isUsesStartsWith(entry, "collections.");
-
-				// TODO possible improvement here is to only process page.url, page.outputPath, permalink
-				// instead of only punting on things that rely on collections.
-				// let firstPhaseComputedData = ["page.url", "page.outputPath", ...this.getOrderFor("page.url"), ...this.getOrderFor("page.outputPath")];
-				// return firstPhaseComputedData.indexOf(entry) > -1;
 			});
 		} else {
 			if (!("page" in data)) {

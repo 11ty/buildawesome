@@ -1,8 +1,6 @@
 import { DepGraph as DependencyGraph } from "dependency-graph";
 
-/* Keeps track of the dependency graph between computed data variables
- * Removes keys from the graph when they are computed.
- */
+/* Dependency graph between computed data keys; keys are removed once computed. */
 class ComputedDataQueue {
 	constructor() {
 		this.graph = new DependencyGraph();
@@ -21,13 +19,9 @@ class ComputedDataQueue {
 	}
 
 	isUsesStartsWith(name, prefix) {
-		if (name.startsWith(prefix)) {
-			return true;
-		}
 		return (
-			this.graph.dependenciesOf(name).filter((entry) => {
-				return entry.startsWith(prefix);
-			}).length > 0
+			name.startsWith(prefix) ||
+			this.graph.dependenciesOf(name).some((entry) => entry.startsWith(prefix))
 		);
 	}
 
@@ -37,21 +31,13 @@ class ComputedDataQueue {
 		}
 	}
 
-	_uses(graph, name, varsUsed = []) {
-		if (!graph.hasNode(name)) {
-			graph.addNode(name);
-		}
+	uses(name, varsUsed = []) {
+		this.addNode(name);
 
 		for (let varUsed of varsUsed) {
-			if (!graph.hasNode(varUsed)) {
-				graph.addNode(varUsed);
-			}
-			graph.addDependency(name, varUsed);
+			this.addNode(varUsed);
+			this.graph.addDependency(name, varUsed);
 		}
-	}
-
-	uses(name, varsUsed = []) {
-		this._uses(this.graph, name, varsUsed);
 	}
 
 	markComputed(varsComputed = []) {
