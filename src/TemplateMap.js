@@ -9,6 +9,7 @@ import TemplateData from "./Data/TemplateData.js";
 import GlobalDependencyMap from "./GlobalDependencyMap.js";
 import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
 import { createDebug } from "./Util/DebugLogUtil.js";
+import { isGlobMatch } from "./Util/GlobMatcher.js";
 
 const debug = createDebug("TemplateMap");
 
@@ -27,6 +28,10 @@ const SPECIAL_COLLECTION_NAMES = {
 
 class TemplateMap {
 	#dependencyMapInitialized = false;
+	// Config collection name to the parts of the collection API it read
+	#userConfigCollectionReads = new Map();
+	#staleUserConfigCollectionNames = new Set();
+	#ignoredDeferUserConfigCollectionNames = new Set();
 
 	constructor(eleventyConfig) {
 		if (!eleventyConfig || eleventyConfig.constructor.name !== "TemplateConfig") {
@@ -177,6 +182,8 @@ class TemplateMap {
 	async initDependencyMap(fullTemplateOrder) {
 		// Temporary workaround for async constructor work in templates
 		// Issue #3170 #3870
+		this.#ignoreDeferForPaginatedCollections();
+
 		let inputPathSet = new Set(fullTemplateOrder);
 		await Promise.all(
 			this.map
@@ -195,8 +202,19 @@ class TemplateMap {
 				// [keys] should initialize `all`
 				if (tagName === SPECIAL_COLLECTION_NAMES.keys) {
 					await this.setCollectionByTagName("all");
+
+					// Deferred collections must exist before templates that consume `collections`
+					for (let name of this.getUserConfigCollectionNames()) {
+						if (this.isDeferredUserConfigCollectionName(name)) {
+							await this.setCollectionByTagName(name);
+						}
+					}
 					// [NAME] is special and implied (e.g. [keys])
-				} else if (!tagName.startsWith("[") && !tagName.endsWith("]")) {
+				} else if (
+					!tagName.startsWith("[") &&
+					!tagName.endsWith("]") &&
+					!this.isDeferredUserConfigCollectionName(tagName)
+				) {
 					// is a tag (collection) entry
 					await this.setCollectionByTagName(tagName);
 				}
@@ -244,6 +262,7 @@ class TemplateMap {
 						true
 					) {
 						// is in *some* collections
+						this.#checkForStaleUserConfigCollections(map, page);
 						this.collection.add(page);
 					}
 				}
@@ -473,15 +492,108 @@ class TemplateMap {
 		return name && !!collections[name];
 	}
 
+	isDeferredUserConfigCollectionName(name) {
+		return (
+			this.isUserConfigCollectionName(name) &&
+			!!this.userConfig.getCollectionOptions?.(name).defer &&
+			!this.#ignoredDeferUserConfigCollectionNames.has(name)
+		);
+	}
+
+	// Pagination needs the collection before its template is processed, so `defer` can’t apply
+	#ignoreDeferForPaginatedCollections() {
+		for (let entry of this.map) {
+			let name = this.getPaginationTagTarget(entry);
+			if (!this.isDeferredUserConfigCollectionName(name)) {
+				continue;
+			}
+
+			this.#ignoredDeferUserConfigCollectionNames.add(name);
+			this.logger?.warn(
+				`Warning: \`defer: true\` was ignored for \`collections.${name}\` (via \`addCollection\`) because ${entry.inputPath} paginates over it.`,
+			);
+		}
+	}
+
 	getUserConfigCollectionNames() {
 		return Object.keys(this.userConfig.getCollections());
+	}
+
+	// Records what a config collection reads so later additions can be checked against it (#4182)
+	#getRecordingCollectionApi(reads) {
+		return new Proxy(this.collection, {
+			get(target, prop) {
+				let value = Reflect.get(target, prop);
+				if (typeof value !== "function") {
+					reads.all = true;
+					return value;
+				}
+
+				return (...args) => {
+					if (prop === "getFilteredByTag" && args[0]) {
+						reads.tags.push([args[0]]);
+					} else if (prop === "getFilteredByTags" && args.length > 0) {
+						reads.tags.push(args);
+					} else if (prop === "getFilteredByGlob") {
+						reads.globs.push(target.getGlobs(args[0]));
+					} else if (prop !== "getGlobs") {
+						reads.all = true;
+					}
+					return value.apply(target, args);
+				};
+			},
+		});
+	}
+
+	#isReadByUserConfigCollection(reads, page) {
+		if (reads.all) {
+			return true;
+		}
+
+		let tags = TemplateData.getIncludedTagNames(page.data);
+		if (reads.tags.some((tagSet) => tagSet.every((tag) => tags.includes(tag)))) {
+			return true;
+		}
+
+		return reads.globs.some((globs) => isGlobMatch(page.inputPath, globs));
+	}
+
+	// Templates that paginate over a collection can’t be in it, so they don’t make it stale
+	#checkForStaleUserConfigCollections(map, page) {
+		let paginationTarget = this.getPaginationTagTarget(map);
+		if (paginationTarget === SPECIAL_COLLECTION_NAMES.keys || paginationTarget === "all") {
+			return;
+		}
+
+		for (let [name, reads] of this.#userConfigCollectionReads) {
+			if (
+				name === paginationTarget ||
+				this.#staleUserConfigCollectionNames.has(name) ||
+				!this.#isReadByUserConfigCollection(reads, page)
+			) {
+				continue;
+			}
+
+			this.#staleUserConfigCollectionNames.add(name);
+
+			let advice = this.isDeferredUserConfigCollectionName(name)
+				? "This is likely a circular reference via `eleventyImport` of `collections`."
+				: `Use \`addCollection("${name}", callback, { defer: true })\` to run it after templates are added.`;
+
+			this.logger?.warn(
+				`Warning: \`collections.${name}\` (via \`addCollection\`) ran before ${map.inputPath} was added to collections, so it may be incomplete (e.g. via a circular \`eleventyImport\`). ${advice}`,
+			);
+		}
 	}
 
 	async getUserConfigCollection(name) {
 		let configCollections = this.userConfig.getCollections();
 
+		let reads = { all: false, tags: [], globs: [] };
+		this.#userConfigCollectionReads.set(name, reads);
+
 		// This works with async now
-		let result = await configCollections[name](this.collection);
+		let result = await configCollections[name](this.#getRecordingCollectionApi(reads));
 
 		// May not return an array (can be anything)
 		// https://www.11ty.dev/docs/collections-api/#return-values

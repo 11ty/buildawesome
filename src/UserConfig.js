@@ -92,6 +92,8 @@ export default class UserConfig {
 		/** @type {object} */
 		this.collections = {};
 		/** @type {object} */
+		this.collectionOptions = {};
+		/** @type {object} */
 		this.precompiledCollections = {};
 		this.templateFormats = undefined;
 		this.templateFormatsAdded = [];
@@ -1157,7 +1159,17 @@ export default class UserConfig {
 		return this.collections;
 	}
 
-	addCollection(name, callback) {
+	getCollectionOptions(name) {
+		return this.collectionOptions[name] || {};
+	}
+
+	/**
+	 * @param {string} name
+	 * @param {Function} callback
+	 * @param {object} [options]
+	 * @param {boolean} [options.defer] Run after templates are added to collections (but before templates that paginate over `collections`), for collections that include their own consumers (#4182)
+	 */
+	addCollection(name, callback, options = {}) {
 		name = this.getNamespacedName(name);
 
 		if (this.collections[name]) {
@@ -1167,6 +1179,7 @@ export default class UserConfig {
 		}
 
 		this.collections[name] = callback;
+		this.collectionOptions[name] = options;
 	}
 
 	augmentFunctionContext(fn, options) {
