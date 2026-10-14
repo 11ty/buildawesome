@@ -768,6 +768,21 @@ test("Nunjucks Shortcode Named Args (Reverse Order)", async (t) => {
   );
 });
 
+test("Nunjucks Shortcode Named Args are a trailing object marked with __keywords", async (t) => {
+  let tr = await getNewTemplateRender("njk", "./test/stubs/");
+  tr.engine.addShortcode("argsToJson", function (...args) {
+    return JSON.stringify(args);
+  });
+
+  t.is(
+    await tr._testRender("{% argsToJson name, key=other %}", {
+      name: "test",
+      other: "howdy",
+    }),
+    JSON.stringify(["test", { key: "howdy", __keywords: true }])
+  );
+});
+
 test("Nunjucks Shortcode Named Args (JS notation)", async (t) => {
   t.plan(2);
 

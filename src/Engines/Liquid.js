@@ -203,22 +203,51 @@ export default class Liquid extends TemplateEngine {
 		return argArray;
 	}
 
+	// Reads a `key: value` keyword argument, falling back to a positional value
+	static readArgumentBuiltin(tokenizer) {
+		let begin = tokenizer.p;
+		let hash = tokenizer.readHash();
+		if (hash?.value) {
+			return hash;
+		}
+		tokenizer.p = begin;
+		return tokenizer.readValue();
+	}
+
 	static parseArgumentsBuiltin(args) {
 		let tokenizer = new Tokenizer(args);
 		let parsedArgs = [];
 
-		let value = tokenizer.readValue();
+		let value = Liquid.readArgumentBuiltin(tokenizer);
 		while (value) {
 			parsedArgs.push(value);
 			tokenizer.skipBlank();
 			if (tokenizer.peek() === ",") {
 				tokenizer.advance();
 			}
-			value = tokenizer.readValue();
+			value = Liquid.readArgumentBuiltin(tokenizer);
 		}
 		tokenizer.end();
 
 		return parsedArgs;
+	}
+
+	// Keyword arguments are passed as a trailing object marked with a non-enumerable `__keywords` (Nunjucks-compatible)
+	static *evalArgumentsBuiltin(tokens, ctx) {
+		let args = [];
+		let kwargs;
+		for (let token of tokens) {
+			if (token.kind === TokenKind.Hash) {
+				kwargs ??= Object.defineProperty({}, "__keywords", { value: true });
+				kwargs[token.name.content] = yield evalToken(token.value, ctx);
+			} else {
+				args.push(yield evalToken(token, ctx));
+			}
+		}
+		if (kwargs) {
+			args.push(kwargs);
+		}
+		return args;
 	}
 
 	addShortcode(shortcodeName, shortcodeFn) {
@@ -229,7 +258,6 @@ export default class Liquid extends TemplateEngine {
 					this.name = tagToken.name;
 					if (_t.config.liquidParameterParsing === "builtin") {
 						this.orderedArgs = Liquid.parseArgumentsBuiltin(tagToken.args);
-						// note that Liquid does have a Hash class for name-based argument parsing but offers no easy to support both modes in one class
 					} else {
 						this.legacyArgs = tagToken.args;
 					}
@@ -244,10 +272,7 @@ export default class Liquid extends TemplateEngine {
 							argArray.push(b);
 						}
 					} else if (this.orderedArgs) {
-						for (let arg of this.orderedArgs) {
-							let b = yield evalToken(arg, ctx);
-							argArray.push(b);
-						}
+						argArray = yield* Liquid.evalArgumentsBuiltin(this.orderedArgs, ctx);
 					}
 
 					let ret = yield shortcodeFn.call(Liquid.normalizeScope(ctx), ...argArray);
@@ -266,7 +291,6 @@ export default class Liquid extends TemplateEngine {
 
 					if (_t.config.liquidParameterParsing === "builtin") {
 						this.orderedArgs = Liquid.parseArgumentsBuiltin(tagToken.args);
-						// note that Liquid does have a Hash class for name-based argument parsing but offers no easy to support both modes in one class
 					} else {
 						this.legacyArgs = tagToken.args;
 					}
@@ -292,10 +316,7 @@ export default class Liquid extends TemplateEngine {
 							argArray.push(b);
 						}
 					} else if (this.orderedArgs) {
-						for (let arg of this.orderedArgs) {
-							let b = yield evalToken(arg, ctx);
-							argArray.push(b);
-						}
+						argArray = yield* Liquid.evalArgumentsBuiltin(this.orderedArgs, ctx);
 					}
 
 					const html = yield liquidEngine.renderer.renderTemplates(this.templates, ctx);

@@ -675,6 +675,76 @@ test("Liquid Shortcode Multiple Args", async (t) => {
   );
 });
 
+test("Liquid Shortcode Keyword Args", async (t) => {
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/");
+  tr.engine.addShortcode("postfixWithZach", function (str, kwargs) {
+    t.true(kwargs.__keywords);
+    t.deepEqual(Object.keys(kwargs), ["prepend", "append"]);
+    return kwargs.prepend + str + "Zach" + kwargs.append;
+  });
+
+  t.is(
+    await tr._testRender("{% postfixWithZach name prepend: 'string' append: other %}", {
+      name: "test",
+      other: "howdy",
+    }),
+    "stringtestZachhowdy"
+  );
+});
+
+test("Liquid Shortcode Only Keyword Args (comma separated)", async (t) => {
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/");
+  tr.engine.addShortcode("postfixWithZach", function (kwargs) {
+    return kwargs.prepend + "Zach" + kwargs.append;
+  });
+
+  t.is(
+    await tr._testRender("{% postfixWithZach prepend: 'string', append: name %}", {
+      name: "test",
+    }),
+    "stringZachtest"
+  );
+});
+
+test("Liquid Shortcode Keyword Args mixed with property access and literals", async (t) => {
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/");
+  tr.engine.addShortcode("argsToJson", function (...args) {
+    return JSON.stringify(args);
+  });
+
+  t.is(
+    await tr._testRender("{% argsToJson page.url, arr[0], key: arr[1], true, -1, 'a:b' %}", {
+      page: { url: "/hi/" },
+      arr: [1, 2],
+    }),
+    JSON.stringify(["/hi/", 1, true, -1, "a:b", { key: 2 }])
+  );
+});
+
+test("Liquid Shortcode without Keyword Args has no trailing object", async (t) => {
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/");
+  tr.engine.addShortcode("argsToJson", function (...args) {
+    return JSON.stringify(args);
+  });
+
+  t.is(await tr._testRender("{% argsToJson name %}", { name: "test" }), JSON.stringify(["test"]));
+});
+
+test("Liquid Paired Shortcode Keyword Args", async (t) => {
+  let tr = await getNewTemplateRender("liquid", "./test/stubs/");
+  tr.engine.addPairedShortcode("postfixWithZach", function (content, kwargs) {
+    return kwargs.str + content + "Zach";
+  });
+
+  t.is(
+    await tr._testRender(
+      "{% postfixWithZach str: name %}Content{% postfixWithZach str: name2 %}Content{% if tester %}If{% endif %}{% endpostfixWithZach %}{% endpostfixWithZach %}",
+      { name: "test", name2: "test2", tester: true }
+    ),
+    "testContenttest2ContentIfZachZach"
+  );
+});
+
 test("Liquid Include Scope Leak", async (t) => {
   let tr1 = await getNewTemplateRender("liquid", "./test/stubs/");
   t.is(tr1.getEngineName(), "liquid");
