@@ -6,14 +6,15 @@ import {
   String as RenderPluginString,
   RenderManager,
 } from "../src/Plugins/RenderPlugin.js";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
+
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 
 async function getTestOutput(input, configCallback = function () {}) {
   let elev = new Eleventy(input, "./_site/", {
-    config: function (eleventyConfig) {
-      eleventyConfig.addPlugin(RenderPlugin);
-      configCallback(eleventyConfig);
+    config: function ($config) {
+      $config.addPlugin(RenderPlugin);
+      configCallback($config);
     },
   });
 
@@ -158,6 +159,11 @@ test("Capture liquid render output to a njk variable", async (t) => {
   t.is(html, `4`);
 });
 
+test("Capture liquid render output to a njk variable (new async support for set)", async (t) => {
+  let html = await getTestOutputForFile("./test/stubs-render-plugin/capture-liquid-set.njk");
+  t.is(html, `4`);
+});
+
 test("Remap non-object data to data._ if object is not passed in", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/bad-data.njk");
   t.is(html, "string");
@@ -165,8 +171,8 @@ test("Remap non-object data to data._ if object is not passed in", async (t) => 
 
 test("Direct use of render string plugin, rendering Nunjucks (and nested Liquid)", async (t) => {
   let renderMgr = new RenderManager();
-  renderMgr.config(function (eleventyConfig) {
-    eleventyConfig.addFilter("testing", function () {
+  renderMgr.config(function ($config) {
+    $config.addFilter("testing", function () {
       return "tested.";
     });
   });
@@ -205,8 +211,8 @@ tested.
 
 test("Direct use of render string plugin, rendering Liquid (and nested Nunjucks)", async (t) => {
   let renderMgr = new RenderManager();
-  renderMgr.config(function (eleventyConfig) {
-    eleventyConfig.addFilter("testing", function () {
+  renderMgr.config(function ($config) {
+    $config.addFilter("testing", function () {
       return "tested.";
     });
   });
@@ -245,9 +251,9 @@ tested.
 
 test("Direct use of render file plugin, rendering Nunjucks (and nested Liquid)", async (t) => {
   let fn = await RenderPluginFile("./test/stubs-render-plugin/liquid-direct.njk", {
-    config: function (eleventyConfig) {
-      eleventyConfig.addPlugin(RenderPlugin);
-      eleventyConfig.addFilter("testing", function () {
+    config: function ($config) {
+      $config.addPlugin(RenderPlugin);
+      $config.addFilter("testing", function () {
         return "tested.";
       });
     },
@@ -289,12 +295,12 @@ test("Use page in renderTemplate (njk in liquid)", async (t) => {
 
 test("Use eleventy in renderTemplate (njk in liquid)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/njk-eleventy.liquid");
-  t.is(html, `1`);
+  t.true(html.startsWith("4."));
 });
 
 test("Use eleventy in renderTemplate (liquid in njk)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid-eleventy.njk");
-  t.is(html, `1`);
+  t.true(html.startsWith("4."));
 });
 test.skip("Use nunjucks in liquid (access to all global data)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/nunjucks-global.liquid");
@@ -304,4 +310,19 @@ test.skip("Use nunjucks in liquid (access to all global data)", async (t) => {
 test.skip("Use liquid in njk (access to all global data)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid-global.njk");
   t.is(html, `globalHi`);
+});
+
+test("renderContent filter #3369 #3370 via renderTemplate (njk)", async (t) => {
+  let html = await getTestOutputForFile("./test/stubs-render-plugin/nunjucks-frontmatter.njk", ($config) => {
+    $config.addShortcode("test", () => "test content")
+  });
+  t.is(html, "test content");
+});
+
+test("#3368 #3810 config init bug with RenderManager", async (t) => {
+  let elev = new Eleventy("./test/stubs-3810/", false, {
+    configPath: "./test/stubs-3810/eleventy.config.js",
+  });
+  let results = await elev.toJSON();
+  t.is(results[0].content, `<h1>Sign up for our newsletter!</h1>`);
 });

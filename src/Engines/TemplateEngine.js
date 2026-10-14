@@ -1,22 +1,21 @@
-import EleventyExtensionMap from "../EleventyExtensionMap.js";
-import EleventyBaseError from "../EleventyBaseError.js";
+import { createDebug } from "../Util/DebugLogUtil.js";
+import BaseError from "../Errors/BaseError.js";
 
-class TemplateEngineConfigError extends EleventyBaseError {}
+class TemplateEngineConfigError extends BaseError {}
 
-class TemplateEngine {
-	constructor(name, dirs, eleventyConfig) {
+const debug = createDebug("TemplateEngine");
+
+const AMENDED_INSTANCES = new Set();
+
+export default class TemplateEngine {
+	#extensionMap;
+	#engineManager;
+	#benchmarks;
+
+	constructor(name, eleventyConfig) {
 		this.name = name;
 
-		if (!dirs) {
-			dirs = {};
-		}
-
-		this.dirs = dirs;
-		this.inputDir = dirs.input;
-		this.includesDir = dirs.includes;
-
 		this.engineLib = null;
-		this.cacheable = false;
 
 		if (!eleventyConfig) {
 			throw new TemplateEngineConfigError("Missing `eleventyConfig` argument.");
@@ -24,39 +23,56 @@ class TemplateEngine {
 		this.eleventyConfig = eleventyConfig;
 	}
 
+	get cacheable() {
+		return false;
+	}
+
+	get dirs() {
+		return this.eleventyConfig.directories;
+	}
+
+	get inputDir() {
+		return this.dirs.input;
+	}
+
+	get includesDir() {
+		return this.dirs.includes;
+	}
+
 	get config() {
-		if (this.eleventyConfig.constructor.name === "TemplateConfig") {
-			return this.eleventyConfig.getConfig();
+		if (this.eleventyConfig.constructor.name !== "TemplateConfig") {
+			throw new Error("Expecting a TemplateConfig instance.");
 		}
-		throw new Error("Expecting a TemplateConfig instance.");
+
+		return this.eleventyConfig.getConfig();
 	}
 
 	get benchmarks() {
-		if (!this._benchmarks) {
-			this._benchmarks = {
+		if (!this.#benchmarks) {
+			this.#benchmarks = {
 				aggregate: this.config.benchmarkManager.get("Aggregate"),
 			};
 		}
-		return this._benchmarks;
+		return this.#benchmarks;
 	}
 
 	get engineManager() {
-		return this._engineManager;
+		return this.#engineManager;
 	}
 
 	set engineManager(manager) {
-		this._engineManager = manager;
+		this.#engineManager = manager;
 	}
 
 	get extensionMap() {
-		if (!this._extensionMap) {
-			this._extensionMap = new EleventyExtensionMap([], this.eleventyConfig);
+		if (!this.#extensionMap) {
+			throw new Error("Internal error: missing `extensionMap` in TemplateEngine.");
 		}
-		return this._extensionMap;
+		return this.#extensionMap;
 	}
 
 	set extensionMap(map) {
-		this._extensionMap = map;
+		this.#extensionMap = map;
 	}
 
 	get extensions() {
@@ -77,6 +93,7 @@ class TemplateEngine {
 		return this.name;
 	}
 
+	// Backwards compat
 	getIncludesDir() {
 		return this.includesDir;
 	}
@@ -84,10 +101,24 @@ class TemplateEngine {
 	/**
 	 * @protected
 	 */
-	setEngineLib(engineLib) {
+	setEngineLib(engineLib, isOverrideViaSetLibrary = false) {
 		this.engineLib = engineLib;
 
 		// Run engine amendments (via issue #2438)
+		// Issue #3816: this isn’t ideal but there is no other way to reset a markdown instance if it was also overridden by addLibrary
+		if (AMENDED_INSTANCES.has(engineLib)) {
+			return;
+		}
+
+		if (isOverrideViaSetLibrary) {
+			AMENDED_INSTANCES.add(engineLib);
+		}
+		debug(
+			"Running amendLibrary for %o (number of amendments: %o)",
+			this.name,
+			this.config.libraryAmendments[this.name]?.length,
+		);
+
 		for (let amendment of this.config.libraryAmendments[this.name] || []) {
 			// TODO it’d be nice if this were async friendly
 			amendment(engineLib);
@@ -99,9 +130,13 @@ class TemplateEngine {
 	}
 
 	async _testRender(str, data) {
-		/* TODO compile needs to pass in inputPath? */
+		// @ts-ignore
 		let fn = await this.compile(str);
 		return fn(data);
+	}
+
+	useJavaScriptImport() {
+		return false;
 	}
 
 	// JavaScript files defer to the module loader rather than read the files to strings
@@ -129,14 +164,23 @@ class TemplateEngine {
 		return "html";
 	}
 
+	// Whether or not to wrap in Eleventy layouts
+	useLayouts() {
+		return true;
+	}
+
+	/** @returns {boolean|undefined} */
 	permalinkNeedsCompilation(str) {
-		return this.needsCompilation(str);
+		return this.needsCompilation();
 	}
 
 	// whether or not compile is needed or can we return the plaintext?
-	needsCompilation(/*str*/) {
+	needsCompilation(str) {
 		return true;
 	}
+
+	// Runs at compile time for pipeline steps that compile later, during render
+	async ready() {}
 
 	/**
 	 * Make sure compile is implemented downstream.
@@ -147,7 +191,7 @@ class TemplateEngine {
 		throw new Error("compile() must be implemented by engine");
 	}
 
-	// See https://www.11ty.dev/docs/watch-serve/#watch-javascript-dependencies
+	// See https://v3.11ty.dev/docs/watch-serve/#watch-javascript-dependencies
 	static shouldSpiderJavaScriptDependencies() {
 		return false;
 	}
@@ -159,9 +203,16 @@ class TemplateEngine {
 		return true;
 	}
 
+	// e.g. a template’s include, import, extends, or layout file, recorded when it is used
+	// `from` is the engine name for string templates (e.g. the Render plugin’s `renderTemplate`)
+	addDependency(from, to) {
+		if (!from || !to) {
+			return;
+		}
+		this.config.uses.addDependency(from, [to]);
+	}
+
 	isFileRelevantTo(inputPath, comparisonFile) {
 		return this.config.uses.isFileRelevantTo(inputPath, comparisonFile);
 	}
 }
-
-export default TemplateEngine;

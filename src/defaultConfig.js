@@ -1,8 +1,5 @@
-import urlFilter from "./Filters/Url.js";
-import slugFilter from "./Filters/Slug.js";
-import slugifyFilter from "./Filters/Slugify.js";
-import getLocaleCollectionItem from "./Filters/GetLocaleCollectionItem.js";
-import getCollectionItemIndex from "./Filters/GetCollectionItemIndex.js";
+import fullBundleDefaultConfig from "./defaultConfigExtended.js";
+import TransformsUtil from "./Util/TransformsUtil.js";
 
 /**
  * @module 11ty/eleventy/defaultConfig
@@ -15,27 +12,30 @@ import getCollectionItemIndex from "./Filters/GetCollectionItemIndex.js";
  */
 
 /**
- * @typedef {Object} config
+ * @typedef {object} config
  * @property {addFilter} addFilter - Register a new global filter.
+ * @property {addPlugin} addPlugin - Execute or defer a plugin’s execution.
+ * @property {addTransform} addTransform - Add an Eleventy transform to postprocess template output
  */
 
 /**
- * @typedef {Object} defaultConfig
+ * @typedef {object} defaultConfig
  * @property {Array<string>} templateFormats - An array of accepted template formats.
+ * @property {Array<string>} dataFileSuffixes - Array of file suffixes for data files in the Data Cascade.
+ * @property {boolean} [dataFileDirBaseNameOverride=false] - Use index.* instead of dirname.* for Directory Data File names
  * @property {string} [pathPrefix='/'] - The directory under which all output files should be written to.
  * @property {string} [markdownTemplateEngine='liquid'] - Template engine to process markdown files with.
  * @property {string} [htmlTemplateEngine='liquid'] - Template engine to process html files with.
  * @property {boolean} [dataTemplateEngine=false] - Changed in v1.0
- * @property {string} [htmlOutputSuffix='-o']
- * @property {string} [jsDataFileSuffix='.11tydata'] - File suffix for jsData files.
- * @property {Object} keys
- * @property {string} [keys.package='pkg']
+ * @property {object} keys
+ * @property {string} [keys.package='pkg'] - Global data property for package.json data
  * @property {string} [keys.layout='layout']
  * @property {string} [keys.permalink='permalink']
  * @property {string} [keys.permalinkRoot='permalinkBypassOutputDir']
  * @property {string} [keys.engineOverride='templateEngineOverride']
- * @property {string} [keys.computed='eleventyComputed']
- * @property {Object} dir
+ * @property {string} [keys.computed='buildawesomeComputed']
+ * @property {string} [keys.dataSchema='buildawesomeDataSchema']
+ * @property {object} dir
  * @property {string} [dir.input='.']
  * @property {string} [dir.includes='_includes']
  * @property {string} [dir.data='_data']
@@ -51,22 +51,8 @@ import getCollectionItemIndex from "./Filters/GetCollectionItemIndex.js";
  * @returns {defaultConfig}
  */
 export default function (config) {
-	let templateConfig = this;
-
-	config.addFilter("slug", slugFilter);
-	config.addFilter("slugify", slugifyFilter);
-
-	// Add pathPrefix manually to a URL
-	config.addFilter("url", function addPathPrefix(url, pathPrefixOverride) {
-		let pathPrefix;
-		if (pathPrefixOverride && typeof pathPrefixOverride === "string") {
-			pathPrefix = pathPrefixOverride;
-		} else {
-			pathPrefix = templateConfig.getPathPrefix();
-		}
-
-		return urlFilter.call(this, url, pathPrefix);
-	});
+	// add extra config (not available in `@11ty/client` bundle)
+	fullBundleDefaultConfig.call(this, config);
 
 	config.addFilter("log", (input, ...messages) => {
 		const allEntries = [input, ...messages];
@@ -91,49 +77,55 @@ export default function (config) {
 		}
 	});
 
-	config.addFilter("getCollectionItemIndex", function (collection, pageOverride) {
-		return getCollectionItemIndex.call(this, collection, pageOverride);
-	});
-
-	config.addFilter("getCollectionItem", function (collection, pageOverride, langCode) {
-		return getLocaleCollectionItem.call(this, config, collection, pageOverride, langCode, 0);
-	});
-	config.addFilter("getPreviousCollectionItem", function (collection, pageOverride, langCode) {
-		return getLocaleCollectionItem.call(this, config, collection, pageOverride, langCode, -1);
-	});
-	config.addFilter("getNextCollectionItem", function (collection, pageOverride, langCode) {
-		return getLocaleCollectionItem.call(this, config, collection, pageOverride, langCode, 1);
-	});
+	// Process arbitrary content with transforms
+	config.addFilter(
+		"renderTransforms",
+		async function transformsFilter(content, pageEntryOverride, baseHrefOverride) {
+			return TransformsUtil.runAll(content, pageEntryOverride || this.page, config.transforms, {
+				baseHrefOverride,
+				logger: config.logger,
+			});
+		},
+	);
 
 	return {
 		templateFormats: ["liquid", "md", "njk", "html", "11ty.js"],
-		// if your site lives in a subdirectory, change this
+
+		// to add a parent directory structure to URLs (not reflected on the file system), change this
 		pathPrefix: "/",
 		markdownTemplateEngine: "liquid",
 		htmlTemplateEngine: "liquid",
-		htmlOutputSuffix: "-o",
 
 		// Renamed from `jsDataFileSuffix` in 2.0 (and swapped to an Array)
 		// If you remove "" we won’t look for dir/dir.json or file.json
-		dataFileSuffixes: [".11tydata", ""],
+		dataFileSuffixes: [".data", ".11tydata", ""],
 
 		// "index" will look for `directory/index.*` directory data files instead of `directory/directory.*`
 		dataFileDirBaseNameOverride: false,
 
 		keys: {
-			package: "pkg",
+			// TODO breaking: use `false` by default
+			package: "pkg", // supports `false`
 			layout: "layout",
 			permalink: "permalink",
 			permalinkRoot: "permalinkBypassOutputDir",
 			engineOverride: "templateEngineOverride",
-			computed: "eleventyComputed",
+			computed: "buildawesomeComputed",
+			dataSchema: "buildawesomeDataSchema",
+			import: "buildawesomeImport",
 		},
+
+		// Deprecated, define using `export const directories = {}` instead.
+		// Reference values using `eleventyConfig.directories` instead.
 		dir: {
+			// These values here aren’t used internally either (except by a few tests), instead we’re using `ProjectDirectories.defaults`.
+			// These are kept in place for backwards compat with `eleventyConfig.dir` references in project config code and plugins.
 			input: ".",
 			includes: "_includes",
 			data: "_data",
 			output: "_site",
 		},
+
 		// deprecated, use config.addNunjucksFilter
 		nunjucksFilters: {},
 	};

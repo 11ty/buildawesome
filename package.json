@@ -1,19 +1,35 @@
 {
 	"name": "@11ty/eleventy",
-	"version": "3.0.0-alpha.3",
-	"description": "A simpler static site generator.",
+	"version": "4.0.0-alpha.10",
+	"description": "A simpler way to build awesome web sites.",
 	"publishConfig": {
-		"access": "public"
+		"access": "public",
+		"provenance": true
 	},
-	"main": "src/Eleventy.js",
 	"type": "module",
+	"main": "./src/Core.js",
+	"exports": {
+		".": {
+			"types": "./types/index.d.ts",
+			"default": "./src/Core.js"
+		},
+		"./UserConfig": {
+			"types": "./types/UserConfig.d.ts"
+		},
+		"./utils/git": "./src/Util/Git.js",
+		"./cli": "./cmd.cjs"
+	},
 	"bin": {
-		"eleventy": "./cmd.cjs"
+		"eleventy": "cmd.cjs"
 	},
 	"license": "MIT",
 	"engines": {
-		"node": ">=18"
+		"node": ">=22.15"
 	},
+	"workspaces": [
+		"packages/browser",
+		"packages/build-awesome"
+	],
 	"funding": {
 		"type": "opencollective",
 		"url": "https://opencollective.com/11ty"
@@ -38,24 +54,24 @@
 	],
 	"scripts": {
 		"default": "npm run test",
-		"test": "npx ava --verbose",
-		"jsdoc": "rm -rf jsdoc && npx jsdoc src/* -r -d jsdoc",
+		"test": "npm run test:server && npm run test:browser",
+		"test:server": "npm run test:node && npm run test:ava",
+		"test:ava": "ava --verbose --timeout 20s",
+		"test:node": "node --test 'test_node/**/*test.js'",
+		"test:browser": "cross-env CI=true npm run test --workspaces",
 		"format": "prettier . --write",
 		"check": "eslint src",
-		"lint-staged": "lint-staged",
+		"typescript": "tsc && node scripts/prune-types.js",
 		"coverage": "npx c8 ava && npx c8 report --reporter=json-summary && cp coverage/coverage-summary.json docs/_data/coverage.json && node cmd.cjs --config=docs/eleventy.coverage.js",
-		"prepare": "husky install"
+		"nano-staged": "nano-staged",
+		"prepare": "simple-git-hooks"
 	},
-	"author": {
-		"name": "Zach Leatherman",
-		"email": "zachleatherman@gmail.com",
-		"url": "https://zachleat.com/"
-	},
+	"author": "Zach Leatherman (https://zachleat.com/)",
 	"repository": {
 		"type": "git",
-		"url": "git://github.com/11ty/eleventy.git"
+		"url": "git+https://github.com/11ty/buildawesome.git"
 	},
-	"bugs": "https://github.com/11ty/eleventy/issues",
+	"bugs": "https://github.com/11ty/buildawesome/issues",
 	"homepage": "https://www.11ty.dev/",
 	"ava": {
 		"environmentVariables": {},
@@ -67,69 +83,85 @@
 		"watchMode": {
 			"ignoreChanges": [
 				"./test/stubs*/**/*",
+				"./test/**/_site/**/*",
 				".cache"
 			]
 		}
 	},
-	"lint-staged": {
+	"nano-staged": {
 		"*.{js,css,md}": [
 			"prettier --write"
 		]
 	},
+	"simple-git-hooks": {
+		"pre-commit": "npm test && npm run nano-staged",
+		"pre-push": "npm test"
+	},
 	"devDependencies": {
-		"@11ty/eleventy-plugin-syntaxhighlight": "^5.0.0",
+		"@11ty/eleventy-img": "^7.0.0",
+		"@11ty/eleventy-plugin-rss": "^3.0.0",
+		"@11ty/eleventy-plugin-syntaxhighlight": "^5.0.2",
+		"@11ty/eleventy-plugin-webc": "^0.12.0-beta.7",
+		"@eslint/js": "^10.0.1",
 		"@iarna/toml": "^2.2.5",
-		"@vue/server-renderer": "^3.3.12",
-		"@zachleat/noop": "^1.0.3",
-		"ava": "^6.0.1",
-		"c8": "^8.0.1",
-		"eslint": "^8.56.0",
-		"eslint-config-prettier": "^9.1.0",
-		"husky": "^8.0.3",
-		"js-yaml": "^4.1.0",
-		"jsdoc": "^4.0.2",
-		"lint-staged": "^15.2.0",
-		"markdown-it-emoji": "^3.0.0",
-		"marked": "^11.1.0",
-		"prettier": "^3.1.1",
+		"@mdx-js/node-loader": "^3.1.1",
+		"@stylistic/eslint-plugin": "^5.10.0",
+		"@types/node": "^26.6.3",
+		"@vue/server-renderer": "^3.5.43",
+		"@zachleat/noop": "^1.0.7",
+		"ava": "^8.0.1",
+		"c8": "^12.0.0",
+		"cross-env": "^10.1.0",
+		"eslint": "^10.11.0",
+		"eslint-config-prettier": "^10.1.8",
+		"globals": "^17.12.0",
+		"jsx-async-runtime": "^2.2.1",
+		"luxon": "^3.7.2",
+		"markdown-it-abbr": "^2.0.0",
+		"markdown-it-emoji": "^3.1.0",
+		"marked": "^18.0.14",
+		"nano-staged": "^1.0.2",
+		"prettier": "^3.9.9",
 		"pretty": "^2.0.0",
-		"rimraf": "^5.0.5",
-		"sass": "^1.69.5",
-		"vue": "^3.3.12"
+		"react": "^19.3.0",
+		"react-dom": "^19.3.0",
+		"sass": "^1.105.1",
+		"simple-git-hooks": "^2.14.0",
+		"tsx": "^4.23.15",
+		"typescript": "7.0.2",
+		"vue": "^3.5.43",
+		"zod": "^4.6.5",
+		"zod-validation-error": "^5.0.0"
 	},
 	"dependencies": {
-		"@11ty/dependency-tree": "^3.0.0",
-		"@11ty/dependency-tree-esm": "^1.0.0",
-		"@11ty/eleventy-dev-server": "^1.0.4",
-		"@11ty/eleventy-utils": "^1.0.2",
+		"@11ty/dependency-tree": "^5.0.0-alpha.3",
+		"@11ty/eleventy-dev-server": "^3.0.0-alpha.13",
+		"@11ty/eleventy-plugin-bundle": "^4.0.3",
+		"@11ty/eleventy-utils": "^3.0.1",
+		"@11ty/gray-matter": "^3.0.0",
 		"@11ty/lodash-custom": "^4.17.21",
-		"@sindresorhus/slugify": "^2.2.1",
+		"@11ty/node-version-check": "^1.0.1",
+		"@11ty/nunjucks": "^4.0.0-alpha.4",
+		"@11ty/parse-date-strings": "^2.0.6",
+		"@11ty/posthtml-urls": "^2.0.0",
+		"@11ty/recursive-copy": "^5.0.2",
+		"@sindresorhus/slugify": "^3.0.1",
 		"bcp-47-normalize": "^2.3.0",
-		"chokidar": "^3.5.3",
-		"cross-spawn": "^7.0.3",
-		"debug": "^4.3.4",
-		"dependency-graph": "^0.11.0",
-		"fast-glob": "^3.3.2",
-		"graceful-fs": "^4.2.11",
-		"gray-matter": "^4.0.3",
-		"is-glob": "^4.0.3",
-		"iso-639-1": "^3.1.0",
+		"chokidar": "^5.0.0",
+		"dependency-graph": "^1.0.0",
+		"entities": "^8.1.0",
+		"import-module-string": "^3.0.0",
+		"iso-639-1": "^3.1.6",
 		"kleur": "^4.1.5",
-		"liquidjs": "^10.9.4",
-		"luxon": "^3.4.4",
-		"markdown-it": "^14.0.0",
-		"micromatch": "^4.0.5",
+		"liquidjs": "^10.30.0",
+		"markdown-it": "^15.0.2",
 		"minimist": "^1.2.8",
-		"moo": "^0.5.2",
-		"multimatch": "^7.0.0",
-		"node-retrieve-globals": "^5.0.0",
-		"normalize-path": "^3.0.0",
-		"nunjucks": "^3.2.4",
-		"please-upgrade-node": "^3.2.0",
-		"posthtml": "^0.16.6",
-		"posthtml-urls": "^1.0.0",
-		"recursive-copy": "^2.0.14",
-		"semver": "^7.5.4",
-		"slugify": "^1.6.6"
+		"moo": "0.5.2",
+		"obug": "^3.0.0",
+		"picomatch": "^4.0.7",
+		"posthtml": "^0.16.7",
+		"posthtml-match-helper": "^2.0.3",
+		"semver": "^7.8.5",
+		"tinyglobby": "^0.2.17"
 	}
 }

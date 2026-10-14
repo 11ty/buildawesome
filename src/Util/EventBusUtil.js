@@ -1,10 +1,13 @@
 import eventBus from "../EventBus.js";
+import { createDebug } from "./DebugLogUtil.js";
+
+const debug = createDebug("EventBus");
 
 class EventBusUtil {
-	// Used for non-global subscriptions that will blow away the previous listener
-	static soloOn(name, callback) {
-		eventBus.off(name, callback);
-		eventBus.on(name, callback);
+	static debugCurrentListenerCounts() {
+		for (let name of eventBus.eventNames()) {
+			debug("Listeners for %o: %o", name, eventBus.listenerCount(name));
+		}
 	}
 }
 

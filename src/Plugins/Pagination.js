@@ -1,18 +1,21 @@
 import { isPlainObject } from "@11ty/eleventy-utils";
 import lodash from "@11ty/lodash-custom";
+import { DeepCopy } from "@11ty/eleventy-utils";
 
-import EleventyBaseError from "../EleventyBaseError.js";
-import { DeepCopy } from "../Util/Merge.js";
-import { ProxyWrap } from "../Util/ProxyWrap.js";
-// import { DeepFreeze } from "../Util/DeepFreeze.js";
-import TemplateData from "../TemplateData.js";
+import BaseError from "../Errors/BaseError.js";
+import { ProxyWrap } from "../Util/Objects/ProxyWrap.js";
+// import { DeepFreeze } from "../Util/Objects/DeepFreeze.js";
+import TemplateData from "../Data/TemplateData.js";
+import { withoutTracking } from "../Data/GlobalDataReads.js";
 
 const { set: lodashSet, get: lodashGet, chunk: lodashChunk } = lodash;
 
-class PaginationConfigError extends EleventyBaseError {}
-class PaginationError extends EleventyBaseError {}
+class PaginationConfigError extends BaseError {}
+class PaginationError extends BaseError {}
 
 class Pagination {
+	static NOT_FOUND_VALUE = "__NOT_FOUND_ERROR__";
+
 	constructor(tmpl, data, config) {
 		if (!config) {
 			throw new PaginationConfigError("Expected `config` argument to Pagination class.");
@@ -113,15 +116,13 @@ class Pagination {
 	}
 
 	_has(target, key) {
-		let notFoundValue = "__NOT_FOUND_ERROR__";
-		let data = lodashGet(target, key, notFoundValue);
-		return data !== notFoundValue;
+		let data = lodashGet(target, key, Pagination.NOT_FOUND_VALUE);
+		return data !== Pagination.NOT_FOUND_VALUE;
 	}
 
 	_get(target, key) {
-		let notFoundValue = "__NOT_FOUND_ERROR__";
-		let data = lodashGet(target, key, notFoundValue);
-		if (data === notFoundValue) {
+		let data = lodashGet(target, key, Pagination.NOT_FOUND_VALUE);
+		if (data === Pagination.NOT_FOUND_VALUE) {
 			throw new Error(
 				`Could not find pagination data${this.inputPathForErrorMessages}, went looking for: ${key}`,
 			);
@@ -178,7 +179,7 @@ class Pagination {
 		}
 
 		const chunks = lodashChunk(this.target, this.size);
-		if (this.data.pagination && this.data.pagination.generatePageOnEmptyData) {
+		if (this.data.pagination?.generatePageOnEmptyData) {
 			return chunks.length ? chunks : [[]];
 		} else {
 			return chunks;
@@ -271,10 +272,9 @@ class Pagination {
 		let links = [];
 		let hrefs = [];
 
-		let hasPermalinkField = Boolean(this.data[this.config.keys.permalink]);
-		let hasComputedPermalinkField = Boolean(
-			this.data.eleventyComputed && this.data.eleventyComputed[this.config.keys.permalink],
-		);
+		let hasPermalinkField =
+			Boolean(this.data[this.config.keys.permalink]) ||
+			Boolean(this.data.eleventyComputed?.[this.config.keys.permalink]);
 
 		// Do *not* pass collections through DeepCopy, we’ll re-add them back in later.
 		let collections = this.data.collections;
@@ -282,17 +282,21 @@ class Pagination {
 			delete this.data.collections;
 		}
 
-		let parentData = DeepCopy(
-			{
-				pagination: {
-					data: this.data.pagination.data,
-					size: this.data.pagination.size,
-					alias: this.alias,
-					pages,
+		// Copying reads every key, so global data reads are tracked again on the copy
+		let parentData = withoutTracking(() =>
+			DeepCopy(
+				{
+					pagination: {
+						data: this.data.pagination.data,
+						size: this.data.pagination.size,
+						alias: this.alias,
+						pages,
+					},
 				},
-			},
-			this.data,
+				this.data,
+			),
 		);
+		this.template?.trackGlobalDataReads(parentData);
 
 		// Restore skipped collections
 		if (collections) {
@@ -316,17 +320,34 @@ class Pagination {
 		for (let pageNumber of indices) {
 			let cloned = await this.template.clone();
 
-			if (pageNumber > 0 && !hasPermalinkField && !hasComputedPermalinkField) {
+			if (pageNumber > 0 && !hasPermalinkField) {
 				cloned.setExtraOutputSubdirectory(pageNumber);
 			}
 
+			let { page } = this.getOverrideDataPages(items, pageNumber);
 			let paginationData = {
+				// All keys up front (links and hrefs are filled in below) so the object keeps a compact shape
 				pagination: {
 					items: items[pageNumber],
+					page,
+					pageNumber,
+					previousPageLink: undefined,
+					previous: undefined,
+					nextPageLink: undefined,
+					next: undefined,
+					firstPageLink: undefined,
+					lastPageLink: undefined,
+					links: undefined,
+					pageLinks: undefined,
+					previousPageHref: undefined,
+					nextPageHref: undefined,
+					firstPageHref: undefined,
+					lastPageHref: undefined,
+					hrefs: undefined,
+					href: undefined,
 				},
 				page: {},
 			};
-			Object.assign(paginationData.pagination, this.getOverrideDataPages(items, pageNumber));
 
 			if (this.alias) {
 				lodashSet(paginationData, this.alias, this.getNormalizedItems(items[pageNumber]));
@@ -334,10 +355,12 @@ class Pagination {
 
 			// Do *not* deep merge pagination data! See https://github.com/11ty/eleventy/issues/147#issuecomment-440802454
 			let clonedData = ProxyWrap(paginationData, parentData);
+
 			// Previous method:
 			// let clonedData = DeepCopy(paginationData, parentData);
 
-			let { /*linkInstance,*/ rawPath, path, href } = await cloned.getOutputLocations(clonedData);
+			let { /*linkInstance,*/ rawPath, path, href, dir } =
+				await cloned.getOutputLocations(clonedData);
 			// TODO subdirectory to links if the site doesn’t live at /
 			if (rawPath) {
 				links.push("/" + rawPath);

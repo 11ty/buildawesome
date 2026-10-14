@@ -2,15 +2,17 @@ import markdownIt from "markdown-it";
 
 import TemplateEngine from "./TemplateEngine.js";
 
-class Markdown extends TemplateEngine {
-	constructor(name, dirs, config) {
-		super(name, dirs, config);
+export default class Markdown extends TemplateEngine {
+	constructor(name, eleventyConfig) {
+		super(name, eleventyConfig);
 
 		this.markdownOptions = {};
 
 		this.setLibrary(this.config.libraryOverrides.md);
+	}
 
-		this.cacheable = true;
+	get cacheable() {
+		return true;
 	}
 
 	setLibrary(mdLib) {
@@ -29,7 +31,7 @@ class Markdown extends TemplateEngine {
 			this.mdLib.disable("code");
 		}
 
-		this.setEngineLib(this.mdLib);
+		this.setEngineLib(this.mdLib, Boolean(this.config.libraryOverrides.md));
 	}
 
 	setMarkdownOptions(options) {
@@ -50,48 +52,11 @@ class Markdown extends TemplateEngine {
 		);
 	}
 
-	async compile(str, inputPath, preTemplateEngine, bypassMarkdown) {
+	// Preprocessing template engines run before this in the TemplateRender pipeline
+	async compile(str) {
 		let mdlib = this.mdLib;
-
-		if (preTemplateEngine) {
-			let engine;
-			if (typeof preTemplateEngine === "string") {
-				engine = await this.engineManager.getEngine(
-					preTemplateEngine,
-					this.dirs,
-					this.extensionMap,
-				);
-			} else {
-				engine = preTemplateEngine;
-			}
-
-			let fnReady = engine.compile(str, inputPath);
-
-			if (bypassMarkdown) {
-				return async function (data) {
-					let fn = await fnReady;
-					return fn(data);
-				};
-			} else {
-				return async function (data) {
-					let fn = await fnReady;
-					let preTemplateEngineRender = await fn(data);
-					let finishedRender = mdlib.render(preTemplateEngineRender, data);
-					return finishedRender;
-				};
-			}
-		} else {
-			if (bypassMarkdown) {
-				return function () {
-					return str;
-				};
-			} else {
-				return function (data) {
-					return mdlib.render(str, data);
-				};
-			}
-		}
+		return function (data) {
+			return mdlib.render(str, data);
+		};
 	}
 }
-
-export default Markdown;

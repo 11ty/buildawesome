@@ -1,6 +1,10 @@
 import { isPlainObject } from "@11ty/eleventy-utils";
 
+import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
+
 class TemplateBehavior {
+	#isRenderOptional;
+
 	constructor(config) {
 		this.render = true;
 		this.write = true;
@@ -12,11 +16,27 @@ class TemplateBehavior {
 		this.config = config;
 	}
 
-	setRenderableOverride(renderableOverride) {
-		this.renderableOverride = renderableOverride;
+	// Render override set to false
+	isRenderableDisabled() {
+		return this.renderableOverride === false;
 	}
 
-	// permalink *has* a build key or output is json/ndjson
+	isRenderableOptional() {
+		return this.#isRenderOptional;
+	}
+
+	// undefined (fallback), true, false
+	setRenderableOverride(renderableOverride) {
+		if (renderableOverride === "optional") {
+			this.#isRenderOptional = true;
+			this.renderableOverride = undefined;
+		} else {
+			this.#isRenderOptional = false;
+			this.renderableOverride = renderableOverride;
+		}
+	}
+
+	// permalink *has* a build key or output is json
 	isRenderable() {
 		return this.renderableOverride ?? (this.render || this.isRenderForced());
 	}
@@ -26,7 +46,7 @@ class TemplateBehavior {
 	}
 
 	isRenderForced() {
-		return this.outputFormat === "json" || this.outputFormat === "ndjson";
+		return this.outputFormat === "json";
 	}
 
 	isWriteable() {
@@ -45,9 +65,11 @@ class TemplateBehavior {
 			}
 		}
 
-		let computedKey = this.config.keys.computed;
-		if (computedKey in data && isPlainObject(data[computedKey].permalink)) {
-			for (let key of Object.keys(data[computedKey].permalink)) {
+		let computedData = ResolveConfigurationData.getValue(data, this.config.keys.computed);
+		let permalink = ResolveConfigurationData.getValue(computedData, this.config.keys.permalink);
+
+		if (computedData && isPlainObject(permalink)) {
+			for (let key of Object.keys(permalink)) {
 				keys.add(key);
 			}
 		}

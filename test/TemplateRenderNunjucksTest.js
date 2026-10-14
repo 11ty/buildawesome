@@ -1,19 +1,26 @@
 import test from "ava";
-import Nunjucks from "nunjucks";
+import Nunjucks from "@11ty/nunjucks";
 
 import TemplateRender from "../src/TemplateRender.js";
-import TemplateConfig from "../src/TemplateConfig.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
+import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
+
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
+import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback } from "./_testHelpers.js";
 
 async function getNewTemplateRender(name, inputDir, eleventyConfig) {
   if (!eleventyConfig) {
-    eleventyConfig = new TemplateConfig();
-    await eleventyConfig.init();
+    eleventyConfig = await getTemplateConfigInstance({
+      dir: {
+        input: inputDir
+      }
+    });
   }
 
-  let tr = new TemplateRender(name, inputDir, eleventyConfig);
-  tr.extensionMap = new EleventyExtensionMap([], eleventyConfig);
+  let tr = new TemplateRender(name, eleventyConfig);
+  tr.extensionMap = new ExtensionMap(eleventyConfig);
+  tr.extensionMap.engineManager = new TemplateEngineManager(eleventyConfig);
+  tr.extensionMap.setFormats([]);
   await tr.init();
   return tr;
 }
@@ -269,13 +276,13 @@ test("Nunjucks Render with getVarFromString Filter Issue #567", async (t) => {
   t.is(await fn({ "my-global-name": "Zach" }), "<p>Zach</p>");
 });
 
-test("Nunjucks Shortcode without args", async (t) => {
+test("Nunjucks Shortcode without args #372", async (t) => {
   let tr = await getNewTemplateRender("njk", "./test/stubs/");
-  tr.engine.addShortcode("postfixWithZach", function () {
-    return "Zach";
+  tr.engine.addShortcode("postfixWithZach", function (arg1) {
+    return arg1 + "Zach";
   });
 
-  t.is(await tr._testRender("{% postfixWithZach %}", {}), "Zach");
+  t.is(await tr._testRender("{% postfixWithZach %}", {}), "undefinedZach");
 });
 
 test("Nunjucks Shortcode", async (t) => {
@@ -308,7 +315,7 @@ test("Nunjucks Async Shortcode", async (t) => {
   let tr = await getNewTemplateRender("njk", "./test/stubs/");
   tr.engine.addShortcode(
     "postfixWithZach",
-    function (str) {
+    async function (str) {
       // Data in context
       t.is(this.page.url, "/hi/");
 
@@ -358,32 +365,43 @@ test("Nunjucks Async function Shortcode", async (t) => {
   );
 });
 
-test("Nunjucks Async function Shortcode (with sync function, error throwing)", async (t) => {
+test("Nunjucks sync function Shortcode (error throwing)", async (t) => {
   let tr = await getNewTemplateRender("njk", "./test/stubs/");
   tr.engine.addShortcode(
     "postfixWithZach",
     function (str) {
-      throw new Error("Nunjucks Async function Shortcode (with sync function, error throwing)");
+      throw new Error("Nunjucks sync function Shortcode (error throwing)");
     },
-    true
+    false
   );
 
   let error = await t.throwsAsync(async () => {
     await tr._testRender("{% postfixWithZach name %}", { name: "test" });
   });
+
   t.true(
     error.message.indexOf(
-      "Nunjucks Async function Shortcode (with sync function, error throwing)"
+      "BuildAwesomeNunjucksError: Error with Nunjucks shortcode `postfixWithZach`"
     ) > -1
+  );
+  t.true(
+    error.cause.message.startsWith(
+      "Error with Nunjucks shortcode `postfixWithZach`"
+    )
+  );
+  t.true(
+    error.cause.originalError.message.startsWith(
+      "Nunjucks sync function Shortcode (error throwing)"
+    )
   );
 });
 
-test("Nunjucks Async function Shortcode (with async function, error throwing)", async (t) => {
+test("Nunjucks Async function Shortcode (error throwing)", async (t) => {
   let tr = await getNewTemplateRender("njk", "./test/stubs/");
   tr.engine.addShortcode(
     "postfixWithZachError",
     async function (str) {
-      throw new Error("Nunjucks Async function Shortcode (with async function, error throwing)");
+      throw new Error("Nunjucks Async function Shortcode (error throwing)");
     },
     true
   );
@@ -393,21 +411,31 @@ test("Nunjucks Async function Shortcode (with async function, error throwing)", 
   });
   t.true(
     error.message.indexOf(
-      "Nunjucks Async function Shortcode (with async function, error throwing)"
+      "BuildAwesomeNunjucksError: Error with Nunjucks shortcode `postfixWithZachError`"
     ) > -1
+  );
+  t.true(
+    error.cause.message.startsWith(
+      "Error with Nunjucks shortcode `postfixWithZachError`"
+    )
+  );
+  t.true(
+    error.cause.originalError.message.startsWith(
+      "Nunjucks Async function Shortcode (error throwing)"
+    )
   );
 });
 
-test("Nunjucks Async function paired Shortcode (with sync function, error throwing)", async (t) => {
+test("Nunjucks sync function paired Shortcode (error throwing)", async (t) => {
   let tr = await getNewTemplateRender("njk", "./test/stubs/");
   tr.engine.addPairedShortcode(
     "postfixWithZachError",
     function (str) {
       throw new Error(
-        "Nunjucks Async function paired Shortcode (with sync function, error throwing)"
+        "Nunjucks sync function paired Shortcode (error throwing)"
       );
     },
-    true
+    false
   );
 
   let error = await t.throwsAsync(async () => {
@@ -415,20 +443,31 @@ test("Nunjucks Async function paired Shortcode (with sync function, error throwi
       name: "test",
     });
   });
+
   t.true(
     error.message.indexOf(
-      "Nunjucks Async function paired Shortcode (with sync function, error throwing)"
+      "BuildAwesomeNunjucksError: Error with Nunjucks paired shortcode `postfixWithZachError`"
     ) > -1
+  );
+  t.true(
+    error.cause.message.startsWith(
+      "Error with Nunjucks paired shortcode `postfixWithZachError`"
+    )
+  );
+  t.true(
+    error.cause.originalError.message.startsWith(
+      "Nunjucks sync function paired Shortcode (error throwing)"
+    )
   );
 });
 
-test("Nunjucks Async function paired Shortcode (with async function, error throwing)", async (t) => {
+test("Nunjucks Async function paired Shortcode (error throwing)", async (t) => {
   let tr = await getNewTemplateRender("njk", "./test/stubs/");
   tr.engine.addPairedShortcode(
     "postfixWithZachError",
     async function (str) {
       throw new Error(
-        "Nunjucks Async function paired Shortcode (with async function, error throwing)"
+        "Nunjucks Async function paired Shortcode (error throwing)"
       );
     },
     true
@@ -439,10 +478,21 @@ test("Nunjucks Async function paired Shortcode (with async function, error throw
       name: "test",
     });
   });
+
   t.true(
     error.message.indexOf(
-      "Nunjucks Async function paired Shortcode (with async function, error throwing)"
+      "BuildAwesomeNunjucksError: Error with Nunjucks paired shortcode `postfixWithZachError`"
     ) > -1
+  );
+  t.true(
+    error.cause.message.startsWith(
+      "Error with Nunjucks paired shortcode `postfixWithZachError`"
+    )
+  );
+  t.true(
+    error.cause.originalError.message.startsWith(
+      "Nunjucks Async function paired Shortcode (error throwing)"
+    )
   );
 });
 
@@ -563,13 +613,13 @@ test("Nunjucks Nested Async Paired Shortcode", async (t) => {
   );
 });
 
-test("Nunjucks Paired Shortcode without args", async (t) => {
+test("Nunjucks Paired Shortcode without args #372", async (t) => {
   let tr = await getNewTemplateRender("njk", "./test/stubs/");
-  tr.engine.addPairedShortcode("postfixWithZach", function (content) {
+  tr.engine.addPairedShortcode("postfixWithZach", function (content, arg1) {
     // Data in context
     t.is(this.page.url, "/hi/");
 
-    return content + "Zach";
+    return content + arg1 + "Zach";
   });
 
   t.is(
@@ -579,7 +629,7 @@ test("Nunjucks Paired Shortcode without args", async (t) => {
         url: "/hi/",
       },
     }),
-    "ContentZach"
+    "ContentundefinedZach"
   );
 });
 
@@ -842,11 +892,14 @@ test("Nunjucks Parse for Symbols with custom block", async (t) => {
 });
 
 test("Use addNunjucksGlobal with function", async (t) => {
-  let templateConfig = new TemplateConfig();
-  templateConfig.userConfig.addNunjucksGlobal("fortytwo", function () {
-    return 42;
-  });
-  await templateConfig.init();
+  let templateConfig = await getTemplateConfigInstanceCustomCallback(
+    {},
+    function(cfg) {
+      cfg.addNunjucksGlobal("fortytwo", function () {
+        return 42;
+      });
+    }
+  );
 
   let tr = await getNewTemplateRender("njk", null, templateConfig);
 
@@ -855,9 +908,12 @@ test("Use addNunjucksGlobal with function", async (t) => {
 });
 
 test("Use addNunjucksGlobal with literal", async (t) => {
-  let templateConfig = new TemplateConfig();
-  templateConfig.userConfig.addNunjucksGlobal("fortytwo", 42);
-  await templateConfig.init();
+  let templateConfig = await getTemplateConfigInstanceCustomCallback(
+    {},
+    function(cfg) {
+      cfg.addNunjucksGlobal("fortytwo", 42);
+    }
+  );
 
   let tr = await getNewTemplateRender("njk", null, templateConfig);
 
@@ -867,9 +923,12 @@ test("Use addNunjucksGlobal with literal", async (t) => {
 
 // Async not supported here
 test.skip("Use addNunjucksGlobal with async function", async (t) => {
-  let templateConfig = new TemplateConfig();
-  templateConfig.userConfig.addNunjucksGlobal("fortytwo", getPromise(42));
-  await templateConfig.init();
+  let templateConfig = await getTemplateConfigInstanceCustomCallback(
+    {},
+    function(cfg) {
+      cfg.addNunjucksGlobal("fortytwo", getPromise(42));
+    }
+  );
 
   let tr = await getNewTemplateRender("njk", null, templateConfig);
 
@@ -878,11 +937,14 @@ test.skip("Use addNunjucksGlobal with async function", async (t) => {
 });
 
 test("Use config driven Nunjucks Environment Options (throws on undefined variable)", async (t) => {
-  let templateConfig = new TemplateConfig();
-  templateConfig.userConfig.setNunjucksEnvironmentOptions({
-    throwOnUndefined: true,
-  });
-  await templateConfig.init();
+  let templateConfig = await getTemplateConfigInstanceCustomCallback(
+    {},
+    function(cfg) {
+      cfg.setNunjucksEnvironmentOptions({
+        throwOnUndefined: true,
+      });
+    }
+  );
 
   let tr = await getNewTemplateRender("njk", null, templateConfig);
 
@@ -893,11 +955,14 @@ test("Use config driven Nunjucks Environment Options (throws on undefined variab
 });
 
 test("Use config driven Nunjucks Environment Options (autoescape)", async (t) => {
-  let templateConfig = new TemplateConfig();
-  templateConfig.userConfig.setNunjucksEnvironmentOptions({
-    autoescape: false,
-  });
-  await templateConfig.init();
+  let templateConfig = await getTemplateConfigInstanceCustomCallback(
+    {},
+    function(cfg) {
+      cfg.setNunjucksEnvironmentOptions({
+        autoescape: false,
+      });
+    }
+  );
 
   let tr = await getNewTemplateRender("njk", null, templateConfig);
 
@@ -911,11 +976,16 @@ test("Use config driven Nunjucks Environment Options (autoescape)", async (t) =>
 });
 
 test("Nunjucks Shortcode in a loop (everything is sync)", async (t) => {
-  let templateConfig = new TemplateConfig();
-  templateConfig.userConfig.addNunjucksShortcode("genericshortcode", function (str) {
-    return str;
-  });
-  await templateConfig.init();
+  let templateConfig = await getTemplateConfigInstanceCustomCallback(
+    {
+      input: "test/stubs-njk-async/"
+    },
+    function(cfg) {
+      cfg.addNunjucksShortcode("genericshortcode", function (str) {
+        return str;
+      });
+    }
+  );
 
   let tr = await getNewTemplateRender("njk", "./test/stubs-njk-async/", templateConfig);
 
@@ -933,11 +1003,16 @@ test("Nunjucks Shortcode in a loop (everything is sync)", async (t) => {
 
 // TODO!
 test.skip("Weird issue with number arguments in a loop (not parsing literals properly?)", async (t) => {
-  let templateConfig = new TemplateConfig();
-  templateConfig.userConfig.addNunjucksShortcode("genericshortcode", function (str) {
-    return str;
-  });
-  await templateConfig.init();
+  let templateConfig = await getTemplateConfigInstanceCustomCallback(
+    {
+      input: "test/stubs-njk-async/"
+    },
+    function(cfg) {
+      cfg.addNunjucksShortcode("genericshortcode", function (str) {
+        return str;
+      });
+    }
+  );
 
   let tr = await getNewTemplateRender("njk", "./test/stubs-njk-async/", templateConfig);
   let fn = await tr.getCompiledTemplate(
@@ -952,74 +1027,16 @@ test.skip("Weird issue with number arguments in a loop (not parsing literals pro
   );
 });
 
-test("Use a precompiled Nunjucks template", async (t) => {
-  // custom loader object
-
-  let templateConfig = new TemplateConfig();
-  templateConfig.userConfig.setNunjucksPrecompiledTemplates({
-    "RenderDirect:BQAPaWxMHTxOqfCSB_bEoWTvtWt-obPbnZTUznRl9LA": (function () {
-      function root(env, context, frame, runtime, cb) {
-        var lineno = 0;
-        var colno = 0;
-        var output = "";
-        try {
-          var parentTemplate = null;
-          var t_1;
-          t_1 = 34;
-          frame.set("nunjucksVar", t_1, true);
-          if (frame.topLevel) {
-            context.setVariable("nunjucksVar", t_1);
-          }
-          if (frame.topLevel) {
-            context.addExport("nunjucksVar", t_1);
-          }
-          output += runtime.suppressValue(
-            runtime.contextOrFrameLookup(context, frame, "hi"),
-            env.opts.autoescape
-          );
-          output += "\n";
-          output += runtime.suppressValue(
-            runtime.contextOrFrameLookup(context, frame, "nunjucksVar"),
-            env.opts.autoescape
-          );
-          if (parentTemplate) {
-            parentTemplate.rootRenderFunc(env, context, frame, runtime, cb);
-          } else {
-            cb(null, output);
-          }
-        } catch (e) {
-          cb(runtime.handleError(e, lineno, colno));
-        }
-      }
-      return {
-        root: root,
-      };
-    })(),
-  });
-  await templateConfig.init();
-
-  let tr = await getNewTemplateRender("njk", null, templateConfig);
-
-  // Just pass a unique key in here if you’re using precompiled templates via config.
-  let fn = await tr.getCompiledTemplate("RenderDirect:BQAPaWxMHTxOqfCSB_bEoWTvtWt-obPbnZTUznRl9LA");
-  t.is(
-    normalizeNewLines(
-      await fn({
-        hi: "Zach",
-      })
-    ),
-    `Zach
-34`
-  );
-});
-
 test("Make sure addFilter is async-friendly for Nunjucks", async (t) => {
-  let templateConfig = new TemplateConfig();
-  // requires async function
-  templateConfig.userConfig.addFilter("fortytwo", async function (val, val2) {
-    return getPromise(val + val2);
-  });
-  await templateConfig.init();
+  let templateConfig = await getTemplateConfigInstanceCustomCallback(
+    {},
+    function(cfg) {
+      // requires async function
+      cfg.addFilter("fortytwo", async function (val, val2) {
+        return getPromise(val + val2);
+      });
+    }
+  );
 
   let tr = await getNewTemplateRender("njk", null, templateConfig);
 
@@ -1028,12 +1045,15 @@ test("Make sure addFilter is async-friendly for Nunjucks", async (t) => {
 });
 
 test("Throw an error when you return a promise in addFilter for Nunjucks", async (t) => {
-  let templateConfig = new TemplateConfig();
-  // requires async function
-  templateConfig.userConfig.addFilter("fortytwo", function () {
-    return getPromise(42);
-  });
-  await templateConfig.init();
+  let templateConfig = await getTemplateConfigInstanceCustomCallback(
+    {},
+    function(cfg) {
+      // requires async function
+      cfg.addFilter("fortytwo", function () {
+        return getPromise(42);
+      });
+    }
+  );
 
   let tr = await getNewTemplateRender("njk", null, templateConfig);
   let fn = await tr.getCompiledTemplate("<p>{{ 'hi' | fortytwo }}</p>");
@@ -1041,12 +1061,15 @@ test("Throw an error when you return a promise in addFilter for Nunjucks", async
 });
 
 test("addAsyncFilter for Nunjucks", async (t) => {
-  let templateConfig = new TemplateConfig();
-  // works without async function (can return promise)
-  templateConfig.userConfig.addAsyncFilter("fortytwo", function (val, val2) {
-    return getPromise(val + val2);
-  });
-  await templateConfig.init();
+  let templateConfig = await getTemplateConfigInstanceCustomCallback(
+    {},
+    function(cfg) {
+      // works without async function (can return promise)
+      cfg.addAsyncFilter("fortytwo", function (val, val2) {
+        return getPromise(val + val2);
+      });
+    }
+  );
 
   let tr = await getNewTemplateRender("njk", null, templateConfig);
 
@@ -1055,18 +1078,21 @@ test("addAsyncFilter for Nunjucks", async (t) => {
 });
 
 test("Asynchronous filters (via addNunjucksFilter) for Nunjucks", async (t) => {
-  let templateConfig = new TemplateConfig();
-  // works without async function (can return promise)
-  templateConfig.userConfig.addNunjucksFilter(
-    "fortytwo",
-    function (value1, value2, callback) {
-      setTimeout(function () {
-        callback(null, value1 + value2);
-      }, 100);
-    },
-    true
+  let templateConfig = await getTemplateConfigInstanceCustomCallback(
+    {},
+    function(cfg) {
+      // works without async function (can return promise)
+      cfg.addNunjucksFilter(
+        "fortytwo",
+        function (value1, value2, callback) {
+          setTimeout(function () {
+            callback(null, value1 + value2);
+          }, 100);
+        },
+        true
+      );
+    }
   );
-  await templateConfig.init();
 
   let tr = await getNewTemplateRender("njk", null, templateConfig);
 
@@ -1075,17 +1101,31 @@ test("Asynchronous filters (via addNunjucksFilter) for Nunjucks", async (t) => {
 });
 
 test("Asynchronous filters (via addNunjucksAsyncFilter) for Nunjucks", async (t) => {
-  let templateConfig = new TemplateConfig();
-  // works without async function (can return promise)
-  templateConfig.userConfig.addNunjucksAsyncFilter("fortytwo", function (value1, value2, callback) {
-    setTimeout(function () {
-      callback(null, value1 + value2);
-    }, 100);
-  });
-  await templateConfig.init();
+  let templateConfig = await getTemplateConfigInstanceCustomCallback(
+    {},
+    function(cfg) {
+      // works without async function (can return promise)
+      cfg.addNunjucksAsyncFilter("fortytwo", function (value1, value2, callback) {
+        setTimeout(function () {
+          callback(null, value1 + value2);
+        }, 100);
+      });
+    }
+  );
 
   let tr = await getNewTemplateRender("njk", null, templateConfig);
 
   let fn = await tr.getCompiledTemplate("<p>{{ 10 | fortytwo(2) }}</p>");
   t.is(await fn(), "<p>12</p>");
+});
+
+test("Nunjucks Shortcode with this.env #3175", async (t) => {
+  t.plan(2);
+  let tr = await getNewTemplateRender("njk", "./test/stubs/");
+  tr.engine.addShortcode("postfixWithZach", function () {
+    t.truthy(this.env);
+    return "Zach";
+  });
+
+  t.is(await tr._testRender("{% postfixWithZach %}", {}), "Zach");
 });

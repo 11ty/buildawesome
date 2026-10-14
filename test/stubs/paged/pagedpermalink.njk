@@ -11,6 +11,6 @@ items:
   - another-slug CandiDate
   - item7
   - item8
-permalink: paged/{{ pagination.items[0] | slug }}/index.html
+permalink: paged/{{ pagination.items[0] | slugify }}/index.html
 ---
 <ol>{% for item in pagination.items %}<li>{{ item }}</li>{% endfor %}</ol>

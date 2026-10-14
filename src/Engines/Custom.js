@@ -1,34 +1,28 @@
 import TemplateEngine from "./TemplateEngine.js";
 import getJavaScriptData from "../Util/GetJavaScriptData.js";
-import eventBus from "../EventBus.js";
 
-let lastModifiedFile = undefined;
-eventBus.on("eleventy.resourceModified", (path) => {
-	lastModifiedFile = path;
-});
-
-class CustomEngine extends TemplateEngine {
-	constructor(name, dirs, config) {
-		super(name, dirs, config);
+export default class CustomEngine extends TemplateEngine {
+	constructor(name, eleventyConfig) {
+		super(name, eleventyConfig);
 
 		this.entry = this.getExtensionMapEntry();
 		this.needsInit = "init" in this.entry && typeof this.entry.init === "function";
 
-		this._defaultEngine = undefined;
+		this.setDefaultEngine(undefined);
 
-		// Enable cacheability for this template
-		if (this.entry.compileOptions && "cache" in this.entry.compileOptions) {
-			this.cacheable = this.entry.compileOptions.cache;
-		} else if (this.needsToReadFileContents()) {
-			this.cacheable = true;
-		}
+		this.previousQueue = [];
+		this.config.events.on("buildawesome#previousqueue", (filePaths) => {
+			this.previousQueue = filePaths;
+		});
 	}
 
 	getExtensionMapEntry() {
 		if ("extensionMap" in this.config) {
+			let name = this.name.toLowerCase();
 			// Iterates over only the user config `addExtension` entries
 			for (let entry of this.config.extensionMap) {
-				if (entry.key.toLowerCase() === this.name.toLowerCase()) {
+				let entryKey = (entry.aliasKey || entry.key || "").toLowerCase();
+				if (entryKey === name) {
 					return entry;
 				}
 			}
@@ -41,6 +35,62 @@ class CustomEngine extends TemplateEngine {
 
 	setDefaultEngine(defaultEngine) {
 		this._defaultEngine = defaultEngine;
+	}
+
+	get cacheable() {
+		// Enable cacheability for this template
+		if (this.entry?.compileOptions?.cache !== undefined) {
+			return this.entry.compileOptions.cache;
+		} else if (this.needsToReadFileContents()) {
+			return true;
+		} else if (this._defaultEngine?.cacheable !== undefined) {
+			return this._defaultEngine.cacheable;
+		}
+
+		return super.cacheable;
+	}
+
+	async getInstanceFromInputPath(inputPath) {
+		if (
+			"getInstanceFromInputPath" in this.entry &&
+			typeof this.entry.getInstanceFromInputPath === "function"
+		) {
+			// returns Promise
+			return this.entry.getInstanceFromInputPath(inputPath);
+		}
+
+		// aliased upstream type
+		if (
+			this._defaultEngine &&
+			"getInstanceFromInputPath" in this._defaultEngine &&
+			typeof this._defaultEngine.getInstanceFromInputPath === "function"
+		) {
+			// returns Promise
+			return this._defaultEngine.getInstanceFromInputPath(inputPath);
+		}
+
+		return false;
+	}
+
+	/**
+	 * Whether to use the module loader directly
+	 *
+	 * @override
+	 */
+	useJavaScriptImport() {
+		if ("useJavaScriptImport" in this.entry) {
+			return this.entry.useJavaScriptImport;
+		}
+
+		if (
+			this._defaultEngine &&
+			"useJavaScriptImport" in this._defaultEngine &&
+			typeof this._defaultEngine.useJavaScriptImport === "function"
+		) {
+			return this._defaultEngine.useJavaScriptImport();
+		}
+
+		return false;
 	}
 
 	/**
@@ -59,6 +109,10 @@ class CustomEngine extends TemplateEngine {
 		}
 
 		return true;
+	}
+
+	async ready() {
+		await this._runningInit();
 	}
 
 	// If we init from multiple places, wait for the first init to finish before continuing on.
@@ -108,15 +162,6 @@ class CustomEngine extends TemplateEngine {
 			return data;
 		}
 
-		// if getData is not false or a function then `getInstanceFromInputPath` must exist
-		if (!("getInstanceFromInputPath" in this.entry)) {
-			return Promise.reject(
-				new Error(
-					`getInstanceFromInputPath callback missing from ${this.name} template engine plugin.`,
-				),
-			);
-		}
-
 		let keys = new Set();
 		if (this.entry.getData === true) {
 			keys.add("data");
@@ -129,7 +174,18 @@ class CustomEngine extends TemplateEngine {
 		let dataBench = this.benchmarks.aggregate.get(`Engine (${this.name}) Get Data From File`);
 		dataBench.before();
 
-		let inst = await this.entry.getInstanceFromInputPath(inputPath);
+		let inst = await this.getInstanceFromInputPath(inputPath);
+
+		if (inst === false) {
+			dataBench.after();
+
+			return Promise.reject(
+				new Error(
+					`\`getInstanceFromInputPath\` callback missing from '${this.name}' template engine plugin. It is required when \`getData\` is in use. You can set \`getData: false\` to opt-out of this.`,
+				),
+			);
+		}
+
 		// override keys set at the plugin level in the individual template
 		if (inst.eleventyDataKey) {
 			keys = new Set(inst.eleventyDataKey);
@@ -163,49 +219,65 @@ class CustomEngine extends TemplateEngine {
 
 	async compile(str, inputPath, ...args) {
 		await this._runningInit();
-		let defaultRenderer;
+		let defaultCompilationFn;
 		if (this._defaultEngine) {
-			defaultRenderer = async (data) => {
-				const render = await this._defaultEngine.compile(str, inputPath, ...args);
-				return render(data);
+			defaultCompilationFn = async (data) => {
+				const renderFn = await this._defaultEngine.compile(str, inputPath, ...args);
+				return renderFn(data);
 			};
 		}
 
 		// Fall back to default compiler if the user does not provide their own
-		if (!this.entry.compile && defaultRenderer) {
-			return defaultRenderer;
+		if (!this.entry.compile) {
+			if (defaultCompilationFn) {
+				return defaultCompilationFn;
+			} else {
+				throw new Error(
+					`Missing \`compile\` property for custom template syntax definition eleventyConfig.addExtension("${this.name}"). This is not necessary when aliasing to an existing template syntax.`,
+				);
+			}
 		}
 
 		// TODO generalize this (look at JavaScript.js)
-		let fn = this.entry.compile.bind({
+		let compiledFn = this.entry.compile.bind({
 			config: this.config,
 			addDependencies: (from, toArray = []) => {
 				this.config.uses.addDependency(from, toArray);
 			},
-			defaultRenderer, // bind defaultRenderer to compile function
+			defaultRenderer: defaultCompilationFn, // bind defaultRenderer to compile function
 		})(str, inputPath);
 
 		// Support `undefined` to skip compile/render
-		if (fn) {
+		if (compiledFn) {
 			// Bind defaultRenderer to render function
-			if ("then" in fn && typeof fn.then === "function") {
+			if ("then" in compiledFn && typeof compiledFn.then === "function") {
 				// Promise, wait to bind
-				return fn.then((fn) => {
+				return compiledFn.then((fn) => {
 					if (typeof fn === "function") {
-						return fn.bind({ defaultRenderer });
+						return fn.bind({
+							defaultRenderer: defaultCompilationFn,
+						});
 					}
 					return fn;
 				});
-			} else if ("bind" in fn && typeof fn.bind === "function") {
-				return fn.bind({ defaultRenderer });
+			} else if ("bind" in compiledFn && typeof compiledFn.bind === "function") {
+				return compiledFn.bind({
+					defaultRenderer: defaultCompilationFn,
+				});
 			}
 		}
 
-		return fn;
+		return compiledFn;
 	}
 
 	get defaultTemplateFileExtension() {
-		return this.entry.outputFileExtension;
+		return this.entry.outputFileExtension ?? "html";
+	}
+
+	// Whether or not to wrap in Eleventy layouts
+	useLayouts() {
+		// TODO future change fallback to `this.defaultTemplateFileExtension === "html"`
+		return this.entry.useLayouts ?? true;
 	}
 
 	hasDependencies(inputPath) {
@@ -215,14 +287,16 @@ class CustomEngine extends TemplateEngine {
 		return true;
 	}
 
-	isFileRelevantTo(inputPath, comparisonFile, includeLayouts) {
-		return this.config.uses.isFileRelevantTo(inputPath, comparisonFile, includeLayouts);
+	wasFileRelevantToPreviousBuild(inputPath) {
+		return this.previousQueue.find((comparisonFile) =>
+			this.config.uses.isFileRelevantTo(inputPath, comparisonFile, false),
+		);
 	}
 
 	getCompileCacheKey(str, inputPath) {
 		// Return this separately so we know whether or not to use the cached version
 		// but still return a key to cache this new render for next time
-		let useCache = !this.isFileRelevantTo(inputPath, lastModifiedFile, false);
+		let useCache = !this.wasFileRelevantToPreviousBuild(inputPath);
 
 		if (this.entry.compileOptions && "getCacheKey" in this.entry.compileOptions) {
 			if (typeof this.entry.compileOptions.getCacheKey !== "function") {
@@ -259,7 +333,9 @@ class CustomEngine extends TemplateEngine {
 			return this.entry.compileOptions.permalink;
 		}
 
-		return true;
+		// Breaking: default changed from `true` to `false` in 3.0.0-alpha.13
+		// Note: `false` is the same as "raw" here.
+		return false;
 	}
 
 	static shouldSpiderJavaScriptDependencies(entry) {
@@ -270,5 +346,3 @@ class CustomEngine extends TemplateEngine {
 		return false;
 	}
 }
-
-export default CustomEngine;

@@ -1,24 +1,53 @@
-import { TemplatePath } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
+import { Merge, TemplatePath } from "@11ty/eleventy-utils";
 
 import TemplateLayoutPathResolver from "./TemplateLayoutPathResolver.js";
 import TemplateContent from "./TemplateContent.js";
-import TemplateData from "./TemplateData.js";
-import templateCache from "./TemplateCache.js";
+import layoutCache from "./LayoutCache.js";
 
-// const debug = debugUtil("Eleventy:TemplateLayout");
-const debugDev = debugUtil("Dev:Eleventy:TemplateLayout");
+// https://github.com/11ty/eleventy/issues/3954
+class CdataWrapper {
+	static PREFIX = "<![CDATA[STARTRAW";
+	static POSTFIX = "ENDRAW]]>";
+
+	constructor(pageTemplateSyntax = "", layoutTemplateSyntax = "") {
+		this.isEligible = CdataWrapper.isEligible(pageTemplateSyntax, layoutTemplateSyntax);
+	}
+
+	// Markdown in Markdown layout only
+	static isEligible(templateSyntax, layoutTemplateSyntax) {
+		return (
+			templateSyntax.split(",").includes("md") && layoutTemplateSyntax.split(",").includes("md")
+		);
+	}
+
+	wrap(content) {
+		if (this.isEligible) {
+			return CdataWrapper.PREFIX + content + CdataWrapper.POSTFIX;
+		}
+		return content;
+	}
+
+	unwrap(content) {
+		if (this.isEligible) {
+			return content.replaceAll(CdataWrapper.PREFIX, "").replaceAll(CdataWrapper.POSTFIX, "");
+		}
+
+		return content;
+	}
+}
 
 class TemplateLayout extends TemplateContent {
-	constructor(key, inputDir, extensionMap, eleventyConfig) {
-		if (!eleventyConfig) {
+	#dataCache;
+
+	constructor(key, extensionMap, eleventyConfig) {
+		if (!eleventyConfig || eleventyConfig.constructor.name !== "TemplateConfig") {
 			throw new Error("Expected `eleventyConfig` in TemplateLayout constructor.");
 		}
 
-		let resolver = new TemplateLayoutPathResolver(key, inputDir, extensionMap, eleventyConfig);
+		let resolver = new TemplateLayoutPathResolver(key, extensionMap, eleventyConfig);
 		let resolvedPath = resolver.getFullPath();
 
-		super(resolvedPath, inputDir, eleventyConfig);
+		super(resolvedPath, eleventyConfig);
 
 		if (!extensionMap) {
 			throw new Error("Expected `extensionMap` in TemplateLayout constructor.");
@@ -28,7 +57,6 @@ class TemplateLayout extends TemplateContent {
 		this.key = resolver.getNormalizedLayoutKey();
 		this.dataKeyLayoutPath = key;
 		this.inputPath = resolvedPath;
-		this.inputDir = inputDir;
 	}
 
 	getKey() {
@@ -47,84 +75,83 @@ class TemplateLayout extends TemplateContent {
 		return TemplatePath.join(inputDir, key);
 	}
 
-	static getTemplate(key, inputDir, eleventyConfig, extensionMap) {
+	static getTemplate(key, eleventyConfig, extensionMap) {
 		let config = eleventyConfig.getConfig();
 		if (!config.useTemplateCache) {
-			return new TemplateLayout(key, inputDir, extensionMap, eleventyConfig);
+			return new TemplateLayout(key, extensionMap, eleventyConfig);
 		}
 
+		let inputDir = eleventyConfig.directories.input;
 		let fullKey = TemplateLayout.resolveFullKey(key, inputDir);
-		if (!templateCache.has(fullKey)) {
-			let layout = new TemplateLayout(key, inputDir, extensionMap, eleventyConfig);
+		if (!layoutCache.has(fullKey)) {
+			let layout = new TemplateLayout(key, extensionMap, eleventyConfig);
 
-			templateCache.add(layout);
-			debugDev("Added %o to TemplateCache", key);
+			layoutCache.add(layout);
 
 			return layout;
 		}
 
-		return templateCache.get(fullKey);
+		return layoutCache.get(fullKey);
 	}
 
 	async getTemplateLayoutMapEntry() {
+		let { data: frontMatterData } = await this.getFrontMatterData();
 		return {
 			// Used by `TemplateLayout.getTemplate()`
 			key: this.dataKeyLayoutPath,
-			inputDir: this.inputDir,
+
+			inputPath: this.inputPath,
 
 			// used by `this.getData()`
-			frontMatterData: await this.getFrontMatterData(),
+			frontMatterData,
 		};
+	}
+
+	async #getTemplateLayoutMap() {
+		// For both the eleventy.layouts event and cyclical layout chain checking  (e.g., a => b => c => a)
+		let layoutChain = new Set();
+		layoutChain.add(this.inputPath);
+
+		let cfgKey = this.config.keys.layout;
+		let map = [];
+		let mapEntry = await this.getTemplateLayoutMapEntry();
+
+		map.push(mapEntry);
+
+		while (mapEntry.frontMatterData && cfgKey in mapEntry.frontMatterData) {
+			// Layout of the current layout
+			let parentLayoutKey = mapEntry.frontMatterData[cfgKey];
+
+			let layout = TemplateLayout.getTemplate(
+				parentLayoutKey,
+				this.eleventyConfig,
+				this.extensionMap,
+			);
+
+			// Abort if a circular layout chain is detected. Otherwise, we'll time out and run out of memory.
+			if (layoutChain.has(layout.inputPath)) {
+				throw new Error(
+					`Your layouts have a circular reference, starting at ${map[0].key}! The layout at ${layout.inputPath} was specified twice in this layout chain.`,
+				);
+			}
+
+			// Keep track of this layout so we can detect duplicates in subsequent iterations
+			layoutChain.add(layout.inputPath);
+
+			// reassign for next loop
+			mapEntry = await layout.getTemplateLayoutMapEntry();
+
+			map.push(mapEntry);
+		}
+
+		this.layoutChain = Array.from(layoutChain);
+
+		return map;
 	}
 
 	async getTemplateLayoutMap() {
 		if (!this.cachedLayoutMap) {
-			this.cachedLayoutMap = new Promise(async (resolve, reject) => {
-				try {
-					// For both the eleventy.layouts event and cyclical layout chain checking  (e.g., a => b => c => a)
-					let layoutChain = new Set();
-					layoutChain.add(this.inputPath);
-
-					let cfgKey = this.config.keys.layout;
-					let map = [];
-					let mapEntry = await this.getTemplateLayoutMapEntry();
-
-					map.push(mapEntry);
-
-					while (mapEntry.frontMatterData && cfgKey in mapEntry.frontMatterData) {
-						// Layout of the current layout
-						let parentLayoutKey = mapEntry.frontMatterData[cfgKey];
-
-						let layout = TemplateLayout.getTemplate(
-							parentLayoutKey,
-							mapEntry.inputDir,
-							this.eleventyConfig,
-							this.extensionMap,
-						);
-
-						// Abort if a circular layout chain is detected. Otherwise, we'll time out and run out of memory.
-						if (layoutChain.has(layout.inputPath)) {
-							throw new Error(
-								`Your layouts have a circular reference, starting at ${map[0].key}! The layout at ${layout.inputPath} was specified twice in this layout chain.`,
-							);
-						}
-
-						// Keep track of this layout so we can detect duplicates in subsequent iterations
-						layoutChain.add(layout.inputPath);
-
-						// reassign for next loop
-						mapEntry = await layout.getTemplateLayoutMapEntry();
-
-						map.push(mapEntry);
-					}
-
-					this.layoutChain = Array.from(layoutChain);
-
-					resolve(map);
-				} catch (e) {
-					reject(e);
-				}
-			});
+			this.cachedLayoutMap = this.#getTemplateLayoutMap();
 		}
 
 		return this.cachedLayoutMap;
@@ -138,42 +165,37 @@ class TemplateLayout extends TemplateContent {
 		return this.layoutChain;
 	}
 
-	async getData() {
-		if (!this.dataCache) {
-			this.dataCache = new Promise(async (resolve, reject) => {
-				try {
-					let map = await this.getTemplateLayoutMap();
-					let dataToMerge = [];
-					for (let j = map.length - 1; j >= 0; j--) {
-						dataToMerge.push(map[j].frontMatterData);
-					}
-
-					// Deep merge of layout front matter
-					let data = TemplateData.mergeDeep(this.config, {}, ...dataToMerge);
-					delete data[this.config.keys.layout];
-
-					resolve(data);
-				} catch (e) {
-					reject(e);
-				}
-			});
+	async #getData() {
+		let map = await this.getTemplateLayoutMap();
+		let dataToMerge = [];
+		for (let j = map.length - 1; j >= 0; j--) {
+			dataToMerge.push(map[j].frontMatterData);
 		}
 
-		return this.dataCache;
+		// Deep merge of layout front matter
+		let data = Merge({}, ...dataToMerge);
+		delete data[this.config.keys.layout];
+
+		return data;
+	}
+
+	async getData() {
+		if (!this.#dataCache) {
+			this.#dataCache = this.#getData();
+		}
+
+		return this.#dataCache;
+	}
+
+	async #getCachedCompiledLayoutFunction() {
+		let rawInput = await this.getPreRender();
+		return this.compile(rawInput);
 	}
 
 	// Do only cache this layout’s render function and delegate the rest to the other templates.
 	async getCachedCompiledLayoutFunction() {
 		if (!this.cachedCompiledLayoutFunction) {
-			this.cachedCompiledLayoutFunction = new Promise(async (resolve, reject) => {
-				try {
-					let rawInput = await this.getPreRender();
-					let renderFunction = await this.compile(rawInput);
-					resolve(renderFunction);
-				} catch (e) {
-					reject(e);
-				}
-			});
+			this.cachedCompiledLayoutFunction = this.#getCachedCompiledLayoutFunction();
 		}
 
 		return this.cachedCompiledLayoutFunction;
@@ -185,16 +207,17 @@ class TemplateLayout extends TemplateContent {
 
 		try {
 			fns.push({
+				inputPath: this.inputPath,
+				template: this,
 				render: await this.getCachedCompiledLayoutFunction(),
 			});
 
 			if (layoutMap.length > 1) {
 				let [, /*currentLayout*/ parentLayout] = layoutMap;
-				let { key, inputDir } = parentLayout;
+				let { key } = parentLayout;
 
 				let layoutTemplate = TemplateLayout.getTemplate(
 					key,
-					inputDir,
 					this.eleventyConfig,
 					this.extensionMap,
 				);
@@ -208,8 +231,7 @@ class TemplateLayout extends TemplateContent {
 
 			return fns;
 		} catch (e) {
-			debugDev("Clearing TemplateCache after error.");
-			templateCache.clear();
+			layoutCache.clear();
 			throw e;
 		}
 	}
@@ -221,16 +243,25 @@ class TemplateLayout extends TemplateContent {
 	// Inefficient? We want to compile all the templatelayouts into a single reusable callback?
 	// Trouble: layouts may need data variables present downstream/upstream
 	// This is called from Template->renderPageEntry
-	async renderPageEntry(pageEntry) {
+	async renderLayoutPageEntry(pageEntry) {
+		let pageTemplateSyntax = pageEntry.template?.getEngineNames(
+			pageEntry.data[this.config.keys.engineOverride],
+		);
 		let templateContent = pageEntry.templateContent;
 		let compiledFunctions = await this.getCompiledLayoutFunctions();
-		for (let { render } of compiledFunctions) {
-			let data = {
-				content: templateContent,
-				...pageEntry.data,
-			};
 
-			templateContent = await render(data);
+		for (let { render, template } of compiledFunctions) {
+			await template.asyncTemplateInitialization();
+
+			let layoutTemplateSyntax = template.getEngineNames(); // templateEngineOverride not supported in layouts
+			let cdata = new CdataWrapper(pageTemplateSyntax, layoutTemplateSyntax);
+
+			let data = {
+				...pageEntry.data,
+				// This should come *after* data, so `content` have override `content` props set in data cascade
+				content: cdata.wrap(templateContent),
+			};
+			templateContent = cdata.unwrap(await render(data));
 		}
 
 		// Don’t set `templateContent` on pageEntry because collection items should not have layout markup
@@ -239,8 +270,7 @@ class TemplateLayout extends TemplateContent {
 
 	resetCaches(types) {
 		super.resetCaches(types);
-
-		delete this.dataCache;
+		this.#dataCache = undefined;
 		delete this.layoutChain;
 		delete this.cachedLayoutMap;
 		delete this.cachedCompiledLayoutFunction;

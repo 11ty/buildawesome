@@ -1,32 +1,36 @@
-import { TemplatePath } from "@11ty/eleventy-utils";
+import { TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 
 import TemplateEngine from "./TemplateEngine.js";
-import EleventyBaseError from "../EleventyBaseError.js";
+import BaseError from "../Errors/BaseError.js";
 import getJavaScriptData from "../Util/GetJavaScriptData.js";
-import EventBusUtil from "../Util/EventBusUtil.js";
-import { EleventyImport } from "../Util/Require.js";
+import { DynamicImport } from "../Util/Require.js";
+import { augmentFunction, augmentObject } from "./Util/ContextAugmenter.js";
 
-class JavaScriptTemplateNotDefined extends EleventyBaseError {}
+class JavaScriptTemplateNotDefined extends BaseError {}
 
-class JavaScript extends TemplateEngine {
-	// which data keys to bind to `this` in JavaScript template functions
-	static DATA_KEYS_TO_BIND = ["page", "eleventy"];
-
-	constructor(name, dirs, config) {
-		super(name, dirs, config);
+export default class JavaScript extends TemplateEngine {
+	constructor(name, templateConfig) {
+		super(name, templateConfig);
 		this.instances = {};
 
-		this.cacheable = false;
-
-		EventBusUtil.soloOn("eleventy.resourceModified", (inputPath, usedByDependants = []) => {
+		this.config.events.on("buildawesome#templatemodified", (inputPath, metadata = {}) => {
+			let { usedByDependants, relevantLayouts } = metadata;
 			// Remove from cached instances when modified
-			let instancesToDelete = [TemplatePath.addLeadingDotSlash(inputPath), ...usedByDependants];
+			let instancesToDelete = [
+				inputPath,
+				...(usedByDependants || []),
+				...(relevantLayouts || []),
+			].map((entry) => TemplatePath.addLeadingDotSlash(entry));
 			for (let inputPath of instancesToDelete) {
 				if (inputPath in this.instances) {
 					delete this.instances[inputPath];
 				}
 			}
 		});
+	}
+
+	get cacheable() {
+		return false;
 	}
 
 	normalize(result) {
@@ -40,39 +44,83 @@ class JavaScript extends TemplateEngine {
 	// String, Buffer, Promise
 	// Function, Class
 	// Object
+	// Module
 	_getInstance(mod) {
 		let noop = function () {
 			return "";
 		};
 
+		let originalModData = mod?.data;
+
+		if (typeof mod === "object" && mod.default && this.eleventyConfig.getIsProjectUsingEsm()) {
+			mod = mod.default;
+		}
+
 		if (typeof mod === "string" || mod instanceof Buffer || mod.then) {
 			return { render: () => mod };
 		} else if (typeof mod === "function") {
-			if (mod.prototype && ("data" in mod.prototype || "render" in mod.prototype)) {
+			if (mod.prototype?.data || mod.prototype?.render) {
 				if (!("render" in mod.prototype)) {
 					mod.prototype.render = noop;
 				}
+
+				if (!("data" in mod.prototype) && !mod.data && originalModData) {
+					mod.prototype.data = originalModData;
+				}
+
 				return new mod();
 			} else {
+				// JavaScript lol
+				if (mod.toString().trimStart().startsWith("class ")) {
+					// we already know that mod.prototype.data and mod.prototype.render do not exist (per above)
+					// now we look for instance properties for `data` or `render`, issue #1645
+					let modInstance = new mod();
+					if (Object.hasOwn(modInstance, "data") || Object.hasOwn(modInstance, "render")) {
+						if (!Object.hasOwn(modInstance, "render")) {
+							mod.prototype.render = noop;
+						}
+
+						if (!Object.hasOwn(modInstance, "data") && !mod.data && originalModData) {
+							mod.prototype.data = originalModData;
+						}
+
+						return modInstance;
+					} else {
+						throw new Error(
+							"Invalid class signature for an 11ty.js template: needs a render or data instance property.",
+						);
+					}
+				}
+
 				return {
+					...(originalModData ? { data: originalModData } : undefined),
 					render: mod,
 				};
 			}
 		} else if ("data" in mod || "render" in mod) {
-			if (!("render" in mod)) {
+			if (!mod.render) {
 				mod.render = noop;
+			}
+			if (!mod.data && originalModData) {
+				mod.data = originalModData;
 			}
 			return mod;
 		}
 	}
 
-	async getInstanceFromInputPath(inputPath) {
-		if (this.instances[inputPath]) {
-			return this.instances[inputPath];
+	async #getInstanceFromInputPath(inputPath) {
+		let mod;
+		let relativeInputPath =
+			this.eleventyConfig.directories.getInputPathRelativeToInputDirectory(inputPath);
+		if (this.eleventyConfig.userConfig.isVirtualTemplate(relativeInputPath)) {
+			mod = this.eleventyConfig.userConfig.virtualTemplates[relativeInputPath].content;
+		} else {
+			let isEsm = this.eleventyConfig.getIsProjectUsingEsm();
+			let cacheBust = !this.cacheable || !this.config.useTemplateCache;
+			mod = await DynamicImport(inputPath, isEsm ? "esm" : "cjs", {
+				cacheBust,
+			});
 		}
-
-		let isEsm = this.eleventyConfig.getIsProjectUsingEsm();
-		const mod = await EleventyImport(inputPath, isEsm ? "esm" : "cjs");
 
 		let inst = this._getInstance(mod);
 		if (inst) {
@@ -85,6 +133,14 @@ class JavaScript extends TemplateEngine {
 		return inst;
 	}
 
+	async getInstanceFromInputPath(inputPath) {
+		if (!this.instances[inputPath]) {
+			this.instances[inputPath] = this.#getInstanceFromInputPath(inputPath);
+		}
+
+		return this.instances[inputPath];
+	}
+
 	/**
 	 * JavaScript files defer to the module loader rather than read the files to strings
 	 *
@@ -92,6 +148,15 @@ class JavaScript extends TemplateEngine {
 	 */
 	needsToReadFileContents() {
 		return false;
+	}
+
+	/**
+	 * Use the module loader directly
+	 *
+	 * @override
+	 */
+	useJavaScriptImport() {
+		return true;
 	}
 
 	async getExtraDataFromFile(inputPath) {
@@ -105,26 +170,59 @@ class JavaScript extends TemplateEngine {
 
 		for (let key in configFns) {
 			// prefer pre-existing `page` javascriptFunction, if one exists
-			if (key === "page") {
-				// do nothing
-			} else {
-				// note: wrapping creates a new function
-				fns[key] = JavaScript.wrapJavaScriptFunction(inst, configFns[key]);
-			}
+			fns[key] = augmentFunction(configFns[key], {
+				source: inst,
+				overwrite: false,
+			});
 		}
 		return fns;
 	}
 
+	// Backwards compat
 	static wrapJavaScriptFunction(inst, fn) {
-		return function (...args) {
-			for (let key of JavaScript.DATA_KEYS_TO_BIND) {
-				if (inst && inst[key]) {
-					this[key] = inst[key];
-				}
+		// TODO ArgumentHelper.wrapFilter(fn);
+		return augmentFunction(fn, {
+			source: inst,
+		});
+	}
+
+	addExportsToBundles(inst, url) {
+		let cfg = this.eleventyConfig.userConfig;
+		if (!("getBundleManagers" in cfg)) {
+			return;
+		}
+
+		let managers = cfg.getBundleManagers();
+		for (let name in managers) {
+			let mgr = managers[name];
+			let key = mgr.getBundleExportKey();
+			if (!key) {
+				continue;
 			}
 
-			return fn.call(this, ...args);
-		};
+			if (typeof inst[key] === "string") {
+				// export const css = ``;
+				mgr.addToPage(url, inst[key]);
+			} else if (isPlainObject(inst[key])) {
+				if (typeof inst[key][name] === "string") {
+					// Object with bundle names:
+					// export const bundle = {
+					//   css: ``
+					// };
+					mgr.addToPage(url, inst[key][name]);
+				} else if (isPlainObject(inst[key][name])) {
+					// Object with bucket names:
+					// export const bundle = {
+					//   css: {
+					//     default: ``
+					//   }
+					// };
+					for (let bucketName in inst[key][name]) {
+						mgr.addToPage(url, inst[key][name][bucketName], bucketName);
+					}
+				}
+			}
+		}
 	}
 
 	async compile(str, inputPath) {
@@ -137,23 +235,25 @@ class JavaScript extends TemplateEngine {
 			inst = await this.getInstanceFromInputPath(inputPath);
 		}
 
-		if (inst && "render" in inst) {
-			return function (data) {
+		if (inst?.render) {
+			return (data = {}) => {
 				// TODO does this do anything meaningful for non-classes?
 				// `inst` should have a normalized `render` function from _getInstance
 
-				for (let key of JavaScript.DATA_KEYS_TO_BIND) {
-					if (!inst[key] && data[key]) {
-						// only blow away existing inst.page if it has a page.url
-						if (key !== "page" || !inst.page || inst.page.url) {
-							inst[key] = data[key];
-						}
-					}
+				// Map exports to bundles
+				if (data.page?.url) {
+					this.addExportsToBundles(inst, data.page.url);
 				}
+
+				augmentObject(inst, {
+					source: data,
+					overwrite: false,
+				});
+
 				Object.assign(inst, this.getJavaScriptFunctions(inst));
 
 				return this.normalize(inst.render.call(inst, data));
-			}.bind(this);
+			};
 		}
 	}
 
@@ -161,5 +261,3 @@ class JavaScript extends TemplateEngine {
 		return true;
 	}
 }
-
-export default JavaScript;

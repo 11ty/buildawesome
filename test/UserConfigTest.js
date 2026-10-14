@@ -1,32 +1,33 @@
 import test from "ava";
 import UserConfig from "../src/UserConfig.js";
+import memoize from "../src/Util/MemoizeFunction.js";
 
 test("Template Formats", (t) => {
   let userCfg = new UserConfig();
 
-  t.falsy(userCfg.getMergingConfigObject().templateFormats);
+  t.falsy(userCfg.templateFormats);
 
   userCfg.setTemplateFormats("njk,liquid");
-  t.deepEqual(userCfg.getMergingConfigObject().templateFormats, ["njk", "liquid"]);
+  t.deepEqual(userCfg.templateFormats, "njk,liquid");
 
   // setting multiple times takes the last one
   userCfg.setTemplateFormats("njk,liquid,pug");
   userCfg.setTemplateFormats("njk,liquid");
-  t.deepEqual(userCfg.getMergingConfigObject().templateFormats, ["njk", "liquid"]);
+  t.deepEqual(userCfg.templateFormats, "njk,liquid");
 });
 
 test("Template Formats (Arrays)", (t) => {
   let userCfg = new UserConfig();
 
-  t.falsy(userCfg.getMergingConfigObject().templateFormats);
+  t.falsy(userCfg.templateFormats);
 
   userCfg.setTemplateFormats(["njk", "liquid"]);
-  t.deepEqual(userCfg.getMergingConfigObject().templateFormats, ["njk", "liquid"]);
+  t.deepEqual(userCfg.templateFormats, ["njk", "liquid"]);
 
   // setting multiple times takes the last one
   userCfg.setTemplateFormats(["njk", "liquid", "pug"]);
   userCfg.setTemplateFormats(["njk", "liquid"]);
-  t.deepEqual(userCfg.getMergingConfigObject().templateFormats, ["njk", "liquid"]);
+  t.deepEqual(userCfg.templateFormats, ["njk", "liquid"]);
 });
 
 // more in TemplateConfigTest.js
@@ -144,7 +145,7 @@ test("Set manual Pass-through File Copy (glob patterns)", (t) => {
 test("Set Template Formats (string)", (t) => {
   let userCfg = new UserConfig();
   userCfg.setTemplateFormats("njk, liquid");
-  t.deepEqual(userCfg.templateFormats, ["njk", "liquid"]);
+  t.deepEqual(userCfg.templateFormats, "njk, liquid");
 });
 
 test("Set Template Formats (array)", (t) => {
@@ -156,13 +157,13 @@ test("Set Template Formats (array)", (t) => {
 test("Set Template Formats (js passthrough copy)", (t) => {
   let userCfg = new UserConfig();
   userCfg.setTemplateFormats("njk, liquid, js");
-  t.deepEqual(userCfg.templateFormats, ["njk", "liquid", "js"]);
+  t.deepEqual(userCfg.templateFormats, "njk, liquid, js");
 });
 
 test("Set Template Formats (11ty.js)", (t) => {
   let userCfg = new UserConfig();
   userCfg.setTemplateFormats("njk, liquid, 11ty.js");
-  t.deepEqual(userCfg.templateFormats, ["njk", "liquid", "11ty.js"]);
+  t.deepEqual(userCfg.templateFormats, "njk, liquid, 11ty.js");
 });
 
 test("Add Template Formats", (t) => {
@@ -173,4 +174,99 @@ test("Add Template Formats", (t) => {
   userCfg.addTemplateFormats("11ty.js");
 
   t.deepEqual(userCfg.templateFormatsAdded.sort(), ["11ty.js", "liquid", "njk", "webc"]);
+});
+
+test("Resolve plugin", async (t) => {
+  let userConfig = new UserConfig();
+  let plugin = await userConfig.resolvePlugin("@11ty/eleventy/html-base-plugin");
+  t.truthy(typeof plugin === "function")
+});
+
+test("Resolve plugin (invalid)", async (t) => {
+  let userConfig = new UserConfig();
+  let e = await t.throwsAsync(async() => {
+    await userConfig.resolvePlugin("@11ty/eleventy/does-not-exist");
+  });
+  t.truthy(e.message.startsWith(`Invalid name "@11ty/eleventy/does-not-exist" passed to resolvePlugin.`));
+});
+
+test("Memoize filters (control)", (t) => {
+  let userCfg = new UserConfig();
+  let count = 0;
+  userCfg.addFilter("increment", (num) => {
+    count += num;
+  });
+
+  let increment = userCfg.getFilter("increment");
+  increment(3);
+
+  t.is(count, 3);
+
+  increment(3);
+  t.is(count, 6);
+});
+
+test("Memoize filters (memoized)", (t) => {
+  let userCfg = new UserConfig();
+  let count = 0;
+  userCfg.addFilter("increment", memoize((num) => {
+    count += num;
+  }));
+
+  let increment = userCfg.getFilter("increment");
+
+  increment(1);
+  increment(1);
+  increment(1);
+  t.is(count, 1);
+
+  increment(2);
+  increment(2);
+  increment(2);
+  t.is(count, 3);
+
+  increment(3);
+  increment(3);
+  increment(3);
+  increment(3);
+  t.is(count, 6);
+});
+
+test("Memoize async filters (memoized)", async (t) => {
+  let userCfg = new UserConfig();
+  let count = 0;
+
+  userCfg.addFilter("increment", memoize(async (num) => {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        count += num;
+        resolve(count);
+      }, 50);
+    });
+  }));
+
+  let increment = userCfg.getFilter("increment");
+  await increment(1);
+  await increment(1);
+  await increment(1);
+  t.is(count, 1);
+
+  await increment(2);
+  await increment(2);
+  await increment(2);
+  t.is(count, 3);
+
+  await increment(3);
+  await increment(3);
+  await increment(3);
+  await increment(3);
+  t.is(count, 6);
+});
+
+// JavaScript functions are included here for backwards compatibility https://github.com/11ty/eleventy/issues/3365
+test("addJavaScriptFunction feeds into `getFilter` #3365", (t) => {
+  let userCfg = new UserConfig();
+  userCfg.addJavaScriptFunction("increment", num => num++);
+
+  t.is(typeof userCfg.getFilter("increment"), "function");
 });

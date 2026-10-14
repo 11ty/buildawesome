@@ -1,0 +1,20 @@
+---
+venues:
+  - id: 1
+    name: first
+  - id: 2
+    name: second
+  - id: 3
+    name: third
+randommetadata: "woopers"
+pagination:
+  data: venues
+  size: 1
+  alias: venue
+eleventyComputed:
+  title: "website - {{ venue.name }}"
+---
+
+{{ venue.name }}
+
+{{ randommetadata }}

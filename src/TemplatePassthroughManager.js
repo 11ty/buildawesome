@@ -1,74 +1,102 @@
-import multimatch from "multimatch";
-import isGlob from "is-glob";
 import { TemplatePath } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
 
-import EleventyExtensionMap from "./EleventyExtensionMap.js";
-import EleventyBaseError from "./EleventyBaseError.js";
+import BaseError from "./Errors/BaseError.js";
 import TemplatePassthrough from "./TemplatePassthrough.js";
 import checkPassthroughCopyBehavior from "./Util/PassthroughCopyBehaviorCheck.js";
+import { isGlobMatch, isDynamicPattern } from "./Util/GlobMatcher.js";
+import { createDebug } from "./Util/DebugLogUtil.js";
 
-const debug = debugUtil("Eleventy:TemplatePassthroughManager");
-const debugDev = debugUtil("Dev:Eleventy:TemplatePassthroughManager");
+const debug = createDebug("TemplatePassthroughManager");
 
-class TemplatePassthroughManagerConfigError extends EleventyBaseError {}
-class TemplatePassthroughManagerCopyError extends EleventyBaseError {}
+class TemplatePassthroughManagerCopyError extends BaseError {}
 
 class TemplatePassthroughManager {
-	constructor(eleventyConfig) {
-		if (!eleventyConfig) {
-			throw new TemplatePassthroughManagerConfigError("Missing `config` argument.");
+	#isDryRun = false;
+	#afterBuild;
+	#queue = new Map();
+	#extensionMap;
+
+	constructor(templateConfig) {
+		if (!templateConfig || templateConfig.constructor.name !== "TemplateConfig") {
+			throw new Error("Internal error: Missing or invalid `templateConfig` argument.");
 		}
-		this.eleventyConfig = eleventyConfig;
-		this.config = eleventyConfig.getConfig();
+
+		this.templateConfig = templateConfig;
+		this.config = templateConfig.getConfig();
+
+		// eleventy# event listeners are removed on each build
+		this.config.events.on("buildawesome#copy", ({ source, target, options }) => {
+			this.enqueueCopy(source, target, options);
+		});
+
+		this.config.events.on("buildawesome#beforerender", () => {
+			this.#afterBuild = Promise.withResolvers();
+		});
+
+		this.config.events.on("buildawesome#render", () => {
+			let { resolve } = this.#afterBuild;
+			resolve();
+		});
+
 		this.reset();
 	}
 
 	reset() {
 		this.count = 0;
+		this.size = 0;
 		this.conflictMap = {};
-		this.incrementalFile = null;
-		debug("Resetting counts to 0");
+		this.incrementalFiles = [];
+
+		this.#queue = new Map();
 	}
 
 	set extensionMap(extensionMap) {
-		this._extensionMap = extensionMap;
+		this.#extensionMap = extensionMap;
 	}
 
 	get extensionMap() {
-		if (!this._extensionMap) {
-			this._extensionMap = new EleventyExtensionMap([], this.eleventyConfig);
+		if (!this.#extensionMap) {
+			throw new Error("Internal error: missing `extensionMap` in TemplatePassthroughManager.");
 		}
-		return this._extensionMap;
+		return this.#extensionMap;
 	}
 
-	setOutputDir(outputDir) {
-		this.outputDir = outputDir;
+	get inputDir() {
+		return this.templateConfig.directories.input;
 	}
 
-	setInputDir(inputDir) {
-		this.inputDir = inputDir;
+	get outputDir() {
+		return this.templateConfig.directories.output;
 	}
 
 	setDryRun(isDryRun) {
-		this.isDryRun = !!isDryRun;
+		this.#isDryRun = Boolean(isDryRun);
 	}
 
 	setRunMode(runMode) {
 		this.runMode = runMode;
 	}
 
-	setIncrementalFile(path) {
-		if (path) {
-			this.incrementalFile = path;
+	setIncrementalFiles(paths) {
+		if (!paths || !Array.isArray(paths)) {
+			return;
 		}
+		this.incrementalFiles = paths;
 	}
 
-	_normalizePaths(path, outputPath, copyOptions = {}) {
+	resetIncremental() {
+		this.incrementalFiles = undefined;
+	}
+
+	#normalizePath(path, outputPath, copyOptions = {}) {
+		let inputPath = TemplatePath.addLeadingDotSlash(path);
+
 		return {
-			inputPath: TemplatePath.addLeadingDotSlash(path),
+			inputPath,
 			outputPath: outputPath ? TemplatePath.stripLeadingDotSlash(outputPath) : true,
 			copyOptions,
+			// eligible if args.length > 1
+			isDynamicPattern: outputPath && isDynamicPattern(inputPath),
 		};
 	}
 
@@ -77,7 +105,7 @@ class TemplatePassthroughManager {
 		let pathsRaw = this.config.passthroughCopies || {};
 		debug("`addPassthroughCopy` config API paths: %o", pathsRaw);
 		for (let [inputPath, { outputPath, copyOptions }] of Object.entries(pathsRaw)) {
-			paths.push(this._normalizePaths(inputPath, outputPath, copyOptions));
+			paths.push(this.#normalizePath(inputPath, outputPath, copyOptions));
 		}
 		debug("`addPassthroughCopy` config API normalized paths: %o", paths);
 		return paths;
@@ -104,16 +132,26 @@ class TemplatePassthroughManager {
 		return this.count;
 	}
 
+	getCopySize() {
+		return this.size;
+	}
+
+	getMetadata() {
+		return {
+			copyCount: this.getCopyCount(),
+			copySize: this.getCopySize(),
+		};
+	}
+
 	setFileSystemSearch(fileSystemSearch) {
 		this.fileSystemSearch = fileSystemSearch;
 	}
 
-	getTemplatePassthroughForPath(path, isIncremental = false) {
-		let inst = new TemplatePassthrough(path, this.outputDir, this.inputDir, this.config);
+	getTemplatePassthroughForPath(path) {
+		let inst = new TemplatePassthrough(path, this.templateConfig);
 
 		inst.setFileSystemSearch(this.fileSystemSearch);
-		inst.setIsIncremental(isIncremental);
-		inst.setDryRun(this.isDryRun);
+		inst.setDryRun(this.#isDryRun);
 		inst.setRunMode(this.runMode);
 
 		return inst;
@@ -139,15 +177,15 @@ class TemplatePassthroughManager {
 
 		// Eventually we’ll want to move all of this to use Node’s fs.cp, which is experimental and only on Node 16+
 
-		return pass
-			.write()
-			.then(({ count, map }) => {
+		return pass.write().then(
+			({ size, count, map }) => {
 				for (let src in map) {
 					let dest = map[src];
 					if (this.conflictMap[dest]) {
 						if (src !== this.conflictMap[dest]) {
+							let paths = [src, this.conflictMap[dest]].sort();
 							throw new TemplatePassthroughManagerCopyError(
-								`Multiple passthrough copy files are trying to write to the same output file (${dest}). ${src} and ${this.conflictMap[dest]}`,
+								`Multiple passthrough copy files are trying to write to the same output file (${TemplatePath.standardizeFilePath(dest)}). ${paths.map((p) => TemplatePath.standardizeFilePath(p)).join(" and ")}`,
 							);
 						} else {
 							// Multiple entries from the same source
@@ -159,8 +197,6 @@ class TemplatePassthroughManager {
 							);
 						}
 					}
-
-					debugDev("Adding %o to passthrough copy conflict map, from %o", dest, src);
 
 					this.conflictMap[dest] = src;
 				}
@@ -174,7 +210,8 @@ class TemplatePassthroughManager {
 				} else {
 					if (count) {
 						this.count += count;
-						debug("Copied %o (%d files)", inputPath, count || 0);
+						this.size += size;
+						debug("Copied %o (%d files, %d size)", inputPath, count || 0, size || 0);
 					} else {
 						debug("Skipped copying %o (emulated passthrough copy)", inputPath);
 					}
@@ -184,48 +221,71 @@ class TemplatePassthroughManager {
 					count,
 					map,
 				};
-			})
-			.catch(function (e) {
+			},
+			function (e) {
 				return Promise.reject(
 					new TemplatePassthroughManagerCopyError(`Having trouble copying '${inputPath}'`, e),
 				);
-			});
+			},
+		);
 	}
 
-	isPassthroughCopyFile(paths, changedFile) {
-		// passthrough copy by non-matching engine extension (via templateFormats)
-		for (let path of paths) {
-			if (path === changedFile && !this.extensionMap.hasEngine(path)) {
-				return true;
-			}
+	filterToPassthroughCopyFilesOnly(eligiblePaths, changedFiles) {
+		if (!changedFiles) {
+			return [];
 		}
 
-		for (let path of this.getConfigPaths()) {
-			if (TemplatePath.startsWithSubPath(changedFile, path.inputPath)) {
-				return path;
-			}
-			if (
-				changedFile &&
-				isGlob(path.inputPath) &&
-				multimatch([changedFile], [path.inputPath]).length
-			) {
-				return path;
-			}
+		if (!Array.isArray(changedFiles)) {
+			changedFiles = [changedFiles];
 		}
 
-		return false;
-	}
+		let configPaths = this.getConfigPaths();
+		let matchedConfigPaths = new Set();
 
-	getAllNormalizedPaths(paths) {
-		if (this.incrementalFile) {
-			let isPassthrough = this.isPassthroughCopyFile(paths, this.incrementalFile);
-
-			if (isPassthrough) {
-				if (isPassthrough.outputPath) {
-					return [this._normalizePaths(this.incrementalFile, isPassthrough.outputPath)];
+		return changedFiles
+			.map((changedFilePath) => {
+				// passthrough copy by non-matching engine extension (via templateFormats)
+				if (
+					eligiblePaths.includes(changedFilePath) &&
+					!this.extensionMap.hasEngine(changedFilePath)
+				) {
+					return changedFilePath;
 				}
 
-				return [this._normalizePaths(this.incrementalFile)];
+				let eligibleConfigPath = configPaths.find((configPath) => {
+					if (TemplatePath.startsWithSubPath(changedFilePath, configPath.inputPath)) {
+						return true;
+					}
+					if (configPath.isDynamicPattern && isGlobMatch(changedFilePath, [configPath.inputPath])) {
+						return true;
+					}
+				});
+
+				// importantly: returns config path, not changed file path
+				if (eligibleConfigPath && !matchedConfigPaths.has(eligibleConfigPath.inputPath)) {
+					matchedConfigPaths.add(eligibleConfigPath.inputPath);
+					return eligibleConfigPath;
+				}
+
+				return false;
+			})
+			.filter(Boolean);
+	}
+
+	getAllNormalizedPaths(paths = []) {
+		if (Array.isArray(this.incrementalFiles) && this.incrementalFiles.length > 0) {
+			let passthroughIncrementalFiles = this.filterToPassthroughCopyFilesOnly(
+				paths,
+				this.incrementalFiles,
+			);
+			if (passthroughIncrementalFiles.length > 0) {
+				return passthroughIncrementalFiles.map((file) => {
+					if (file.outputPath) {
+						return file;
+					}
+
+					return this.#normalizePath(file);
+				});
 			}
 
 			// Fixes https://github.com/11ty/eleventy/issues/2491
@@ -241,10 +301,10 @@ class TemplatePassthroughManager {
 			}
 		}
 
-		if (paths && paths.length) {
+		if (paths?.length) {
 			let passthroughPaths = this.getNonTemplatePaths(paths);
 			for (let path of passthroughPaths) {
-				let normalizedPath = this._normalizePaths(path);
+				let normalizedPath = this.#normalizePath(path);
 
 				debug(
 					`TemplatePassthrough copying from non-matching file extension: ${normalizedPath.inputPath}`,
@@ -264,34 +324,63 @@ class TemplatePassthroughManager {
 		for (let entry of result) {
 			for (let src in entry.map) {
 				let dest = TemplatePath.stripLeadingSubPath(entry.map[src], this.outputDir);
-				entries["/" + dest] = src;
+				entries["/" + encodeURI(dest)] = src;
 			}
 		}
 		return entries;
 	}
 
-	// Performance note: these can actually take a fair bit of time, but aren’t a
-	// bottleneck to eleventy. The copies are performed asynchronously and don’t affect eleventy
-	// write times in a significant way.
+	async #waitForTemplatesRendered() {
+		if (!this.#afterBuild) {
+			return Promise.resolve(); // immediately resolve
+		}
+
+		let { promise } = this.#afterBuild;
+		return promise;
+	}
+
+	enqueueCopy(source, target, copyOptions) {
+		let key = `${source}=>${target}`;
+
+		// light de-dupe the same source/target combo (might be in the same file, might be viaTransforms)
+		if (this.#queue.has(key)) {
+			return;
+		}
+
+		let passthrough = TemplatePassthrough.factory(source, target, {
+			templateConfig: this.templateConfig,
+			copyOptions,
+		});
+
+		passthrough.setCheckSourceDirectory(true);
+		passthrough.setIsAlreadyNormalized(true);
+		passthrough.setRunMode(this.runMode);
+		passthrough.setDryRun(this.#isDryRun);
+
+		this.#queue.set(key, this.copyPassthrough(passthrough));
+	}
+
 	async copyAll(templateExtensionPaths) {
 		debug("TemplatePassthrough copy started.");
 		let normalizedPaths = this.getAllNormalizedPaths(templateExtensionPaths);
 
-		let passthroughs = normalizedPaths.map((path) => {
-			// if incrementalFile is set but it isn’t a passthrough copy, normalizedPaths will be an empty array
-			let isIncremental = !!this.incrementalFile;
-
-			return this.getTemplatePassthroughForPath(path, isIncremental);
-		});
+		let passthroughs = normalizedPaths.map((path) => this.getTemplatePassthroughForPath(path));
 
 		let promises = passthroughs.map((pass) => this.copyPassthrough(pass));
+
+		await this.#waitForTemplatesRendered();
+
+		for (let [key, afterBuildCopyPromises] of this.#queue) {
+			promises.push(afterBuildCopyPromises);
+		}
+
 		return Promise.all(promises).then(async (results) => {
 			let aliases = this.getAliasesFromPassthroughResults(results);
-			await this.config.events.emit("eleventy.passthrough", {
+			await this.config.events.emit("buildawesome.passthrough", {
 				map: aliases,
 			});
 
-			debug(`TemplatePassthrough copy finished. Current count: ${this.count}`);
+			debug(`TemplatePassthrough copy finished. Current count: ${this.count} (size: ${this.size})`);
 			return results;
 		});
 	}

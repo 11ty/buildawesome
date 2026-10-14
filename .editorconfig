@@ -10,6 +10,9 @@ charset = utf-8
 [*.yml]
 indent_style = space
 
+[/test/**/*]
+indent_style = space
+
 [/test/stubs*/**]
 insert_final_newline = false
 trim_trailing_whitespace = false

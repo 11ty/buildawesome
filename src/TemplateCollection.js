@@ -1,22 +1,52 @@
-import multimatch from "multimatch";
 import { TemplatePath } from "@11ty/eleventy-utils";
 
-import Sortable from "./Util/Sortable.js";
-import TemplateData from "./TemplateData.js";
+import TemplateData from "./Data/TemplateData.js";
+import Sortable from "./Util/Objects/Sortable.js";
+import { isGlobMatch } from "./Util/GlobMatcher.js";
 
-class TemplateCollection extends Sortable {
-	constructor() {
-		super();
+export default class TemplateCollection extends Sortable {
+	// Sorted items, tag index, and glob matches, reset by `add`, the only entry point that mutates `items`
+	#cache = {};
 
-		this._filteredByGlobsCache = new Map();
+	add(item) {
+		this.#cache = {};
+		super.add(item);
 	}
 
 	getAll() {
 		return this.items.slice();
 	}
 
+	#getAllSorted() {
+		this.#cache.sorted ??= this.sort(Sortable.sortFunctionDateInputPath);
+		return this.#cache.sorted;
+	}
+
+	// Tag name to items (in sorted order), so tag lookups don’t walk the full collection
+	#getTagIndex() {
+		if (!this.#cache.tags) {
+			let index = new Map();
+
+			for (let item of this.#getAllSorted()) {
+				for (let tagName of TemplateData.getIncludedTagNames(item.data)) {
+					let tagItems = index.get(tagName);
+					if (!tagItems) {
+						tagItems = [];
+						index.set(tagName, tagItems);
+					}
+					tagItems.push(item);
+				}
+			}
+
+			this.#cache.tags = index;
+		}
+
+		return this.#cache.tags;
+	}
+
 	getAllSorted() {
-		return this.sort(Sortable.sortFunctionDateInputPath);
+		// Callers sort and reverse the result in place, so hand out a copy
+		return this.#getAllSorted().slice();
 	}
 
 	getSortedByDate() {
@@ -36,50 +66,41 @@ class TemplateCollection extends Sortable {
 	getFilteredByGlob(globs) {
 		globs = this.getGlobs(globs);
 
+		this.#cache.globs ??= new Map();
+
 		let key = globs.join("::");
-		if (!this._dirty) {
-			// Try to find a pre-sorted list and clone it.
-			if (this._filteredByGlobsCache.has(key)) {
-				return [...this._filteredByGlobsCache.get(key)];
-			}
-		} else if (this._filteredByGlobsCache.size) {
-			// Blow away cache
-			this._filteredByGlobsCache = new Map();
+		if (!this.#cache.globs.has(key)) {
+			let filtered = this.#getAllSorted().filter((item) => isGlobMatch(item.inputPath, globs));
+			this.#cache.globs.set(key, filtered);
 		}
 
-		let filtered = this.getAllSorted().filter((item) => {
-			if (multimatch([item.inputPath], globs).length) {
-				return true;
-			}
-
-			return false;
-		});
-		this._dirty = false;
-		this._filteredByGlobsCache.set(key, [...filtered]);
-		return filtered;
+		return this.#cache.globs.get(key).slice();
 	}
 
 	getFilteredByTag(tagName) {
-		return this.getAllSorted().filter((item) => {
-			if (!tagName || TemplateData.getIncludedTagNames(item.data).includes(tagName)) {
-				return true;
-			}
-			return false;
-		});
+		if (!tagName) {
+			return this.getAllSorted();
+		}
+
+		return this.#getTagIndex().get(tagName)?.slice() || [];
 	}
 
 	getFilteredByTags(...tags) {
-		return this.getAllSorted().filter((item) => {
-			let itemTags = TemplateData.getIncludedTagNames(item.data);
-			return tags.every((requiredTag) => {
-				if (Array.isArray(itemTags)) {
-					return itemTags.includes(requiredTag);
-				} else {
-					return itemTags === requiredTag;
-				}
-			});
+		if (!tags.length) {
+			return this.getAllSorted();
+		}
+
+		let index = this.#getTagIndex();
+		let [firstTag, ...remainingTags] = tags;
+		let matches = index.get(firstTag) || [];
+		if (!remainingTags.length) {
+			return matches.slice();
+		}
+
+		// Intersect the first tag’s matches with the remaining tags
+		let remainingItems = remainingTags.map((tagName) => new Set(index.get(tagName)));
+		return matches.filter((item) => {
+			return remainingItems.every((tagItems) => tagItems.has(item));
 		});
 	}
 }
-
-export default TemplateCollection;

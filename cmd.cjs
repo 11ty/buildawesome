@@ -4,30 +4,55 @@
 // as possible with error messaging to folks on older runtimes.
 
 const pkg = require("./package.json");
-require("please-upgrade-node")(pkg, {
+require("@11ty/node-version-check")(pkg, {
 	message: function (requiredVersion) {
 		return (
-			"Eleventy " +
+			"Build Awesome (Eleventy) " +
 			pkg.version +
 			" requires Node " +
 			requiredVersion +
-			". You will need to upgrade Node to use Eleventy!"
+			". You will need to upgrade Node!"
 		);
 	},
 });
 
-const debug = require("debug")("Eleventy:cmd");
+const minimist = require("minimist");
 
-(async function () {
-	const { default: EleventyErrorHandler } = await import("./src/EleventyErrorHandler.js");
-	const { default: EleventyBaseError } = await import("./src/EleventyBaseError.js");
+class SimpleError extends Error {
+	constructor(...args) {
+		super(...args);
+		this.skipOriginalStack = true;
+	}
+}
 
-	class EleventyCommandCheckError extends EleventyBaseError {}
+async function exec() {
+	const { createDebug } = await import("./src/Util/DebugLogUtil.js");
+	const debug = createDebug("CLI");
+
+	// Notes about friendly error messaging with outdated Node versions: https://github.com/11ty/buildawesome/issues/3761
+	const { ErrorHandler } = await import("./src/Errors/ErrorHandler.js");
+	const { getEnvValue } = await import("./src/Util/EnvironmentVars.cjs");
+	const { default: ConsoleLogger } = await import("./src/Util/ConsoleLogger.js");
+
+	// Defensive use of Node 22.8+ Module Compile Cache
+	if(!getEnvValue("SKIP_NODE_COMPILE_CACHE")) {
+		try {
+			const nodeMod = await import('node:module').then(mod => mod.default);
+			nodeMod.enableCompileCache?.();
+		} catch(e) {
+			debug("Node compile cache error (ignored: optional API) %o", e);
+		}
+	}
 
 	try {
-		let errorHandler = new EleventyErrorHandler();
-		const argv = require("minimist")(process.argv.slice(2), {
-			string: ["input", "output", "formats", "config", "pathprefix", "port", "to"],
+		function getFallbackErrorHandler() {
+			let handler = new ErrorHandler();
+			handler.logger = new ConsoleLogger();
+			return handler;
+		}
+
+		const argv = minimist(process.argv.slice(2), {
+			string: ["input", "output", "formats", "config", "pathprefix", "port", "to", "incremental", "loader", "events-file"],
 			boolean: [
 				"quiet",
 				"version",
@@ -35,111 +60,137 @@ const debug = require("debug")("Eleventy:cmd");
 				"dryrun",
 				"help",
 				"serve",
-				"incremental",
 				"ignore-initial",
 			],
 			default: {
 				quiet: null,
 				"ignore-initial": false,
+				"to": "fs",
 			},
 			unknown: function (unknownArgument) {
-				throw new EleventyCommandCheckError(
+				throw new Error(
 					`We don’t know what '${unknownArgument}' is. Use --help to see the list of supported commands.`,
 				);
 			},
 		});
 
-		debug("command: eleventy %o", argv);
-		const { Eleventy } = await import("./src/Eleventy.js");
+		debug("Arguments: %o", argv);
+		const { default: Core } = await import("./src/Core.js");
+
+		let handler = getFallbackErrorHandler();
 
 		process.on("unhandledRejection", (error, promise) => {
-			errorHandler.fatal(error, "Unhandled rejection in promise");
+			handler.fatal(error, "Unhandled rejection in promise");
 		});
 		process.on("uncaughtException", (error) => {
-			errorHandler.fatal(error, "Uncaught exception");
+			handler.fatal(error, "Uncaught exception");
 		});
 		process.on("rejectionHandled", (promise) => {
-			errorHandler.warn(promise, "A promise rejection was handled asynchronously");
+			handler.warn(promise, "A promise rejection was handled asynchronously");
 		});
 
 		if (argv.version) {
-			console.log(Eleventy.getVersion());
+			console.log(Core.getVersion());
+			return;
 		} else if (argv.help) {
-			console.log(Eleventy.getHelp());
-		} else {
-			let elev = new Eleventy(argv.input, argv.output, {
-				source: "cli",
-				// --quiet and --quiet=true both resolve to true
-				quietMode: argv.quiet,
-				configPath: argv.config,
-				pathPrefix: argv.pathprefix,
-				runMode: argv.serve ? "serve" : argv.watch ? "watch" : "build",
-				dryRun: argv.dryrun,
-			});
-
-			// reuse ErrorHandler instance in Eleventy
-			errorHandler = elev.errorHandler;
-
-			// careful, we can’t use async/await here to error properly
-			// with old node versions in `please-upgrade-node` above.
-			elev
-				.init()
-				.then(function () {
-					if (argv.to === "json" || argv.to === "ndjson") {
-						// override logging output
-						elev.setIsVerbose(false);
-					}
-
-					elev.setIgnoreInitial(argv["ignore-initial"]);
-					elev.setIncrementalBuild(argv.incremental);
-					elev.setFormats(argv.formats);
-
-					try {
-						if (argv.serve) {
-							let shouldStartServer = true;
-							elev
-								.watch()
-								.catch((e) => {
-									// Build failed but error message already displayed.
-									shouldStartServer = false;
-									// A build error occurred and we aren’t going to --serve
-									errorHandler.fatal(e, "Eleventy CLI Error");
-								})
-								.then(function () {
-									if (shouldStartServer) {
-										elev.serve(argv.port);
-									}
-								});
-						} else if (argv.watch) {
-							elev.watch().catch((e) => {
-								// A build error occurred and we aren’t going to --watch
-								errorHandler.fatal(e, "Eleventy CLI Error");
-							});
-						} else {
-							if (argv.to === "json") {
-								elev.toJSON().then(function (result) {
-									console.log(JSON.stringify(result, null, 2));
-								});
-							} else if (argv.to === "ndjson") {
-								elev.toNDJSON().then(function (stream) {
-									stream.pipe(process.stdout);
-								});
-							} else if (!argv.to || argv.to === "fs") {
-								elev.write();
-							} else {
-								throw new EleventyCommandCheckError(
-									`Invalid --to value: ${argv.to}. Supported values: \`fs\` (default), \`json\`, and \`ndjson\`.`,
-								);
-							}
-						}
-					} catch (e) {
-						errorHandler.fatal(e, "Eleventy CLI Error");
-					}
-				})
-				.catch(errorHandler.fatal.bind(errorHandler));
+			console.log(Core.getHelp());
+			return;
 		}
-	} catch (e) {
-		let errorHandler = new EleventyErrorHandler();
-		errorHandler.fatal(e, "Eleventy CLI Fatal Error");
+
+		let reporter;
+		if ("events-file" in argv) {
+			// Bare flag parses as "", repeated as an array, --no-events-file as false
+			if (typeof argv["events-file"] !== "string" || !argv["events-file"]) {
+				throw new SimpleError(
+					"--events-file requires a single file path, e.g. --events-file=.events.ndjson.",
+				);
+			}
+			const { NdjsonReporter } = await import("./src/Reporters/NdjsonReporter.js");
+			reporter = new NdjsonReporter(argv["events-file"]);
+		}
+
+		let core = new Core(argv.input, argv.output, {
+			source: "cli",
+			// --quiet and --quiet=true both resolve to true
+			quietMode: argv.quiet,
+			configPath: argv.config,
+			pathPrefix: argv.pathprefix,
+			runMode: argv.serve ? "serve" : argv.watch ? "watch" : "build",
+			dryRun: argv.dryrun,
+			loader: argv.loader,
+		});
+
+		// Before init
+		if (reporter) {
+			core.setReporter(reporter);
+		}
+
+		// override with ErrorHandler instance in Core
+		handler = core.errorHandler;
+
+		// Before init
+		core.setFormats(argv.formats);
+
+		await core.init();
+
+		if (argv.to === "json") {
+			// override logging output
+			core.setIsVerbose(false);
+		}
+
+		// Only relevant for watch/serve
+		core.setIgnoreInitial(argv["ignore-initial"]);
+
+		// v4.0.0-alpha.8 multiple now supported via:
+		// --incremental=one.md --incremental=two.md => ["one.md", "two.md"]
+		// --incremental=one.md,two.md => ["one.md", "two.md"]
+		if(argv.incremental) {
+			core.setIncrementalFiles(argv.incremental);
+		} else if(argv.incremental !== undefined) {
+			core.setIncrementalBuild(argv.incremental === "" || argv.incremental);
+		}
+
+		if (argv.serve || argv.watch) {
+			if(argv.to === "json") {
+				throw new SimpleError("--to=json is not compatible with --serve or --watch.");
+			}
+
+			await core.watch();
+
+			if (argv.serve) {
+				// TODO await here?
+				core.serve(argv.port);
+			}
+
+			process.on("SIGINT", async () => {
+				core.interrupt();
+
+				await core.stopWatch();
+				process.exitCode = 0;
+			});
+		} else {
+			// `fs:templates` will skip passthrough copy
+			if (!argv.to || argv.to === "fs" || argv.to.startsWith("fs:")) {
+				await core.write(argv.to);
+			} else if (argv.to === "json") {
+				let result = await core.toJSON()
+				console.log(JSON.stringify(result, null, 2));
+			} else {
+				throw new SimpleError(
+					`Invalid --to value: ${argv.to}. Supported values: \`fs\` (default), \`json\`.`,
+				);
+			}
+		}
+	} catch (error) {
+		if(typeof ErrorHandler !== "undefined") {
+			let handler = getFallbackErrorHandler();
+			handler.fatal(error, "Fatal Error (CLI)");
+		} else {
+			console.error(error);
+			process.exitCode = 1;
+		}
 	}
-})();
+}
+
+// await
+exec();

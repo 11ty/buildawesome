@@ -1,0 +1,1 @@
+{% promo "newsletter" %}

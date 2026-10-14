@@ -1,5 +1,5 @@
 import test from "ava";
-import ComputedDataProxy from "../src/ComputedDataProxy.js";
+import ComputedDataProxy from "../src/Data/ComputedDataProxy.js";
 
 test("Get vars used by function", async (t) => {
   let cd = new ComputedDataProxy(["key1"]);

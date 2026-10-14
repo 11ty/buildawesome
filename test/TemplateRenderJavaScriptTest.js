@@ -1,15 +1,25 @@
 import test from "ava";
 
 import TemplateRender from "../src/TemplateRender.js";
-import TemplateConfig from "../src/TemplateConfig.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import Eleventy from "../src/Core.js";
+import ExtensionMap from "../src/ExtensionMap.js";
+import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
+
+import { getTemplateConfigInstance } from "./_testHelpers.js";
 
 async function getNewTemplateRender(name, inputDir, extendedConfig) {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init(extendedConfig);
+  let eleventyConfig = await getTemplateConfigInstance({
+		dir: {
+			input: inputDir
+		}
+	}, null, extendedConfig);
 
-  let tr = new TemplateRender(name, inputDir, eleventyConfig);
-  tr.extensionMap = new EleventyExtensionMap([], eleventyConfig);
+  eleventyConfig.setProjectUsingEsm(true);
+
+  let tr = new TemplateRender(name, eleventyConfig);
+  tr.extensionMap = new ExtensionMap(eleventyConfig);
+  tr.extensionMap.engineManager = new TemplateEngineManager(eleventyConfig);
+  tr.extensionMap.setFormats([]);
   await tr.init();
 
   return tr;
@@ -293,4 +303,31 @@ test("Class has page property already and keeps it", async (t) => {
   let tr = await getNewTemplateRender("./test/stubs/class-fns-has-page.11ty.cjs");
   let fn = await tr.getCompiledTemplate();
   await fn({ avaTest: t, page: { url: "/hi/" } });
+});
+
+test("File has default function export and another one too, issue #3288", async (t) => {
+  let tr = await getNewTemplateRender("./test/stubs/default-export-and-others.11ty.js");
+  let fn = await tr.getCompiledTemplate();
+  t.is(await fn(), "<h1>hello</h1>")
+});
+
+test("File has default class export and another one too, issue #3359", async (t) => {
+  let elev = new Eleventy("./test/stubs/default-class-export-and-others.11ty.js", "");
+  let results = await elev.toJSON();
+
+  t.is(results[0].content, "<div>hello</div>")
+});
+
+test("File has default function export and another one for data too, issue #3359", async (t) => {
+  let elev = new Eleventy("./test/stubs/default-function-export-and-named-data.11ty.js", "");
+  let results = await elev.toJSON();
+
+  t.is(results[0].content, "<h1>Hello World</h1>")
+});
+
+test("File has default function export and another one for data too, issue #3359 (CommonJS)", async (t) => {
+  let elev = new Eleventy("./test/stubs/default-function-export-and-named-data.11ty.cjs", "");
+  let results = await elev.toJSON();
+
+  t.is(results[0].content, "<h1>Hello World</h1>")
 });

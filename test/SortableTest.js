@@ -1,7 +1,7 @@
 import test from "ava";
 import { DateTime } from "luxon";
 
-import Sortable from "../src/Util/Sortable.js";
+import Sortable from "../src/Util/Objects/Sortable.js";
 
 test("get Sort Function", (t) => {
   let s = new Sortable();

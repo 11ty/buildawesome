@@ -6,7 +6,7 @@ pagination:
   data: collections.userCollection
   size: 1
   alias: item
-permalink: /{{ item.data.title | slug}}/goodbye/
+permalink: /{{ item.data.title | slugify }}/goodbye/
 ---
 
 # {{ title }}

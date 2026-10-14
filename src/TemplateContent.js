@@ -1,44 +1,74 @@
-import os from "node:os";
-import util from "node:util";
-
-import fs from "graceful-fs";
-import normalize from "normalize-path";
-import matter from "gray-matter";
+import { readFileSync } from "node:fs";
+import matter from "@11ty/gray-matter";
 import lodash from "@11ty/lodash-custom";
-import { TemplatePath } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
+import { DeepCopy, TemplatePath } from "@11ty/eleventy-utils";
 
-import EleventyExtensionMap from "./EleventyExtensionMap.js";
-import TemplateData from "./TemplateData.js";
+import JavaScriptFrontMatter from "./Engines/FrontMatter/JavaScript.js";
+import { createDebug } from "./Util/DebugLogUtil.js";
+import { EOL } from "./Util/NewLineAdapter.js";
+import TemplateData from "./Data/TemplateData.js";
 import TemplateRender from "./TemplateRender.js";
-import EleventyBaseError from "./EleventyBaseError.js";
-import EleventyErrorUtil from "./EleventyErrorUtil.js";
+import BaseError from "./Errors/BaseError.js";
+import ErrorUtil from "./Errors/ErrorUtil.js";
 import eventBus from "./EventBus.js";
 
 const { set: lodashSet } = lodash;
-const readFile = util.promisify(fs.readFile);
-const debug = debugUtil("Eleventy:TemplateContent");
-const debugDev = debugUtil("Dev:Eleventy:TemplateContent");
+const debug = createDebug("TemplateContent");
 
-class TemplateContentConfigError extends EleventyBaseError {}
-class TemplateContentFrontMatterError extends EleventyBaseError {}
-class TemplateContentCompileError extends EleventyBaseError {}
-class TemplateContentRenderError extends EleventyBaseError {}
+class TemplateContentFrontMatterError extends BaseError {}
+class TemplateContentCompileError extends BaseError {}
+class TemplateContentRenderError extends BaseError {}
 
 class TemplateContent {
-	constructor(inputPath, inputDir, config) {
-		if (!config) {
-			throw new TemplateContentConfigError("Missing `config` argument to TemplateContent");
-		}
-		this.eleventyConfig = config;
+	// The template render the preprocessor engine was looked up for (engines are recreated with it)
+	#initializedFor;
+	#config;
+	#templateRender;
+	#renderPreprocessorEngine;
+	#extensionMap;
+	#configOptions;
+	#frontMatterOptions;
 
+	constructor(inputPath, templateConfig) {
+		if (!templateConfig || templateConfig.constructor.name !== "TemplateConfig") {
+			throw new Error("Missing or invalid `templateConfig` argument");
+		}
+		this.eleventyConfig = templateConfig;
 		this.inputPath = inputPath;
+	}
 
-		if (inputDir) {
-			this.inputDir = normalize(inputDir);
-		} else {
-			this.inputDir = false;
+	async asyncTemplateInitialization() {
+		if (!this.hasTemplateRender()) {
+			await this.getTemplateRender();
 		}
+
+		if (this.#initializedFor === this.#templateRender) {
+			return;
+		}
+		this.#initializedFor = this.#templateRender;
+		this.#renderPreprocessorEngine = undefined;
+
+		let preprocessorEngineName = this.templateRender.getPreprocessorEngineName();
+		if (preprocessorEngineName && this.templateRender.engine.getName() !== preprocessorEngineName) {
+			let engine = await this.templateRender.getEngineByName(preprocessorEngineName);
+			this.#renderPreprocessorEngine = engine;
+		}
+	}
+
+	resetCachedTemplate({ eleventyConfig }) {
+		this.eleventyConfig = eleventyConfig;
+	}
+
+	get dirs() {
+		return this.eleventyConfig.directories;
+	}
+
+	get inputDir() {
+		return this.dirs.input;
+	}
+
+	get outputDir() {
+		return this.dirs.output;
 	}
 
 	getResetTypes(types) {
@@ -67,46 +97,47 @@ class TemplateContent {
 		if (types.read) {
 			delete this.readingPromise;
 			delete this.inputContent;
-			delete this.frontMatter;
 			delete this._frontMatterDataCache;
+		}
+		if (types.render) {
+			this.#templateRender = undefined;
 		}
 	}
 
-	/* Used by tests */
 	get extensionMap() {
-		if (!this._extensionMap) {
-			this._extensionMap = new EleventyExtensionMap([], this.eleventyConfig);
+		if (!this.#extensionMap) {
+			throw new Error("Internal error: Missing `extensionMap` in TemplateContent.");
 		}
-		return this._extensionMap;
+		return this.#extensionMap;
 	}
 
 	set extensionMap(map) {
-		this._extensionMap = map;
+		this.#extensionMap = map;
 	}
 
 	set eleventyConfig(config) {
-		this._config = config;
+		this.#config = config;
 
-		if (this._config.constructor.name === "TemplateConfig") {
-			this._configOptions = this._config.getConfig();
+		if (this.#config.constructor.name === "TemplateConfig") {
+			this.#configOptions = this.#config.getConfig();
 		} else {
-			throw new TemplateContentConfigError("Tried to get an TemplateConfig but none was found.");
+			throw new Error("Tried to get an TemplateConfig but none was found.");
 		}
 	}
 
 	get eleventyConfig() {
-		if (this._config.constructor.name === "TemplateConfig") {
-			return this._config;
+		if (this.#config.constructor.name === "TemplateConfig") {
+			return this.#config;
 		}
-		throw new TemplateContentConfigError("Tried to get an TemplateConfig but none was found.");
+		throw new Error("Tried to get an TemplateConfig but none was found.");
 	}
 
 	get config() {
-		if (this._config.constructor.name === "TemplateConfig" && !this._configOptions) {
-			this._configOptions = this._config.getConfig();
+		if (this.#config.constructor.name === "TemplateConfig" && !this.#configOptions) {
+			this.#configOptions = this.#config.getConfig();
 		}
 
-		return this._configOptions;
+		return this.#configOptions;
 	}
 
 	get bench() {
@@ -118,28 +149,34 @@ class TemplateContent {
 	}
 
 	get templateRender() {
-		if (!this._templateRender) {
-			throw new Error("TemplateRender has not yet initialized.");
+		if (!this.hasTemplateRender()) {
+			throw new Error(`\`templateRender\` has not yet initialized on ${this.inputPath}`);
 		}
-		return this._templateRender;
+
+		return this.#templateRender;
+	}
+
+	hasTemplateRender() {
+		return !!this.#templateRender;
 	}
 
 	async getTemplateRender() {
-		if (!this._templateRender) {
-			this._templateRender = new TemplateRender(this.inputPath, this.inputDir, this.eleventyConfig);
-			this._templateRender.extensionMap = this.extensionMap;
-			await this._templateRender.init();
+		if (!this.#templateRender) {
+			this.#templateRender = new TemplateRender(this.inputPath, this.eleventyConfig);
+			this.#templateRender.extensionMap = this.extensionMap;
+
+			return this.#templateRender.init().then(() => {
+				return this.#templateRender;
+			});
 		}
 
-		return this._templateRender;
+		return this.#templateRender;
 	}
 
 	// For monkey patchers
 	get frontMatter() {
 		if (this.frontMatterOverride) {
 			return this.frontMatterOverride;
-		} else if (this._frontMatter) {
-			return this._frontMatter;
 		} else {
 			throw new Error(
 				"Unfortunately you’re using code that monkey patched some Eleventy internals and it isn’t async-friendly. Change your code to use the async `read()` method on the template instead!",
@@ -160,74 +197,130 @@ class TemplateContent {
 		return this.inputDir;
 	}
 
+	isVirtualTemplate() {
+		let def = this.getVirtualTemplateDefinition();
+		return !!def;
+	}
+
+	getVirtualTemplateDefinition() {
+		let inputDirRelativeInputPath =
+			this.eleventyConfig.directories.getInputPathRelativeToInputDirectory(this.inputPath);
+		return this.config.virtualTemplates[inputDirRelativeInputPath];
+	}
+
+	getFrontMatterParsingOptions() {
+		if (!this.#frontMatterOptions) {
+			this.#frontMatterOptions = DeepCopy(
+				{
+					// Set a project-wide default.
+					// language: "yaml",
+
+					// Supplementary engines
+					engines: {
+						// v4: Moved to a fork of gray-matter to modernize to js-yaml@4 internally
+						// v4.0.0-alpha.11 gray-matter@3 upgrade removed timestamp/date from YAML parsing (workaround available at #4333)
+						// yaml: yaml.load.bind(yaml),
+
+						// Backwards compatible with `js` object front matter
+						// https://github.com/11ty/eleventy/issues/2819
+						javascript: JavaScriptFrontMatter,
+
+						// Upstream `js` was removed in @11ty/gray-matter@2
+						js: JavaScriptFrontMatter,
+
+						node: function () {
+							throw new Error(
+								"The `node` front matter type was a 3.0.0-alpha.x only feature, removed for stable release. Rename to `js` or `javascript` instead!",
+							);
+						},
+					},
+				},
+				this.config.frontMatterParsingOptions,
+			);
+		}
+
+		return this.#frontMatterOptions;
+	}
+
+	async #read() {
+		let content = await this.inputContent;
+
+		if (content || content === "") {
+			let tr = await this.getTemplateRender();
+			if (tr.engine.useJavaScriptImport()) {
+				return {
+					data: {},
+					content,
+				};
+			}
+
+			let options = this.getFrontMatterParsingOptions();
+			let fm;
+			try {
+				// Added in 3.0, passed along to front matter engines
+				options.filePath = this.inputPath;
+				fm = matter(content, options);
+			} catch (e) {
+				throw new TemplateContentFrontMatterError(
+					`Having trouble reading front matter from template ${this.inputPath}`,
+					e,
+				).setFilePath(this.inputPath);
+			}
+
+			if (typeof fm.data?.then === "function") {
+				fm.data = await fm.data;
+			}
+
+			if (options.excerpt && fm.excerpt) {
+				let excerptString = fm.excerpt + (options.excerpt_separator || "---");
+				if (fm.content.startsWith(excerptString + EOL)) {
+					// with an os-specific newline after excerpt separator
+					fm.content = fm.excerpt.trim() + "\n" + fm.content.slice((excerptString + EOL).length);
+				} else if (fm.content.startsWith(excerptString + "\n")) {
+					// with a newline (\n) after excerpt separator
+					// This is necessary for some git configurations on windows
+					fm.content = fm.excerpt.trim() + "\n" + fm.content.slice((excerptString + 1).length);
+				} else if (fm.content.startsWith(excerptString)) {
+					// no newline after excerpt separator
+					fm.content = fm.excerpt + fm.content.slice(excerptString.length);
+				}
+
+				// alias, defaults to page.excerpt
+				let alias = options.excerpt_alias || "page.excerpt";
+				lodashSet(fm.data, alias, fm.excerpt);
+			}
+
+			// For monkey patchers that used `frontMatter` 🤧
+			// https://github.com/11ty/eleventy/issues/613#issuecomment-999637109
+			// https://github.com/11ty/eleventy/issues/2710#issuecomment-1373854834
+			// Removed this._frontMatter monkey patcher help in 3.0.0-alpha.7
+
+			return fm;
+		} else {
+			return {
+				data: {},
+				content: "",
+				excerpt: "",
+			};
+		}
+	}
+
 	async read() {
 		if (!this.readingPromise) {
 			if (!this.inputContent) {
-				// cache the promise
+				// @cachedproperty
 				this.inputContent = this.getInputContent();
 			}
 
-			this.readingPromise = new Promise(async (resolve, reject) => {
-				try {
-					let content = await this.inputContent;
-
-					if (content) {
-						let options = this.config.frontMatterParsingOptions || {};
-						let fm;
-						try {
-							// Added in 3.0, passed along to front matter engines
-							options.filePath = this.inputPath;
-							fm = matter(content, options);
-						} catch (e) {
-							throw new TemplateContentFrontMatterError(
-								`Having trouble reading front matter from template ${this.inputPath}`,
-								e,
-							);
-						}
-
-						if (options.excerpt && fm.excerpt) {
-							let excerptString = fm.excerpt + (options.excerpt_separator || "---");
-							if (fm.content.startsWith(excerptString + os.EOL)) {
-								// with an os-specific newline after excerpt separator
-								fm.content =
-									fm.excerpt.trim() + "\n" + fm.content.slice((excerptString + os.EOL).length);
-							} else if (fm.content.startsWith(excerptString + "\n")) {
-								// with a newline (\n) after excerpt separator
-								// This is necessary for some git configurations on windows
-								fm.content =
-									fm.excerpt.trim() + "\n" + fm.content.slice((excerptString + 1).length);
-							} else if (fm.content.startsWith(excerptString)) {
-								// no newline after excerpt separator
-								fm.content = fm.excerpt + fm.content.slice(excerptString.length);
-							}
-
-							// alias, defaults to page.excerpt
-							let alias = options.excerpt_alias || "page.excerpt";
-							lodashSet(fm.data, alias, fm.excerpt);
-						}
-
-						// For monkey patchers that used `frontMatter` 🤧
-						// https://github.com/11ty/eleventy/issues/613#issuecomment-999637109
-						// https://github.com/11ty/eleventy/issues/2710#issuecomment-1373854834
-						this._frontMatter = fm;
-
-						resolve(fm);
-					} else {
-						resolve({
-							data: {},
-							content: "",
-							excerpt: "",
-						});
-					}
-				} catch (e) {
-					reject(e);
-				}
-			});
+			// @cachedproperty
+			this.readingPromise = this.#read();
 		}
 
 		return this.readingPromise;
 	}
 
+	/* Incremental builds cache the Template instances (in TemplateWriter) but
+	 * these template specific caches are important for Pagination */
 	static cache(path, content) {
 		this._inputCache.set(TemplatePath.absolutePath(path), content);
 	}
@@ -247,6 +340,20 @@ class TemplateContent {
 
 	async getInputContent() {
 		let tr = await this.getTemplateRender();
+
+		let virtualTemplateDefinition = this.getVirtualTemplateDefinition();
+		if (virtualTemplateDefinition) {
+			let { content } = virtualTemplateDefinition;
+			return content;
+		}
+
+		if (
+			tr.engine.useJavaScriptImport() &&
+			typeof tr.engine.getInstanceFromInputPath === "function"
+		) {
+			return tr.engine.getInstanceFromInputPath(this.inputPath);
+		}
+
 		if (!tr.engine.needsToReadFileContents()) {
 			return "";
 		}
@@ -260,8 +367,10 @@ class TemplateContent {
 			content = TemplateContent.getCached(this.inputPath);
 		}
 
-		if (!content) {
-			content = await readFile(this.inputPath, "utf8");
+		if (!content && content !== "") {
+			let contentBuffer = readFileSync(this.inputPath);
+
+			content = contentBuffer.toString("utf8");
 
 			if (this.config.useTemplateCache) {
 				TemplateContent.cache(this.inputPath, content);
@@ -273,9 +382,9 @@ class TemplateContent {
 		return content;
 	}
 
-	// This might only be used in tests
-	async getFrontMatter() {
+	async _testGetFrontMatter() {
 		let fm = this.frontMatterOverride ? this.frontMatterOverride : await this.read();
+
 		return fm;
 	}
 
@@ -285,41 +394,90 @@ class TemplateContent {
 		return fm.content;
 	}
 
+	async #getFrontMatterData() {
+		let fm = await this.read();
+
+		let virtualTemplateDefinition = this.getVirtualTemplateDefinition();
+		let virtualTemplateData;
+		if (virtualTemplateDefinition) {
+			virtualTemplateData = virtualTemplateDefinition.data;
+
+			TemplateData.cleanupData(virtualTemplateData, {
+				file: this.inputPath,
+				isVirtualTemplate: Boolean(virtualTemplateData),
+			});
+		}
+
+		// gray-matter isn’t async-friendly but can return a promise from custom front matter
+		if (fm.data instanceof Promise) {
+			fm.data = await fm.data;
+		}
+
+		let frontMatterData = Object.assign({}, fm.data);
+
+		TemplateData.cleanupData(frontMatterData, {
+			file: this.inputPath,
+			isVirtualTemplate: Boolean(virtualTemplateData),
+		});
+
+		let tr = await this.getTemplateRender();
+		let extraData = await tr.engine.getExtraDataFromFile(this.inputPath);
+
+		TemplateData.cleanupData(extraData, {
+			file: this.inputPath,
+			isVirtualTemplate: Boolean(virtualTemplateData),
+		});
+
+		let data = Object.assign(frontMatterData, extraData, virtualTemplateData);
+
+		return {
+			data,
+			excerpt: fm.excerpt,
+		};
+	}
+
 	async getFrontMatterData() {
 		if (!this._frontMatterDataCache) {
-			this._frontMatterDataCache = new Promise(async (resolve, reject) => {
-				try {
-					let fm = await this.read();
-
-					let extraData = await this.engine.getExtraDataFromFile(this.inputPath);
-					let data = TemplateData.mergeDeep({}, fm.data, extraData);
-
-					let cleanedData = TemplateData.cleanupData(data);
-					resolve(cleanedData);
-				} catch (e) {
-					reject(e);
-				}
-			});
+			// @cachedproperty
+			this._frontMatterDataCache = this.#getFrontMatterData();
 		}
 
 		return this._frontMatterDataCache;
 	}
 
+	getEngineNames(engineOverride) {
+		return this.templateRender.getEnginesList(engineOverride);
+	}
+
 	async getEngineOverride() {
-		let frontMatterData = await this.getFrontMatterData();
-		return frontMatterData[this.config.keys.engineOverride];
+		return this.getFrontMatterData().then((data) => {
+			return data[this.config.keys.engineOverride];
+		});
+	}
+
+	// checks engines
+	isTemplateCacheable() {
+		if (this.#renderPreprocessorEngine) {
+			return this.#renderPreprocessorEngine.cacheable;
+		}
+		return this.engine.cacheable;
 	}
 
 	_getCompileCache(str) {
 		// Caches used to be bifurcated based on engine name, now they’re based on inputPath
+		// TODO does `cacheable` need to help inform whether a cache is used here?
 		let inputPathMap = TemplateContent._compileCache.get(this.inputPath);
 		if (!inputPathMap) {
 			inputPathMap = new Map();
 			TemplateContent._compileCache.set(this.inputPath, inputPathMap);
 		}
 
-		let cacheable = this.engine.cacheable;
+		let cacheable = this.isTemplateCacheable();
 		let { useCache, key } = this.engine.getCompileCacheKey(str, this.inputPath);
+		// e.g. Markdown preprocessed by Nunjucks
+		if (useCache && this.#renderPreprocessorEngine) {
+			useCache = this.#renderPreprocessorEngine.getCompileCacheKey(str, this.inputPath).useCache;
+		}
 
 		// We also tie the compile cache key to the UserConfig instance, to alleviate issues with global template cache
 		// Better to move the cache to the Eleventy instance instead, no?
@@ -329,23 +487,23 @@ class TemplateContent {
 		return [cacheable, key, inputPathMap, useCache];
 	}
 
-	async compile(str, bypassMarkdown, engineOverride) {
+	async compile(str, options = {}) {
+		let { type, templateOnly, engineOverride } = options;
+
+		// Must happen before cacheable fetch below
+		// Likely only necessary for Eleventy Layouts, see TemplateMap->initDependencyMap
+		await this.asyncTemplateInitialization();
+
+		// this.templateRender is guaranteed here
 		let tr = await this.getTemplateRender();
-
 		if (engineOverride !== undefined) {
-			debugDev("%o overriding template engine to use %o", this.inputPath, engineOverride);
-			await tr.setEngineOverride(engineOverride, bypassMarkdown);
-		} else {
-			tr.setUseMarkdown(!bypassMarkdown);
+			await tr.setEngineOverride(engineOverride);
 		}
-
-		if (bypassMarkdown && !this.engine.needsCompilation(str)) {
-			return async function () {
+		if (templateOnly && !this.engine.needsCompilation(str)) {
+			return function () {
 				return str;
 			};
 		}
-
-		debugDev("%o compile() using engine: %o", this.inputPath, tr.engineName);
 
 		try {
 			let res;
@@ -363,23 +521,23 @@ class TemplateContent {
 
 					// Compilation is async, so we eagerly cache a Promise that eventually
 					// resolves to the compiled function
-					cache.set(
-						key,
-						new Promise((resolve) => {
-							res = resolve;
-						}),
-					);
+					let withRes = Promise.withResolvers();
+					res = withRes.resolve;
+
+					cache.set(key, withRes.promise);
 				}
 			}
 
-			let templateBenchmark = this.bench.get("Template Compile");
-			let inputPathBenchmark = this.bench.get(`> Compile > ${this.inputPath}`);
+			let typeStr = type ? ` ${type}` : "";
+			let templateBenchmark = this.bench.get(`Template Compile${typeStr}`);
+			let inputPathBenchmark = this.bench.get(`> Compile${typeStr} > ${this.inputPath}`);
 			templateBenchmark.before();
 			inputPathBenchmark.before();
-			let fn = await tr.getCompiledTemplate(str);
+
+			let fn = await tr.getCompiledTemplate(str, { templateOnly });
 			inputPathBenchmark.after();
 			templateBenchmark.after();
-			debugDev("%o getCompiledTemplate function created", this.inputPath);
+
 			if (this.config.useTemplateCache && res) {
 				res(fn);
 			}
@@ -393,7 +551,7 @@ class TemplateContent {
 			throw new TemplateContentCompileError(
 				`Having trouble compiling template ${this.inputPath}`,
 				e,
-			);
+			).setFilePath(this.inputPath);
 		}
 	}
 
@@ -402,17 +560,22 @@ class TemplateContent {
 
 		// Don’t use markdown as the engine to parse for symbols
 		// TODO pass in engineOverride here
-		let preprocessorEngine = this.templateRender.getPreprocessorEngine();
-		if (preprocessorEngine && engine.getName() !== preprocessorEngine) {
-			let replacementEngine = this.templateRender.getEngineByName(preprocessorEngine);
-			if (replacementEngine) {
-				engine = replacementEngine;
-			}
+		if (this.#renderPreprocessorEngine) {
+			engine = this.#renderPreprocessorEngine;
 		}
 
 		if ("parseForSymbols" in engine) {
 			return () => {
-				return engine.parseForSymbols(str);
+				if (Array.isArray(str)) {
+					return str
+						.filter((entry) => typeof entry === "string")
+						.map((entry) => engine.parseForSymbols(entry))
+						.flat();
+				}
+				if (typeof str === "string") {
+					return engine.parseForSymbols(str);
+				}
+				return [];
 			};
 		}
 	}
@@ -435,16 +598,15 @@ class TemplateContent {
 			return this._renderFunction(str, data);
 		}
 
-		return this._render(str, data, true);
+		return this._render(str, data, {
+			type: "Computed Data",
+			templateOnly: true,
+		});
 	}
 
 	async renderPermalink(permalink, data) {
-		this.bench.get("(count) Render Permalink").incrementCount();
-		this.bench
-			.get(`(count) > Render Permalink > ${this.inputPath}${this._getPaginationLogSuffix(data)}`)
-			.incrementCount();
-
-		let permalinkCompilation = this.engine.permalinkNeedsCompilation(permalink);
+		let tr = await this.getTemplateRender();
+		let permalinkCompilation = tr.engine.permalinkNeedsCompilation(permalink);
 
 		// No string compilation:
 		//    ({ compileOptions: { permalink: "raw" }})
@@ -452,17 +614,17 @@ class TemplateContent {
 		//    ({ compileOptions: { permalink: false }})
 		//    ({ compileOptions: { permalink: () => false }})
 		//    ({ compileOptions: { permalink: () => (() = > false) }})
-		if (permalinkCompilation === false) {
+		if (permalinkCompilation === false && typeof permalink !== "function") {
 			return permalink;
 		}
 
 		/* Custom `compile` function for permalinks, usage:
-    permalink: function(permalinkString, inputPath) {
-      return async function(data) {
-        return "THIS IS MY RENDERED PERMALINK";
-      }
-    }
-    */
+		permalink: function(permalinkString, inputPath) {
+			return async function(data) {
+				return "THIS IS MY RENDERED PERMALINK";
+			}
+		}
+		*/
 		if (permalinkCompilation && typeof permalinkCompilation === "function") {
 			permalink = await this._renderFunction(permalinkCompilation, permalink, this.inputPath);
 		}
@@ -472,11 +634,18 @@ class TemplateContent {
 			return this._renderFunction(permalink, data);
 		}
 
-		return this._render(permalink, data, true);
+		return this._render(permalink, data, {
+			type: "Permalink",
+			templateOnly: true,
+		});
 	}
 
-	async render(str, data, bypassMarkdown) {
-		return this._render(str, data, bypassMarkdown);
+	async render(str, data, templateOnly, renderContext) {
+		return this._render(str, data, {
+			type: "Content",
+			templateOnly,
+			renderContext,
+		});
 	}
 
 	_getPaginationLogSuffix(data) {
@@ -495,13 +664,19 @@ class TemplateContent {
 		return suffix.join("");
 	}
 
-	async _render(str, data, bypassMarkdown) {
+	async _render(str, data, options = {}) {
+		let { templateOnly, type, renderContext } = options;
+
 		try {
-			if (bypassMarkdown && !this.engine.needsCompilation(str)) {
+			if (templateOnly && !this.engine.needsCompilation(str)) {
 				return str;
 			}
 
-			let fn = await this.compile(str, bypassMarkdown, data[this.config.keys.engineOverride]);
+			let fn = await this.compile(str, {
+				templateOnly,
+				engineOverride: data[this.config.keys.engineOverride],
+				type,
+			});
 
 			if (fn === undefined) {
 				return;
@@ -511,45 +686,36 @@ class TemplateContent {
 
 			// Benchmark
 			let templateBenchmark = this.bench.get("Render");
-			// Skip benchmark for each individual pagination entry (very busy output)
-			let logRenderToOutputBenchmark = "pagination" in data;
 			let inputPathBenchmark = this.bench.get(
-				`> Render > ${this.inputPath}${this._getPaginationLogSuffix(data)}`,
+				`> Render${type ? ` ${type}` : ""} > ${this.inputPath}${this._getPaginationLogSuffix(data)}`,
 			);
-			let outputPathBenchmark;
-			if (data.page && data.page.outputPath && logRenderToOutputBenchmark) {
-				outputPathBenchmark = this.bench.get(`> Render to > ${data.page.outputPath}`);
-			}
 
 			templateBenchmark.before();
 			if (inputPathBenchmark) {
 				inputPathBenchmark.before();
 			}
-			if (outputPathBenchmark) {
-				outputPathBenchmark.before();
-			}
 
-			let rendered = await fn(data);
+			// `renderContext` collects intermediate output between pipeline steps
+			let rendered = await (renderContext ? fn(data, renderContext) : fn(data));
 
-			if (outputPathBenchmark) {
-				outputPathBenchmark.after();
-			}
 			if (inputPathBenchmark) {
 				inputPathBenchmark.after();
 			}
 			templateBenchmark.after();
-			debugDev("%o getCompiledTemplate called, rendered content created", this.inputPath);
+
 			return rendered;
 		} catch (e) {
-			if (EleventyErrorUtil.isPrematureTemplateContentError(e)) {
-				throw e;
+			if (ErrorUtil.isPrematureTemplateContentError(e)) {
+				return Promise.reject(e);
 			} else {
 				let tr = await this.getTemplateRender();
 				let engine = tr.getReadableEnginesList();
 				debug(`Having trouble rendering ${engine} template ${this.inputPath}: %O`, str);
-				throw new TemplateContentRenderError(
-					`Having trouble rendering ${engine} template ${this.inputPath}`,
-					e,
+				return Promise.reject(
+					new TemplateContentRenderError(
+						`Having trouble rendering ${engine} template ${this.inputPath}`,
+						e,
+					).setFilePath(this.inputPath),
 				);
 			}
 		}
@@ -617,7 +783,7 @@ class TemplateContent {
 
 TemplateContent._inputCache = new Map();
 TemplateContent._compileCache = new Map();
-eventBus.on("eleventy.resourceModified", (path) => {
+eventBus.on("buildawesome.resourcemodified", (path) => {
 	// delete from input cache
 	TemplateContent.deleteFromInputCache(path);
 
@@ -630,7 +796,7 @@ eventBus.on("eleventy.resourceModified", (path) => {
 });
 
 // Used when the configuration file reset https://github.com/11ty/eleventy/issues/2147
-eventBus.on("eleventy.compileCacheReset", (/*path*/) => {
+eventBus.on("buildawesome.compilecachereset", () => {
 	TemplateContent._compileCache = new Map();
 });
 

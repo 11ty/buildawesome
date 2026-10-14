@@ -12,7 +12,7 @@ export default function getCollectionItem(collection, page, modifier = 0) {
 		j++;
 	}
 
-	if (index !== undefined && collection && collection.length) {
+	if (index !== undefined && collection?.length) {
 		if (index + modifier >= 0 && index + modifier < collection.length) {
 			return collection[index + modifier];
 		}

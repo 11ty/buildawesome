@@ -1,5 +1,5 @@
 import test from "ava";
-import ComputedDataTemplateString from "../src/ComputedDataTemplateString.js";
+import ComputedDataTemplateString from "../src/Data/ComputedDataTemplateString.js";
 
 test("Get fake proxy data", (t) => {
   let cd = new ComputedDataTemplateString(["key1", "key2"]);

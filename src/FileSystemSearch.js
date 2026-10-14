@@ -1,9 +1,11 @@
-import fastglob from "fast-glob";
-import micromatch from "micromatch";
+import { glob } from "tinyglobby";
 import { TemplatePath } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
 
-const debug = debugUtil("Eleventy:FastGlobManager");
+import { createDebug } from "./Util/DebugLogUtil.js";
+import GlobRemap from "./Util/GlobRemap.js";
+import { isGlobMatch } from "./Util/GlobMatcher.js";
+
+const debug = createDebug("FileSystemSearch");
 
 class FileSystemSearch {
 	constructor() {
@@ -29,10 +31,21 @@ class FileSystemSearch {
 		}
 
 		// Strip leading slashes from everything!
-		globs = globs.map((entry) => TemplatePath.stripLeadingDotSlash(entry));
+		globs = globs.map((entry) => {
+			return TemplatePath.stripLeadingDotSlash(entry);
+		});
+
+		let cwd = GlobRemap.getCwd(globs);
+		if (cwd) {
+			options.cwd = cwd;
+		}
 
 		if (options.ignore && Array.isArray(options.ignore)) {
-			options.ignore = options.ignore.map((entry) => TemplatePath.stripLeadingDotSlash(entry));
+			options.ignore = options.ignore.map((entry) => {
+				entry = TemplatePath.stripLeadingDotSlash(entry);
+
+				return GlobRemap.remapInput(entry, cwd);
+			});
 			debug("Glob search (%o) ignoring: %o", key, options.ignore);
 		}
 
@@ -51,19 +64,25 @@ class FileSystemSearch {
 
 			this.count++;
 
-			this.promises[cacheKey] = fastglob(
-				globs,
-				Object.assign(
-					{
-						caseSensitiveMatch: false, // insensitive
-						dot: true,
-					},
-					options,
-				),
-			).then((results) => {
+			globs = globs.map((entry) => {
+				if (cwd && entry.startsWith(cwd)) {
+					return GlobRemap.remapInput(entry, cwd);
+				}
+
+				return entry;
+			});
+
+			options.caseSensitiveMatch ??= false; // insensitive
+			options.dot ??= true;
+
+			this.promises[cacheKey] = glob(globs, options).then((results) => {
 				this.outputs[cacheKey] = new Set(
-					results.map((entry) => TemplatePath.addLeadingDotSlash(entry)),
+					results.map((entry) => {
+						let remapped = GlobRemap.remapOutput(entry, options.cwd);
+						return TemplatePath.standardizeFilePath(remapped);
+					}),
 				);
+
 				return Array.from(this.outputs[cacheKey]);
 			});
 		}
@@ -75,16 +94,14 @@ class FileSystemSearch {
 	_modify(path, setOperation) {
 		path = TemplatePath.stripLeadingDotSlash(path);
 
-		let normalized = TemplatePath.addLeadingDotSlash(path);
+		let normalized = TemplatePath.standardizeFilePath(path);
 
 		for (let key in this.inputs) {
 			let { input, options } = this.inputs[key];
 			if (
-				micromatch([path], input, {
-					dot: true,
-					nocase: true, // insensitive
+				isGlobMatch(path, input, {
 					ignore: options.ignore,
-				}).length > 0
+				})
 			) {
 				this.outputs[key][setOperation](normalized);
 			}
@@ -98,6 +115,11 @@ class FileSystemSearch {
 	delete(path) {
 		this._modify(path, "delete");
 	}
+
+	// Issue #3859 get rid of chokidar globs
+	// getAllOutputFiles() {
+	// 	return Object.values(this.outputs).map(set => Array.from(set)).flat();
+	// }
 }
 
 export default FileSystemSearch;

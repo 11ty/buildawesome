@@ -2,19 +2,20 @@ import test from "ava";
 import fs from "fs";
 import pretty from "pretty";
 import TOML from "@iarna/toml";
+import * as yaml from "js-yaml";
 
-import TemplateConfig from "../src/TemplateConfig.js";
-import TemplateData from "../src/TemplateData.js";
+import TemplateData from "../src/Data/TemplateData.js";
 import FileSystemSearch from "../src/FileSystemSearch.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
-import EleventyErrorUtil from "../src/EleventyErrorUtil.js";
+import ExtensionMap from "../src/ExtensionMap.js";
+import ErrorUtil from "../src/Errors/ErrorUtil.js";
 import TemplateContentPrematureUseError from "../src/Errors/TemplateContentPrematureUseError.js";
+import { isTypeScriptSupported } from "../src/Util/TypeScriptFeatureTest.cjs";
+
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
-import eventBus from "../src/EventBus.js";
 import getNewTemplate from "./_getNewTemplateForTests.js";
 import { getRenderedTemplates as getRenderedTmpls, renderLayout, renderTemplate } from "./_getRenderedTemplates.js";
-
-const fsp = fs.promises;
+import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback } from "./_testHelpers.js";
+import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
 
 async function getRenderedData(tmpl, pageNumber = 0) {
   let data = await tmpl.getData();
@@ -28,17 +29,13 @@ function cleanHtml(str) {
 
 async function _testCompleteRender(tmpl) {
   let data = await tmpl.getData();
-  let entries = await tmpl.getTemplateMapEntries(data);
+  let entry = await tmpl.getTemplateMapEntry(data);
 
+  entry._pages = await entry.template.getTemplates(entry.data);
   let nestedContent = await Promise.all(
-    entries.map(async (entry) => {
-      entry._pages = await entry.template.getTemplates(entry.data);
-      return Promise.all(
-        entry._pages.map(async (page) => {
-          page.templateContent = await page.template.renderPageEntryWithoutLayout(page);
-          return page.template.renderPageEntry(page);
-        })
-      );
+    entry._pages.map(async (page) => {
+      page.templateContent = await page.template.renderPageEntryWithoutLayout(page);
+      return page.template.renderPageEntry(page);
     })
   );
 
@@ -62,9 +59,8 @@ test("getTemplateSubFolder, output is a subdir of input", async (t) => {
 
 test("output path maps to an html file", async (t) => {
   let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
-  t.is(tmpl.parsed.dir, "./test/stubs");
-  t.is(tmpl.inputDir, "./test/stubs");
-  t.is(tmpl.outputDir, "./dist");
+  t.is(tmpl.inputDir, "./test/stubs/");
+  t.is(tmpl.outputDir, "./dist/");
   t.is(tmpl.getTemplateSubfolder(), "");
 
   let data = await tmpl.getData();
@@ -104,7 +100,7 @@ test("HTML files output to the same as the input directory have a file suffix ad
 test("HTML files output to the same as the input directory have a file suffix added (only if index, this _is_ index).", async (t) => {
   let tmpl = await getNewTemplate("./test/stubs/index.html", "./test/stubs", "./test/stubs");
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./test/stubs/index-o.html");
+  t.is(await tmpl.getOutputPath(data), "./test/stubs/index.html");
 });
 
 test("HTML files output to the same as the input directory have a file suffix added (only if index, this _is_ index, subfolder).", async (t) => {
@@ -114,7 +110,7 @@ test("HTML files output to the same as the input directory have a file suffix ad
     "./test/stubs"
   );
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./test/stubs/subfolder/index-o.html");
+  t.is(await tmpl.getOutputPath(data), "./test/stubs/subfolder/index.html");
 });
 
 test("Test raw front matter from template (yaml)", async (t) => {
@@ -126,8 +122,8 @@ test("Test raw front matter from template (yaml)", async (t) => {
   );
   t.truthy(await tmpl.getInputContent(), "template exists and can be opened.");
 
-  t.is((await tmpl.getFrontMatter()).data.key1, "value1");
-  t.is((await tmpl.getFrontMatter()).data.key3, "value3");
+  t.is((await tmpl._testGetFrontMatter()).data.key1, "value1");
+  t.is((await tmpl._testGetFrontMatter()).data.key3, "value3");
 
   let data = await tmpl.getData();
   t.is(data.key1, "value1");
@@ -145,8 +141,8 @@ test("Test raw front matter from template (json)", async (t) => {
     "./dist"
   );
 
-  t.is((await tmpl.getFrontMatter()).data.key1, "value1");
-  t.is((await tmpl.getFrontMatter()).data.key3, "value3");
+  t.is((await tmpl._testGetFrontMatter()).data.key1, "value1");
+  t.is((await tmpl._testGetFrontMatter()).data.key3, "value3");
 
   let data = await tmpl.getData();
   t.is(data.key1, "value1");
@@ -164,8 +160,8 @@ test("Test raw front matter from template (js)", async (t) => {
     "./dist"
   );
 
-  t.is((await tmpl.getFrontMatter()).data.key1, "value1");
-  t.is((await tmpl.getFrontMatter()).data.key3, "value3");
+  t.is((await tmpl._testGetFrontMatter()).data.key1, "value1");
+  t.is((await tmpl._testGetFrontMatter()).data.key3, "value3");
 
   let data = await tmpl.getData();
   t.is(data.key1, "value1");
@@ -188,10 +184,16 @@ test("Test that getData() works", async (t) => {
 });
 
 test("One Layout (using new content var)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs",
+      output: "dist"
+    }
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   let tmpl = await getNewTemplate(
     "./test/stubs/templateWithLayoutKey.liquid",
     "./test/stubs/",
@@ -201,7 +203,7 @@ test("One Layout (using new content var)", async (t) => {
     eleventyConfig
   );
 
-  t.is((await tmpl.getFrontMatter()).data[tmpl.config.keys.layout], "defaultLayout");
+  t.is((await tmpl._testGetFrontMatter()).data[tmpl.config.keys.layout], "defaultLayout");
 
   let data = await tmpl.getData();
   t.is(data[tmpl.config.keys.layout], "defaultLayout");
@@ -218,10 +220,16 @@ test("One Layout (using new content var)", async (t) => {
 });
 
 test("One Layout (using content)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs",
+      output: "dist"
+    }
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   let tmpl = await getNewTemplate(
     "./test/stubs/templateWithLayoutContent.liquid",
     "./test/stubs/",
@@ -231,7 +239,7 @@ test("One Layout (using content)", async (t) => {
     eleventyConfig
   );
 
-  t.is((await tmpl.getFrontMatter()).data[tmpl.config.keys.layout], "defaultLayoutLayoutContent");
+  t.is((await tmpl._testGetFrontMatter()).data[tmpl.config.keys.layout], "defaultLayoutLayoutContent");
 
   let data = await tmpl.getData();
   t.is(data[tmpl.config.keys.layout], "defaultLayoutLayoutContent");
@@ -248,10 +256,16 @@ test("One Layout (using content)", async (t) => {
 });
 
 test("One Layout (layouts disabled)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs",
+      output: "dist"
+    }
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   let tmpl = await getNewTemplate(
     "./test/stubs/templateWithLayoutContent.liquid",
     "./test/stubs/",
@@ -261,25 +275,31 @@ test("One Layout (layouts disabled)", async (t) => {
     eleventyConfig
   );
 
-  t.is((await tmpl.getFrontMatter()).data[tmpl.config.keys.layout], "defaultLayoutLayoutContent");
+  t.is((await tmpl._testGetFrontMatter()).data[tmpl.config.keys.layout], "defaultLayoutLayoutContent");
 
   let data = await tmpl.getData();
   t.is(data[tmpl.config.keys.layout], "defaultLayoutLayoutContent");
 
   t.is(cleanHtml(await tmpl.renderPageEntryWithoutLayout({
-		rawInput: await tmpl.getPreRender(),
-		data: data
-	})), "<p>Hello.</p>");
+    rawInput: await tmpl.getPreRender(),
+    data: data
+  })), "<p>Hello.</p>");
 
   t.is(data.keymain, "valuemain");
   t.is(data.keylayout, "valuelayout");
 });
 
 test("One Layout (liquid test)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs",
+      output: "dist"
+    }
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   let tmpl = await getNewTemplate(
     "./test/stubs/templateWithLayout.liquid",
     "./test/stubs/",
@@ -289,7 +309,7 @@ test("One Layout (liquid test)", async (t) => {
     eleventyConfig
   );
 
-  t.is((await tmpl.getFrontMatter()).data[tmpl.config.keys.layout], "layoutLiquid.liquid");
+  t.is((await tmpl._testGetFrontMatter()).data[tmpl.config.keys.layout], "layoutLiquid.liquid");
 
   let data = await tmpl.getData();
   t.is(data[tmpl.config.keys.layout], "layoutLiquid.liquid");
@@ -306,10 +326,16 @@ test("One Layout (liquid test)", async (t) => {
 });
 
 test("Two Layouts", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs",
+      output: "dist"
+    }
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   let tmpl = await getNewTemplate(
     "./test/stubs/templateTwoLayouts.liquid",
     "./test/stubs/",
@@ -319,7 +345,7 @@ test("Two Layouts", async (t) => {
     eleventyConfig
   );
 
-  t.is((await tmpl.getFrontMatter()).data[tmpl.config.keys.layout], "layout-a");
+  t.is((await tmpl._testGetFrontMatter()).data[tmpl.config.keys.layout], "layout-a");
 
   let data = await tmpl.getData();
   t.is(data[tmpl.config.keys.layout], "layout-a");
@@ -338,10 +364,16 @@ test("Two Layouts", async (t) => {
 });
 
 test("Liquid template", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs",
+      output: "dist"
+    }
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   let tmpl = await getNewTemplate(
     "./test/stubs/formatTest.liquid",
     "./test/stubs/",
@@ -387,10 +419,16 @@ test("Permalink output directory from layout (fileslug)", async (t) => {
 });
 
 test("Layout from template-data-file that has a permalink (fileslug) Issue #121", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs",
+      output: "dist"
+    }
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   let tmpl = await getNewTemplate(
     "./test/stubs/permalink-data-layout/test.njk",
     "./test/stubs/",
@@ -413,10 +451,16 @@ test("Fileslug in an 11ty.js template Issue #588", async (t) => {
 });
 
 test("Local template data file import (without a global data json)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs",
+      output: "dist"
+    }
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
   await dataObj.getGlobalData();
 
@@ -430,25 +474,56 @@ test("Local template data file import (without a global data json)", async (t) =
   let data = await tmpl.getData();
   t.deepEqual(await dataObj.getLocalDataPaths(tmpl.getInputPath()), [
     "./test/stubs/stubs.json",
+
     "./test/stubs/stubs.11tydata.json",
     "./test/stubs/stubs.11tydata.mjs",
     "./test/stubs/stubs.11tydata.cjs",
     "./test/stubs/stubs.11tydata.js",
+    "./test/stubs/stubs.11tydata.mts",
+    "./test/stubs/stubs.11tydata.cts",
+    "./test/stubs/stubs.11tydata.ts",
+
+    "./test/stubs/stubs.data.json",
+    "./test/stubs/stubs.data.mjs",
+    "./test/stubs/stubs.data.cjs",
+    "./test/stubs/stubs.data.js",
+    "./test/stubs/stubs.data.mts",
+    "./test/stubs/stubs.data.cts",
+    "./test/stubs/stubs.data.ts",
+
     "./test/stubs/component/component.json",
+
     "./test/stubs/component/component.11tydata.json",
     "./test/stubs/component/component.11tydata.mjs",
     "./test/stubs/component/component.11tydata.cjs",
     "./test/stubs/component/component.11tydata.js",
+    "./test/stubs/component/component.11tydata.mts",
+    "./test/stubs/component/component.11tydata.cts",
+    "./test/stubs/component/component.11tydata.ts",
+
+    "./test/stubs/component/component.data.json",
+    "./test/stubs/component/component.data.mjs",
+    "./test/stubs/component/component.data.cjs",
+    "./test/stubs/component/component.data.js",
+    "./test/stubs/component/component.data.mts",
+    "./test/stubs/component/component.data.cts",
+    "./test/stubs/component/component.data.ts",
   ]);
   t.is(data.localdatakey1, "localdatavalue1");
   t.is(await renderTemplate(tmpl, data), "localdatavalue1");
 });
 
 test("Local template data file import (two subdirectories deep)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs",
+      output: "dist"
+    }
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
   await dataObj.getGlobalData();
 
@@ -461,33 +536,90 @@ test("Local template data file import (two subdirectories deep)", async (t) => {
 
   t.deepEqual(await dataObj.getLocalDataPaths(tmpl.getInputPath()), [
     "./test/stubs/stubs.json",
+
     "./test/stubs/stubs.11tydata.json",
     "./test/stubs/stubs.11tydata.mjs",
     "./test/stubs/stubs.11tydata.cjs",
     "./test/stubs/stubs.11tydata.js",
+    "./test/stubs/stubs.11tydata.mts",
+    "./test/stubs/stubs.11tydata.cts",
+    "./test/stubs/stubs.11tydata.ts",
+
+    "./test/stubs/stubs.data.json",
+    "./test/stubs/stubs.data.mjs",
+    "./test/stubs/stubs.data.cjs",
+    "./test/stubs/stubs.data.js",
+    "./test/stubs/stubs.data.mts",
+    "./test/stubs/stubs.data.cts",
+    "./test/stubs/stubs.data.ts",
+
     "./test/stubs/firstdir/firstdir.json",
+
     "./test/stubs/firstdir/firstdir.11tydata.json",
     "./test/stubs/firstdir/firstdir.11tydata.mjs",
     "./test/stubs/firstdir/firstdir.11tydata.cjs",
     "./test/stubs/firstdir/firstdir.11tydata.js",
+    "./test/stubs/firstdir/firstdir.11tydata.mts",
+    "./test/stubs/firstdir/firstdir.11tydata.cts",
+    "./test/stubs/firstdir/firstdir.11tydata.ts",
+
+    "./test/stubs/firstdir/firstdir.data.json",
+    "./test/stubs/firstdir/firstdir.data.mjs",
+    "./test/stubs/firstdir/firstdir.data.cjs",
+    "./test/stubs/firstdir/firstdir.data.js",
+    "./test/stubs/firstdir/firstdir.data.mts",
+    "./test/stubs/firstdir/firstdir.data.cts",
+    "./test/stubs/firstdir/firstdir.data.ts",
+
     "./test/stubs/firstdir/seconddir/seconddir.json",
+
     "./test/stubs/firstdir/seconddir/seconddir.11tydata.json",
     "./test/stubs/firstdir/seconddir/seconddir.11tydata.mjs",
     "./test/stubs/firstdir/seconddir/seconddir.11tydata.cjs",
     "./test/stubs/firstdir/seconddir/seconddir.11tydata.js",
+    "./test/stubs/firstdir/seconddir/seconddir.11tydata.mts",
+    "./test/stubs/firstdir/seconddir/seconddir.11tydata.cts",
+    "./test/stubs/firstdir/seconddir/seconddir.11tydata.ts",
+
+    "./test/stubs/firstdir/seconddir/seconddir.data.json",
+    "./test/stubs/firstdir/seconddir/seconddir.data.mjs",
+    "./test/stubs/firstdir/seconddir/seconddir.data.cjs",
+    "./test/stubs/firstdir/seconddir/seconddir.data.js",
+    "./test/stubs/firstdir/seconddir/seconddir.data.mts",
+    "./test/stubs/firstdir/seconddir/seconddir.data.cts",
+    "./test/stubs/firstdir/seconddir/seconddir.data.ts",
+
     "./test/stubs/firstdir/seconddir/component.json",
+
     "./test/stubs/firstdir/seconddir/component.11tydata.json",
     "./test/stubs/firstdir/seconddir/component.11tydata.mjs",
     "./test/stubs/firstdir/seconddir/component.11tydata.cjs",
     "./test/stubs/firstdir/seconddir/component.11tydata.js",
+    "./test/stubs/firstdir/seconddir/component.11tydata.mts",
+    "./test/stubs/firstdir/seconddir/component.11tydata.cts",
+    "./test/stubs/firstdir/seconddir/component.11tydata.ts",
+
+    "./test/stubs/firstdir/seconddir/component.data.json",
+    "./test/stubs/firstdir/seconddir/component.data.mjs",
+    "./test/stubs/firstdir/seconddir/component.data.cjs",
+    "./test/stubs/firstdir/seconddir/component.data.js",
+    "./test/stubs/firstdir/seconddir/component.data.mts",
+    "./test/stubs/firstdir/seconddir/component.data.cts",
+    "./test/stubs/firstdir/seconddir/component.data.ts",
   ]);
 });
 
 test("Posts inherits local JSON, layouts", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs",
+      output: "dist"
+    }
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
   await dataObj.getGlobalData();
 
@@ -501,20 +633,58 @@ test("Posts inherits local JSON, layouts", async (t) => {
   let localDataPaths = await dataObj.getLocalDataPaths(tmpl.getInputPath());
   t.deepEqual(localDataPaths, [
     "./test/stubs/stubs.json",
+
     "./test/stubs/stubs.11tydata.json",
     "./test/stubs/stubs.11tydata.mjs",
     "./test/stubs/stubs.11tydata.cjs",
     "./test/stubs/stubs.11tydata.js",
+    "./test/stubs/stubs.11tydata.mts",
+    "./test/stubs/stubs.11tydata.cts",
+    "./test/stubs/stubs.11tydata.ts",
+
+    "./test/stubs/stubs.data.json",
+    "./test/stubs/stubs.data.mjs",
+    "./test/stubs/stubs.data.cjs",
+    "./test/stubs/stubs.data.js",
+    "./test/stubs/stubs.data.mts",
+    "./test/stubs/stubs.data.cts",
+    "./test/stubs/stubs.data.ts",
+
     "./test/stubs/posts/posts.json",
+
     "./test/stubs/posts/posts.11tydata.json",
     "./test/stubs/posts/posts.11tydata.mjs",
     "./test/stubs/posts/posts.11tydata.cjs",
     "./test/stubs/posts/posts.11tydata.js",
+    "./test/stubs/posts/posts.11tydata.mts",
+    "./test/stubs/posts/posts.11tydata.cts",
+    "./test/stubs/posts/posts.11tydata.ts",
+
+    "./test/stubs/posts/posts.data.json",
+    "./test/stubs/posts/posts.data.mjs",
+    "./test/stubs/posts/posts.data.cjs",
+    "./test/stubs/posts/posts.data.js",
+    "./test/stubs/posts/posts.data.mts",
+    "./test/stubs/posts/posts.data.cts",
+    "./test/stubs/posts/posts.data.ts",
+
     "./test/stubs/posts/post1.json",
+
     "./test/stubs/posts/post1.11tydata.json",
     "./test/stubs/posts/post1.11tydata.mjs",
     "./test/stubs/posts/post1.11tydata.cjs",
     "./test/stubs/posts/post1.11tydata.js",
+    "./test/stubs/posts/post1.11tydata.mts",
+    "./test/stubs/posts/post1.11tydata.cts",
+    "./test/stubs/posts/post1.11tydata.ts",
+
+    "./test/stubs/posts/post1.data.json",
+    "./test/stubs/posts/post1.data.mjs",
+    "./test/stubs/posts/post1.data.cjs",
+    "./test/stubs/posts/post1.data.js",
+    "./test/stubs/posts/post1.data.mts",
+    "./test/stubs/posts/post1.data.cts",
+    "./test/stubs/posts/post1.data.ts",
   ]);
 
   let localData = await dataObj.getTemplateDirectoryData(tmpl.getInputPath());
@@ -534,10 +704,16 @@ test("Posts inherits local JSON, layouts", async (t) => {
 });
 
 test("Template and folder name are the same, make sure data imports work ok", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs",
+      output: "dist"
+    }
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
   await dataObj.getGlobalData();
 
@@ -551,15 +727,40 @@ test("Template and folder name are the same, make sure data imports work ok", as
   let localDataPaths = await dataObj.getLocalDataPaths(tmpl.getInputPath());
   t.deepEqual(localDataPaths, [
     "./test/stubs/stubs.json",
+
     "./test/stubs/stubs.11tydata.json",
     "./test/stubs/stubs.11tydata.mjs",
     "./test/stubs/stubs.11tydata.cjs",
     "./test/stubs/stubs.11tydata.js",
+    "./test/stubs/stubs.11tydata.mts",
+    "./test/stubs/stubs.11tydata.cts",
+    "./test/stubs/stubs.11tydata.ts",
+
+    "./test/stubs/stubs.data.json",
+    "./test/stubs/stubs.data.mjs",
+    "./test/stubs/stubs.data.cjs",
+    "./test/stubs/stubs.data.js",
+    "./test/stubs/stubs.data.mts",
+    "./test/stubs/stubs.data.cts",
+    "./test/stubs/stubs.data.ts",
+
     "./test/stubs/posts/posts.json",
+
     "./test/stubs/posts/posts.11tydata.json",
     "./test/stubs/posts/posts.11tydata.mjs",
     "./test/stubs/posts/posts.11tydata.cjs",
     "./test/stubs/posts/posts.11tydata.js",
+    "./test/stubs/posts/posts.11tydata.mts",
+    "./test/stubs/posts/posts.11tydata.cts",
+    "./test/stubs/posts/posts.11tydata.ts",
+
+    "./test/stubs/posts/posts.data.json",
+    "./test/stubs/posts/posts.data.mjs",
+    "./test/stubs/posts/posts.data.cjs",
+    "./test/stubs/posts/posts.data.js",
+    "./test/stubs/posts/posts.data.mts",
+    "./test/stubs/posts/posts.data.cts",
+    "./test/stubs/posts/posts.data.ts",
   ]);
 
   let localData = await dataObj.getTemplateDirectoryData(tmpl.getInputPath());
@@ -873,9 +1074,11 @@ test("Test a transform", async (t) => {
     "./test/stubs/_site"
   );
 
-  tmpl.addTransform("transformName", function (content, outputPath) {
-    t.true(outputPath.endsWith(".html"));
-    return "OVERRIDE BY A TRANSFORM";
+  tmpl.setTransforms({
+    transformName: function (content, outputPath) {
+      t.true(outputPath.endsWith(".html"));
+      return "OVERRIDE BY A TRANSFORM";
+    }
   });
 
   let renders = await _testCompleteRender(tmpl);
@@ -892,10 +1095,12 @@ test("Test a transform (does it have this.inputPath?)", async (t) => {
     "./test/stubs/_site"
   );
 
-  tmpl.addTransform("transformName", function (content, outputPath) {
-    t.true(outputPath.endsWith(".html"));
-    t.true(!!this.inputPath);
-    return "OVERRIDE BY A TRANSFORM";
+  tmpl.setTransforms({
+    transformName: function (content, outputPath) {
+      t.true(outputPath.endsWith(".html"));
+      t.true(!!this.inputPath);
+      return "OVERRIDE BY A TRANSFORM";
+    }
   });
 
   let renders = await _testCompleteRender(tmpl);
@@ -911,11 +1116,13 @@ test("Test a transform with pages", async (t) => {
     "./test/stubs/_site"
   );
 
-  tmpl.addTransform("transformName", function (content, outputPath) {
-    // should run twice, one for each page
-    t.true(content.length > 0);
-    t.true(outputPath.endsWith(".html"));
-    return "OVERRIDE BY A TRANSFORM";
+  tmpl.setTransforms({
+    transformName: function (content, outputPath) {
+      // should run twice, one for each page
+      t.true(content.length > 0);
+      t.true(outputPath.endsWith(".html"));
+      return "OVERRIDE BY A TRANSFORM";
+    }
   });
 
   let renders = await _testCompleteRender(tmpl);
@@ -931,10 +1138,12 @@ test("Test a transform with a layout", async (t) => {
     "./test/stubs-475/_site"
   );
 
-  tmpl.addTransform("transformName", function (content, outputPath) {
-    t.is(content, "<html><body>This is content.</body></html>");
-    t.true(outputPath.endsWith(".html"));
-    return "OVERRIDE BY A TRANSFORM";
+  tmpl.setTransforms({
+    transformName: function (content, outputPath) {
+      t.is(content, "<html><body>This is content.</body></html>");
+      t.true(outputPath.endsWith(".html"));
+      return "OVERRIDE BY A TRANSFORM";
+    }
   });
 
   let renders = await _testCompleteRender(tmpl);
@@ -950,14 +1159,16 @@ test("Test a single asynchronous transform", async (t) => {
     "./test/stubs/_site"
   );
 
-  tmpl.addTransform("transformName", async function (content, outputPath) {
-    t.true(outputPath.endsWith("template/index.html"));
+  tmpl.setTransforms({
+    transformName: async function (content, outputPath) {
+      t.true(outputPath.endsWith("template/index.html"));
 
-    return new Promise((resolve) => {
-      setTimeout(function (str, outputPath) {
-        resolve("OVERRIDE BY A TRANSFORM");
-      }, 50);
-    });
+      return new Promise((resolve) => {
+        setTimeout(function (str, outputPath) {
+          resolve("OVERRIDE BY A TRANSFORM");
+        }, 50);
+      });
+    }
   });
 
   let renders = await _testCompleteRender(tmpl);
@@ -973,25 +1184,26 @@ test("Test multiple asynchronous transforms", async (t) => {
     "./test/stubs/_site"
   );
 
-  tmpl.addTransform("transformName", async function (content, outputPath) {
-    t.true(outputPath.endsWith("template/index.html"));
+  tmpl.setTransforms({
+    transformName1: async function (content, outputPath) {
+      t.true(outputPath.endsWith("template/index.html"));
 
-    return new Promise((resolve, reject) => {
-      setTimeout(function (str, outputPath) {
-        resolve("lowercase transform");
-      }, 50);
-    });
-  });
+      return new Promise((resolve, reject) => {
+        setTimeout(function (str, outputPath) {
+          resolve("lowercase transform");
+        }, 50);
+      });
+    },
+    // uppercase
+    transformName2: async function (str, outputPath) {
+      t.true(outputPath.endsWith("template/index.html"));
 
-  // uppercase
-  tmpl.addTransform("transformName", async function (str, outputPath) {
-    t.true(outputPath.endsWith("template/index.html"));
-
-    return new Promise((resolve, reject) => {
-      setTimeout(function () {
-        resolve(str.toUpperCase());
-      }, 50);
-    });
+      return new Promise((resolve, reject) => {
+        setTimeout(function () {
+          resolve(str.toUpperCase());
+        }, 50);
+      });
+    }
   });
 
   let renders = await _testCompleteRender(tmpl);
@@ -1021,7 +1233,7 @@ test("Front Matter Tags (Single)", async (t) => {
     "./test/stubs/",
     "dist"
   );
-  let frontmatter = await tmpl.getFrontMatterData();
+  let { data: frontmatter } = await tmpl.getFrontMatterData();
   t.deepEqual(frontmatter.tags, ["single-tag"]);
 
   let fulldata = await tmpl.getData();
@@ -1037,7 +1249,7 @@ test("Front Matter Tags (Multiple)", async (t) => {
     "./test/stubs/",
     "dist"
   );
-  let frontmatter = await tmpl.getFrontMatterData();
+  let { data: frontmatter } = await tmpl.getFrontMatterData();
   t.deepEqual(frontmatter.tags, ["multi-tag", "multi-tag-2"]);
 
   let fulldata = await tmpl.getData();
@@ -1048,10 +1260,28 @@ test("Front Matter Tags (Multiple)", async (t) => {
 });
 
 test("Front matter date with quotes (liquid), issue #258", async (t) => {
+let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs/frontmatter-date/test.liquid",
+    output: "dist"
+  }, function(cfg) {
+    const YAML_SCHEMA = yaml.CORE_SCHEMA.withTags(yaml.timestampTag);
+    const YAML_LOAD = (str, options) => yaml.load(str, Object.assign({ schema: YAML_SCHEMA }, options));
+
+    cfg.setFrontMatterParsingOptions({
+      engines: {
+        yaml: YAML_LOAD,
+      }
+    })
+  });
+
+  let dataObj = new TemplateData(eleventyConfig);
   let tmpl = await getNewTemplate(
     "./test/stubs/frontmatter-date/test.liquid",
     "./test/stubs/",
-    "dist"
+    "dist",
+    dataObj,
+    null,
+    eleventyConfig
   );
 
   let data = await tmpl.getData();
@@ -1062,10 +1292,28 @@ test("Front matter date with quotes (liquid), issue #258", async (t) => {
 });
 
 test("Front matter date with quotes (njk), issue #258", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs/frontmatter-date/test.njk",
+    output: "dist"
+  }, function(cfg) {
+    const YAML_SCHEMA = yaml.CORE_SCHEMA.withTags(yaml.timestampTag);
+    const YAML_LOAD = (str, options) => yaml.load(str, Object.assign({ schema: YAML_SCHEMA }, options));
+
+    cfg.setFrontMatterParsingOptions({
+      engines: {
+        yaml: YAML_LOAD,
+      }
+    })
+  });
+
+  let dataObj = new TemplateData(eleventyConfig);
   let tmpl = await getNewTemplate(
     "./test/stubs/frontmatter-date/test.njk",
     "./test/stubs/",
-    "dist"
+    "dist",
+    dataObj,
+    null,
+    eleventyConfig
   );
 
   let data = await tmpl.getData();
@@ -1076,18 +1324,23 @@ test("Front matter date with quotes (njk), issue #258", async (t) => {
 });
 
 test("Data Cascade (Deep merge)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  // Default changed in 1.0
-  // eleventyConfig.userConfig.setDataDeepMerge(true);
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test",
+    output: "dist"
+  }, function(cfg) {
+    // Default changed in 1.0
+    // cfg.setDataDeepMerge(true);
+  });
 
-  let dataObj = new TemplateData("./test/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
   await dataObj.getGlobalData();
 
   let tmpl = await getNewTemplate(
     "./test/stubs/data-cascade/template.njk",
-    "./test/stubs/",
+    "./test/",
     "./dist",
     dataObj,
     null,
@@ -1096,6 +1349,7 @@ test("Data Cascade (Deep merge)", async (t) => {
 
   let data = await tmpl.getData();
   t.deepEqual(Object.keys(data).sort(), [
+    "buildawesome",
     "datafile",
     "eleventy",
     "frontmatter",
@@ -1110,48 +1364,18 @@ test("Data Cascade (Deep merge)", async (t) => {
   t.is(data.parent.child, -2);
 });
 
-test("Data Cascade (Shallow merge)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  // Default changed in 1.0
-  eleventyConfig.userConfig.setDataDeepMerge(false);
-  await eleventyConfig.init();
-
-  let dataObj = new TemplateData("./test/", eleventyConfig);
-  dataObj.setFileSystemSearch(new FileSystemSearch());
-  await dataObj.getGlobalData();
-
-  let tmpl = await getNewTemplate(
-    "./test/stubs/data-cascade/template.njk",
-    "./test/stubs/",
-    "./dist",
-    dataObj,
-    null,
-    eleventyConfig
-  );
-
-  let data = await tmpl.getData();
-  t.deepEqual(Object.keys(data).sort(), [
-    "datafile",
-    "eleventy",
-    "frontmatter",
-    "page",
-    "parent",
-    "pkg",
-    "tags",
-  ]);
-
-  t.deepEqual(Object.keys(data.parent).sort(), ["child", "frontmatter"]);
-
-  t.is(data.parent.child, -2);
-});
-
 test("Data Cascade Tag Merge (Deep merge)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  // Default changed in 1.0
-  // eleventyConfig.userConfig.setDataDeepMerge(true);
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs",
+    output: "dist"
+  }, function(cfg) {
+    // Default changed in 1.0
+    // cfg.setDataDeepMerge(true);
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
   await dataObj.getGlobalData();
 
@@ -1169,12 +1393,17 @@ test("Data Cascade Tag Merge (Deep merge)", async (t) => {
 });
 
 test("Data Cascade Tag Merge (Deep Merge - Deduplication)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  // Default changed in 1.0
-  // eleventyConfig.userConfig.setDataDeepMerge(true);
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs",
+    output: "dist"
+  }, function(cfg) {
+    // Default changed in 1.0
+    // cfg.setDataDeepMerge(true);
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
   await dataObj.getGlobalData();
 
@@ -1191,59 +1420,18 @@ test("Data Cascade Tag Merge (Deep Merge - Deduplication)", async (t) => {
   t.deepEqual(data.tags.sort(), ["tagA", "tagB", "tagC", "tagD"]);
 });
 
-test("Data Cascade Tag Merge (Shallow merge)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  // Default changed in 1.0
-  eleventyConfig.userConfig.setDataDeepMerge(false);
-  await eleventyConfig.init();
-
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
-  dataObj.setFileSystemSearch(new FileSystemSearch());
-  await dataObj.getGlobalData();
-
-  let tmpl = await getNewTemplate(
-    "./test/stubs/data-cascade/template.njk",
-    "./test/stubs/",
-    "./dist",
-    dataObj,
-    null,
-    eleventyConfig
-  );
-
-  let data = await tmpl.getData();
-  t.deepEqual(data.tags.sort(), ["tagA", "tagB"]);
-});
-
-test('Local data inherits tags string ([tags] vs "tags") Shallow Merge', async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  // Default changed in 1.0
-  eleventyConfig.userConfig.setDataDeepMerge(false);
-  await eleventyConfig.init();
-
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
-  dataObj.setFileSystemSearch(new FileSystemSearch());
-  await dataObj.getGlobalData();
-
-  let tmpl = await getNewTemplate(
-    "./test/stubs/local-data-tags/component.njk",
-    "./test/stubs/",
-    "./dist",
-    dataObj,
-    null,
-    eleventyConfig
-  );
-
-  let data = await tmpl.getData();
-  t.deepEqual(data.tags.sort(), ["tag1", "tag2"]);
-});
-
 test('Local data inherits tags string ([tags] vs "tags") Deep Merge', async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs",
+    output: "dist"
+  }, function(cfg) {
+    // Default changed in 1.0
+    // cfg.setDataDeepMerge(true);
+  });
 
-  // Default changed in 1.0
-  // eleventyConfig.userConfig.setDataDeepMerge(true);
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
   await dataObj.getGlobalData();
 
@@ -1272,32 +1460,64 @@ test("Throws a Premature Template Content Error (njk)", async (t) => {
   let error = t.throws(() => {
     mapEntries[0].templateContent;
   });
-  t.is(EleventyErrorUtil.isPrematureTemplateContentError(error), true);
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
 });
 
-test("Throws a Premature Template Content Error from rendering (njk)", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/stubs/prematureTemplateContent/test.njk",
-    "./test/stubs/",
-    "./test/stubs/_site"
-  );
+// Renders like TemplateMap (no layouts) so the error comes from the template, not the page entry’s own templateContent.
+async function getPrematureErrorFromRendering(t, inputPath, configCallback) {
+  let sampleRead = false;
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, configCallback || function () {});
+  let tmpl = await getNewTemplate(inputPath, "./test/stubs/", "./test/stubs/_site", null, null, eleventyConfig);
 
   let data = await tmpl.getData();
-  let mapEntries = await tmpl.getTemplateMapEntries(data);
-  let pageEntries = await tmpl.getTemplates({
-    page: {},
-    sample: {
-      get templateContent() {
-        throw new TemplateContentPrematureUseError(
-          "Tried to use templateContent too early (test.njk)"
-        );
-      },
+  await tmpl.getTemplateMapEntry(data);
+
+  let sample = {
+    get templateContent() {
+      sampleRead = true;
+      throw new TemplateContentPrematureUseError(`Tried to use templateContent too early (${inputPath})`);
     },
-  });
+  };
+  let pageEntries = await tmpl.getTemplates({ page: {}, sample, samples: [sample], collections: { all: [sample] } });
   let error = await t.throwsAsync(async () => {
-    await tmpl.renderPageEntry(pageEntries[0]);
+    await tmpl.renderPageEntryWithoutLayout(pageEntries[0]);
   });
-  t.is(EleventyErrorUtil.isPrematureTemplateContentError(error), true);
+  t.true(sampleRead);
+  return error;
+}
+
+test("Throws a Premature Template Content Error from rendering (njk)", async (t) => {
+  let error = await getPrematureErrorFromRendering(t, "./test/stubs/prematureTemplateContent/test.njk");
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
+});
+
+test("Throws a Premature Template Content Error from rendering (liquid)", async (t) => {
+  let error = await getPrematureErrorFromRendering(t, "./test/stubs/prematureTemplateContent/test.liquid");
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
+});
+
+test("Recognizes a Premature Template Content Error wrapped by a Nunjucks filter", async (t) => {
+  let error = await getPrematureErrorFromRendering(t, "./test/stubs/prematureTemplateContent/filter.njk", function (cfg) {
+    cfg.addFilter("renderedContent", (items) => items[0].templateContent);
+  });
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
+});
+
+test("Recognizes a Premature Template Content Error wrapped by a Nunjucks filter (dev: false)", async (t) => {
+  let error = await getPrematureErrorFromRendering(t, "./test/stubs/prematureTemplateContent/filter.njk", function (cfg) {
+    cfg.setNunjucksEnvironmentOptions({ dev: false });
+    cfg.addFilter("renderedContent", (items) => items[0].templateContent);
+  });
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
+});
+
+test("Premature Template Content Error detection handles cycles", (t) => {
+  let error = new Error("Outer error");
+  let cause = new Error("Inner error");
+  error.cause = cause;
+  cause.cause = error;
+
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), false);
 });
 
 test("Throws a Premature Template Content Error (liquid)", async (t) => {
@@ -1312,7 +1532,7 @@ test("Throws a Premature Template Content Error (liquid)", async (t) => {
   let error = t.throws(() => {
     mapEntries[0].templateContent;
   });
-  t.is(EleventyErrorUtil.isPrematureTemplateContentError(error), true);
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
 });
 
 test("Throws a Premature Template Content Error (11ty.js)", async (t) => {
@@ -1327,7 +1547,7 @@ test("Throws a Premature Template Content Error (11ty.js)", async (t) => {
   let error = t.throws(() => {
     mapEntries[0].templateContent;
   });
-  t.is(EleventyErrorUtil.isPrematureTemplateContentError(error), true);
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
 });
 
 test("Throws a Premature Template Content Error (md)", async (t) => {
@@ -1342,32 +1562,12 @@ test("Throws a Premature Template Content Error (md)", async (t) => {
   let error = t.throws(() => {
     mapEntries[0].templateContent;
   });
-  t.is(EleventyErrorUtil.isPrematureTemplateContentError(error), true);
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
 });
 
 test("Throws a Premature Template Content Error from rendering (md)", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/stubs/prematureTemplateContent/test.md",
-    "./test/stubs/",
-    "./test/stubs/_site"
-  );
-
-  let data = await tmpl.getData();
-  let mapEntries = await tmpl.getTemplateMapEntries(data);
-  let pageEntries = await tmpl.getTemplates({
-    page: {},
-    sample: {
-      get templateContent() {
-        throw new TemplateContentPrematureUseError(
-          "Tried to use templateContent too early (test.md)"
-        );
-      },
-    },
-  });
-  let error = await t.throwsAsync(async () => {
-    await tmpl.renderPageEntry(pageEntries[0]);
-  });
-  t.is(EleventyErrorUtil.isPrematureTemplateContentError(error), true);
+  let error = await getPrematureErrorFromRendering(t, "./test/stubs/prematureTemplateContent/test.md");
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
 });
 
 test("Issue 413 weird date format", async (t) => {
@@ -1377,28 +1577,31 @@ test("Issue 413 weird date format", async (t) => {
     "./dist"
   );
 
-  let error = await t.throwsAsync(async function () {
+  await t.throwsAsync(async function () {
     await tmpl.getData();
+  }, {
+    message: "Data cascade value for `date` (2019-03-13 20:18:42 +0000) is invalid for ./test/stubs-413/date-frontmatter.md"
   });
-
-  t.truthy(
-    error.message.indexOf("date front matter value (2019-03-13 20:18:42 +0000) is invalid") > -1
-  );
 });
 
 test("Custom Front Matter Parsing Options", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
+    cfg.setFrontMatterParsingOptions({
+      excerpt: true,
+    })
+  });
   let tmpl = await getNewTemplate(
     "./test/stubs/custom-frontmatter/template.njk",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    undefined,
+    undefined,
+    eleventyConfig,
   );
-  tmpl.config.frontMatterParsingOptions = {
-    excerpt: true,
-  };
 
-  let frontmatter = await tmpl.getFrontMatter();
+  let frontmatter = await tmpl._testGetFrontMatter();
+
   t.is(frontmatter.data.front, "hello");
-  t.is(frontmatter.data.page.excerpt.trim(), "This is an excerpt.");
 
   t.is(frontmatter.excerpt.trim(), "This is an excerpt.");
   t.is(
@@ -1412,19 +1615,25 @@ This is content.`
 });
 
 test("Custom Front Matter Parsing Options (using alias)", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
+    cfg.setFrontMatterParsingOptions({
+      excerpt: true,
+      excerpt_alias: "my_excerpt",
+    })
+  });
+
   let tmpl = await getNewTemplate(
     "./test/stubs/custom-frontmatter/template.njk",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    undefined,
+    undefined,
+    eleventyConfig,
   );
-  tmpl.config.frontMatterParsingOptions = {
-    excerpt: true,
-    excerpt_alias: "my_excerpt",
-  };
 
-  let frontmatter = await tmpl.getFrontMatter();
+  let frontmatter = await tmpl._testGetFrontMatter();
   t.is(frontmatter.data.front, "hello");
-  t.is(frontmatter.data.my_excerpt.trim(), "This is an excerpt.");
+
   t.is(
     normalizeNewLines(frontmatter.content.trim()),
     `This is an excerpt.
@@ -1436,18 +1645,22 @@ This is content.`
 });
 
 test("Custom Front Matter Parsing Options (no newline before excerpt separator)", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
+    cfg.setFrontMatterParsingOptions({
+      excerpt: true,
+    })
+  });
   let tmpl = await getNewTemplate(
     "./test/stubs/custom-frontmatter/template-newline1.njk",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    undefined,
+    undefined,
+    eleventyConfig,
   );
-  tmpl.config.frontMatterParsingOptions = {
-    excerpt: true,
-  };
 
-  let frontmatter = await tmpl.getFrontMatter();
+  let frontmatter = await tmpl._testGetFrontMatter();
   t.is(frontmatter.data.front, "hello");
-  t.is(frontmatter.data.page.excerpt.trim(), "This is an excerpt.");
 
   t.is(frontmatter.excerpt.trim(), "This is an excerpt.");
   t.is(
@@ -1461,16 +1674,21 @@ This is content.`
 });
 
 test("Custom Front Matter Parsing Options (no newline after excerpt separator)", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
+    cfg.setFrontMatterParsingOptions({
+      excerpt: true,
+    })
+  });
   let tmpl = await getNewTemplate(
     "./test/stubs/custom-frontmatter/template-newline3.njk",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    undefined,
+    undefined,
+    eleventyConfig,
   );
-  tmpl.config.frontMatterParsingOptions = {
-    excerpt: true,
-  };
 
-  let frontmatter = await tmpl.getFrontMatter();
+  let frontmatter = await tmpl._testGetFrontMatter();
   t.is(
     normalizeNewLines(frontmatter.content.trim()),
     `This is an excerpt.
@@ -1479,33 +1697,43 @@ This is content.`
 });
 
 test("Custom Front Matter Parsing Options (no newlines before or after excerpt separator)", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
+    cfg.setFrontMatterParsingOptions({
+      excerpt: true,
+    })
+  });
+
   let tmpl = await getNewTemplate(
     "./test/stubs/custom-frontmatter/template-newline2.njk",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    undefined,
+    undefined,
+    eleventyConfig
   );
-  tmpl.config.frontMatterParsingOptions = {
-    excerpt: true,
-  };
 
-  let frontmatter = await tmpl.getFrontMatter();
+  let frontmatter = await tmpl._testGetFrontMatter();
   t.is(frontmatter.content.trim(), "This is an excerpt.This is content.");
 });
 
 test("Custom Front Matter Parsing Options (html comment separator)", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
+    cfg.setFrontMatterParsingOptions({
+      excerpt: true,
+      excerpt_separator: "<!-- excerpt -->",
+    })
+  });
   let tmpl = await getNewTemplate(
     "./test/stubs/custom-frontmatter/template-excerpt-comment.njk",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    undefined,
+    undefined,
+    eleventyConfig
   );
-  tmpl.config.frontMatterParsingOptions = {
-    excerpt: true,
-    excerpt_separator: "<!-- excerpt -->",
-  };
 
-  let frontmatter = await tmpl.getFrontMatter();
+  let frontmatter = await tmpl._testGetFrontMatter();
   t.is(frontmatter.data.front, "hello");
-  t.is(frontmatter.data.page.excerpt.trim(), "This is an excerpt.");
 
   t.is(frontmatter.excerpt.trim(), "This is an excerpt.");
   t.is(
@@ -1513,6 +1741,9 @@ test("Custom Front Matter Parsing Options (html comment separator)", async (t) =
     `This is an excerpt.
 This is content.`
   );
+
+  let fulldata = await tmpl.getData();
+  t.is(fulldata.page.excerpt.trim(), "This is an excerpt.");
 });
 
 test("Custom Front Matter Parsing Options (using TOML)", async (t) => {
@@ -1528,7 +1759,7 @@ test("Custom Front Matter Parsing Options (using TOML)", async (t) => {
     },
   };
 
-  let frontmatter = await tmpl.getFrontMatter();
+  let frontmatter = await tmpl._testGetFrontMatter();
   t.deepEqual(frontmatter.data, {
     front: "hello",
   });
@@ -1584,9 +1815,16 @@ test("Get Layout Chain", async (t) => {
 });
 
 test("Engine Singletons", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
-  let map = new EleventyExtensionMap(["njk"], eleventyConfig);
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs/engine-singletons",
+      output: "dist"
+    }
+  });
+
+  let map = new ExtensionMap(eleventyConfig);
+  map.engineManager = new TemplateEngineManager(eleventyConfig);
+  map.setFormats(["njk"]);
   let tmpl1 = await getNewTemplate(
     "./test/stubs/engine-singletons/first.njk",
     "./test/stubs/engine-singletons/",
@@ -1610,7 +1848,7 @@ test("Engine Singletons", async (t) => {
 test("Make sure layout cache takes new changes during watch (nunjucks)", async (t) => {
   let filePath = "./test/stubs-layout-cache/_includes/include-script-1.js";
 
-  await fsp.writeFile(filePath, `alert("hi");`, { encoding: "utf8" });
+  fs.writeFileSync(filePath, `alert("hi");`, "utf8");
 
   let tmpl = await getNewTemplate(
     "./test/stubs-layout-cache/test.njk",
@@ -1622,16 +1860,16 @@ test("Make sure layout cache takes new changes during watch (nunjucks)", async (
 
   t.is((await renderTemplate(tmpl, data)).trim(), '<script>alert("hi");</script>');
 
-  await fsp.writeFile(filePath, `alert("bye");`, { encoding: "utf8" });
+  fs.writeFileSync(filePath, `alert("bye");`, "utf8");
 
-  eventBus.emit("eleventy.resourceModified", filePath);
+  tmpl.config.events.emit("buildawesome#templatemodified", filePath);
 
   t.is((await renderTemplate(tmpl, data)).trim(), '<script>alert("bye");</script>');
 });
 
 test("Make sure layout cache takes new changes during watch (liquid)", async (t) => {
   let filePath = "./test/stubs-layout-cache/_includes/include-script-2.js";
-  await fsp.writeFile(filePath, `alert("hi");`, { encoding: "utf8" });
+  fs.writeFileSync(filePath, `alert("hi");`, "utf8");
 
   let tmpl = await getNewTemplate(
     "./test/stubs-layout-cache/test.liquid",
@@ -1643,30 +1881,36 @@ test("Make sure layout cache takes new changes during watch (liquid)", async (t)
 
   t.is((await renderTemplate(tmpl, data)).trim(), '<script>alert("hi");</script>');
 
-  await fsp.writeFile(filePath, `alert("bye");`, { encoding: "utf8" });
+  fs.writeFileSync(filePath, `alert("bye");`, "utf8");
 
-  eventBus.emit("eleventy.resourceModified", filePath);
+  // Trigger that the file has changed
+  tmpl.internalTriggerTemplateModifiedPath(filePath);
 
   t.is((await renderTemplate(tmpl, data)).trim(), '<script>alert("bye");</script>');
 });
 
 test("Add Extension via Configuration (txt file)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  eleventyConfig.userConfig.addExtension("txt", {
-    isIncrementalMatch: function (incrementalFilePath) {
-      // do some kind of check
-      return this.inputPath === incrementalFilePath;
-    },
-    compile: function (str, inputPath) {
-      // plaintext
-      return function (data) {
-        return str;
-      };
-    },
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs",
+    output: "dist"
+  }, function(cfg) {
+    cfg.addExtension("txt", {
+      isIncrementalMatch: function (incrementalFilePath) {
+        // do some kind of check
+        return this.inputPath === incrementalFilePath;
+      },
+      compile: function (str, inputPath) {
+        // plaintext
+        return function (data) {
+          return str;
+        };
+      },
+    });
   });
-  await eleventyConfig.init();
 
-  let map = new EleventyExtensionMap([], eleventyConfig);
+  let map = new ExtensionMap(eleventyConfig);
+  map.engineManager = new TemplateEngineManager(eleventyConfig);
+  map.setFormats([]);
   let tmpl = await getNewTemplate(
     "./test/stubs/default.txt",
     "./test/stubs/",
@@ -1823,13 +2067,18 @@ test("page.templateSyntax works with templateEngineOverride", async (t) => {
 
 // Inspired by https://github.com/11ty/eleventy/pull/1691
 test("Error messaging, returning literals (not objects) from custom data extension", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  eleventyConfig.userConfig.addDataExtension("txt", {
-    parser: (s) => s,
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs-1691",
+    output: "dist"
+  }, function(cfg) {
+    cfg.addDataExtension("txt", {
+      parser: (s) => s,
+    });
   });
-  await eleventyConfig.init();
 
-  let dataObj = new TemplateData("./test/stubs-1691/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
     "./test/stubs-1691/template.njk",

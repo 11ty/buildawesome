@@ -3,7 +3,7 @@ class Test {
     return {
       title: "My Super Cool Title",
       permalink: function({ title }) {
-        return `/my-permalink/${this.slug(title)}/`;
+        return `/my-permalink/${this.slugify(title)}/`;
       }
     };
   }

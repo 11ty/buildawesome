@@ -1,13 +1,11 @@
 import moo from "moo";
-import liquidLib from "liquidjs";
+import { Tokenizer, TokenKind, LookupType, Parser, evalToken, Liquid as LiquidJs } from "liquidjs";
 import { TemplatePath } from "@11ty/eleventy-utils";
-// import debugUtil from "debug";
 
 import TemplateEngine from "./TemplateEngine.js";
+import { augmentObject } from "./Util/ContextAugmenter.js";
 
-// const debug = debugUtil("Eleventy:Liquid");
-
-class Liquid extends TemplateEngine {
+export default class Liquid extends TemplateEngine {
 	static argumentLexerOptions = {
 		number: /[0-9]+\.*[0-9]*/,
 		doubleQuoteString: /"(?:\\["\\]|[^\n"\\])*"/,
@@ -16,21 +14,25 @@ class Liquid extends TemplateEngine {
 		"ignore:whitespace": /[, \t]+/, // includes comma separator
 	};
 
-	constructor(name, dirs, config) {
-		super(name, dirs, config);
+	constructor(name, eleventyConfig) {
+		super(name, eleventyConfig);
 
 		this.liquidOptions = this.config.liquidOptions || {};
 
 		this.setLibrary(this.config.libraryOverrides.liquid);
 
 		this.argLexer = moo.compile(Liquid.argumentLexerOptions);
-		this.cacheable = true;
+	}
+
+	get cacheable() {
+		return true;
 	}
 
 	setLibrary(override) {
 		// warning, the include syntax supported here does not exactly match what Jekyll uses.
-		this.liquidLib = override || new liquidLib.Liquid(this.getLiquidOptions());
-		this.setEngineLib(this.liquidLib);
+		this.liquidLib = override || new LiquidJs(this.getLiquidOptions());
+		this.setEngineLib(this.liquidLib, Boolean(this.config.libraryOverrides.liquid));
+		this.#trackPartialFiles();
 
 		this.addFilters(this.config.liquidFilters);
 
@@ -45,8 +47,8 @@ class Liquid extends TemplateEngine {
 			root: [this.dirs.includes, this.dirs.input], // supplemented in compile with inputPath below
 			extname: ".liquid",
 			strictFilters: true,
-			// TODO?
 			// cache: true,
+			jsTruthy: true, // Breaking in v4 #3507
 		};
 
 		let options = Object.assign(defaults, this.liquidOptions || {});
@@ -55,13 +57,56 @@ class Liquid extends TemplateEngine {
 		return options;
 	}
 
-	static wrapFilter(fn) {
+	// Records `include`, `render`, and `layout` files in the dependency graph for incremental builds
+	#trackPartialFiles() {
+		let lib = this.liquidLib;
+		if (typeof lib._parsePartialFile !== "function" || typeof lib._parseLayoutFile !== "function") {
+			return;
+		}
+
+		let engine = this;
+		let track = (lookupType) =>
+			function (file, sync, currentFile) {
+				let parser = new Parser(this);
+				let lookup = parser.loader.lookup;
+				parser.loader.lookup = function* (...args) {
+					let filepath = yield* lookup.apply(this, args);
+					// String templates have no file, so use the engine name (e.g. includes in `renderTemplate`)
+					engine.addDependency(currentFile || engine.name, filepath);
+					return filepath;
+				};
+				// A cached parse skips the lookup
+				if (parser.cache) {
+					return (function* () {
+						yield parser.loader.lookup(file, lookupType, sync, currentFile);
+						return yield parser.parseFile(file, sync, lookupType, currentFile);
+					})();
+				}
+				return parser.parseFile(file, sync, lookupType, currentFile);
+			};
+
+		lib._parsePartialFile = track(LookupType.Partials);
+		lib._parseLayoutFile = track(LookupType.Layouts);
+	}
+
+	static wrapFilter(name, fn) {
+		/**
+		 * @this {object}
+		 */
 		return function (...args) {
-			if (this.context && "get" in this.context) {
-				this.page = this.context.get(["page"]);
-				this.eleventy = this.context.get(["eleventy"]);
+			// TODO ArgumentHelper.wrapFilter(fn);
+
+			// Set this.eleventy and this.page
+			if (typeof this.context?.get === "function") {
+				augmentObject(this, {
+					source: this.context,
+					getter: (key, context) => context.get([key]),
+
+					lazy: this.context.strictVariables,
+				});
 			}
 
+			// We *don’t* wrap this in an EleventyFilterError because Liquid has a better error message with line/column information in the template
 			return fn.call(this, ...args);
 		};
 	}
@@ -70,10 +115,16 @@ class Liquid extends TemplateEngine {
 	static normalizeScope(context) {
 		let obj = {};
 		if (context) {
-			obj.ctx = context;
-			obj.page = context.get(["page"]);
-			obj.eleventy = context.get(["eleventy"]);
+			obj.ctx = context; // Full context available on `ctx`
+
+			// Set this.eleventy and this.page
+			augmentObject(obj, {
+				source: context,
+				getter: (key, context) => context.get([key]),
+				lazy: context.strictVariables,
+			});
 		}
+
 		return obj;
 	}
 
@@ -90,13 +141,13 @@ class Liquid extends TemplateEngine {
 	}
 
 	addFilter(name, filter) {
-		this.liquidLib.registerFilter(name, Liquid.wrapFilter(filter));
+		this.liquidLib.registerFilter(name, Liquid.wrapFilter(name, filter));
 	}
 
 	addTag(name, tagFn) {
 		let tagObj;
 		if (typeof tagFn === "function") {
-			tagObj = tagFn(this.liquidLib);
+			tagObj = tagFn(this.liquidLib, { evalToken });
 		} else {
 			throw new Error(
 				"Liquid.addTag expects a callback function to be passed in: addTag(name, function(liquidEngine) { return { parse: …, render: … } })",
@@ -130,14 +181,14 @@ class Liquid extends TemplateEngine {
 			let arg = lexer.next();
 			while (arg) {
 				/*{
-          type: 'doubleQuoteString',
-          value: '"test 2"',
-          text: '"test 2"',
-          toString: [Function: tokenToString],
-          offset: 0,
-          lineBreaks: 0,
-          line: 1,
-          col: 1 }*/
+					type: 'doubleQuoteString',
+					value: '"test 2"',
+					text: '"test 2"',
+					toString: [Function: tokenToString],
+					offset: 0,
+					lineBreaks: 0,
+					line: 1,
+					col: 1 }*/
 				if (arg.type.indexOf("ignore:") === -1) {
 					// Push the promise into an array instead of awaiting it here.
 					// This forces the promises to run in order with the correct scope value for each arg.
@@ -152,21 +203,51 @@ class Liquid extends TemplateEngine {
 		return argArray;
 	}
 
+	static parseArgumentsBuiltin(args) {
+		let tokenizer = new Tokenizer(args);
+		let parsedArgs = [];
+
+		let value = tokenizer.readValue();
+		while (value) {
+			parsedArgs.push(value);
+			tokenizer.skipBlank();
+			if (tokenizer.peek() === ",") {
+				tokenizer.advance();
+			}
+			value = tokenizer.readValue();
+		}
+		tokenizer.end();
+
+		return parsedArgs;
+	}
+
 	addShortcode(shortcodeName, shortcodeFn) {
 		let _t = this;
 		this.addTag(shortcodeName, function (liquidEngine) {
 			return {
 				parse(tagToken) {
 					this.name = tagToken.name;
-					this.args = tagToken.args;
+					if (_t.config.liquidParameterParsing === "builtin") {
+						this.orderedArgs = Liquid.parseArgumentsBuiltin(tagToken.args);
+						// note that Liquid does have a Hash class for name-based argument parsing but offers no easy to support both modes in one class
+					} else {
+						this.legacyArgs = tagToken.args;
+					}
 				},
 				render: function* (ctx) {
-					let rawArgs = Liquid.parseArguments(_t.argLexer, this.args);
 					let argArray = [];
-					let contextScope = ctx.getAll();
-					for (let arg of rawArgs) {
-						let b = yield liquidEngine.evalValue(arg, contextScope);
-						argArray.push(b);
+
+					if (this.legacyArgs) {
+						let rawArgs = Liquid.parseArguments(_t.argLexer, this.legacyArgs);
+						for (let arg of rawArgs) {
+							let b = yield liquidEngine.evalValue(arg, ctx);
+							argArray.push(b);
+						}
+					} else if (this.orderedArgs) {
+						for (let arg of this.orderedArgs) {
+							let b = yield evalToken(arg, ctx);
+							argArray.push(b);
+						}
 					}
 
 					let ret = yield shortcodeFn.call(Liquid.normalizeScope(ctx), ...argArray);
@@ -182,7 +263,14 @@ class Liquid extends TemplateEngine {
 			return {
 				parse(tagToken, remainTokens) {
 					this.name = tagToken.name;
-					this.args = tagToken.args;
+
+					if (_t.config.liquidParameterParsing === "builtin") {
+						this.orderedArgs = Liquid.parseArgumentsBuiltin(tagToken.args);
+						// note that Liquid does have a Hash class for name-based argument parsing but offers no easy to support both modes in one class
+					} else {
+						this.legacyArgs = tagToken.args;
+					}
+
 					this.templates = [];
 
 					var stream = liquidEngine.parser
@@ -196,18 +284,24 @@ class Liquid extends TemplateEngine {
 					stream.start();
 				},
 				render: function* (ctx /*, emitter*/) {
-					let rawArgs = Liquid.parseArguments(_t.argLexer, this.args);
 					let argArray = [];
-					let contextScope = ctx.getAll();
-					for (let arg of rawArgs) {
-						let b = yield liquidEngine.evalValue(arg, contextScope);
-						argArray.push(b);
+					if (this.legacyArgs) {
+						let rawArgs = Liquid.parseArguments(_t.argLexer, this.legacyArgs);
+						for (let arg of rawArgs) {
+							let b = yield liquidEngine.evalValue(arg, ctx);
+							argArray.push(b);
+						}
+					} else if (this.orderedArgs) {
+						for (let arg of this.orderedArgs) {
+							let b = yield evalToken(arg, ctx);
+							argArray.push(b);
+						}
 					}
 
 					const html = yield liquidEngine.renderer.renderTemplates(this.templates, ctx);
 
 					let ret = yield shortcodeFn.call(Liquid.normalizeScope(ctx), html, ...argArray);
-					// emitter.write(ret);
+
 					return ret;
 				},
 			};
@@ -215,10 +309,15 @@ class Liquid extends TemplateEngine {
 	}
 
 	parseForSymbols(str) {
-		let tokenizer = new liquidLib.Tokenizer(str);
+		if (!str) {
+			return [];
+		}
+
+		let tokenizer = new Tokenizer(str);
+		/** @type {Array} */
 		let tokens = tokenizer.readTopLevelTokens();
 		let symbols = tokens
-			.filter((token) => token.kind === liquidLib.TokenKind.Output)
+			.filter((token) => token.kind === TokenKind.Output)
 			.map((token) => {
 				// manually remove filters 😅
 				return token.content.split("|").map((entry) => entry.trim())[0];
@@ -227,6 +326,7 @@ class Liquid extends TemplateEngine {
 	}
 
 	// Don’t return a boolean if permalink is a function (see TemplateContent->renderPermalink)
+	/** @returns {boolean|undefined} */
 	permalinkNeedsCompilation(str) {
 		if (typeof str === "string") {
 			return this.needsCompilation(str);
@@ -244,6 +344,7 @@ class Liquid extends TemplateEngine {
 
 	async compile(str, inputPath) {
 		let engine = this.liquidLib;
+		let liquidOptions = this.liquidOptions;
 		let tmplReady = engine.parse(str, inputPath);
 
 		// Required for relative includes
@@ -257,9 +358,17 @@ class Liquid extends TemplateEngine {
 		return async function (data) {
 			let tmpl = await tmplReady;
 
+			options.globals = Object.assign(
+				{
+					page: data?.page,
+					eleventy: data?.eleventy,
+					buildawesome: data?.buildawesome,
+					collections: data?.collections,
+				},
+				liquidOptions?.globals,
+			);
+
 			return engine.render(tmpl, data, options);
 		};
 	}
 }
-
-export default Liquid;

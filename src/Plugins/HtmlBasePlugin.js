@@ -1,18 +1,8 @@
-import posthtml from "posthtml";
-import urls from "posthtml-urls";
-
+import { DeepCopy } from "@11ty/eleventy-utils";
 import urlFilter from "../Filters/Url.js";
 import PathPrefixer from "../Util/PathPrefixer.js";
-import { DeepCopy } from "../Util/Merge.js";
-
-function isValidUrl(url) {
-	try {
-		new URL(url);
-		return true;
-	} catch (e) {
-		return false;
-	}
-}
+import { HtmlTransformer } from "../Util/HtmlTransformer.js";
+import { isValidUrl } from "../Util/UrlUtil.js";
 
 function addPathPrefixToUrl(url, pathPrefix, base) {
 	let u;
@@ -31,7 +21,14 @@ function addPathPrefixToUrl(url, pathPrefix, base) {
 
 // pathprefix is only used when overrideBase is a full URL
 function transformUrl(url, base, opts = {}) {
-	let { pathPrefix, pageUrl } = opts;
+	let { pathPrefix, pageUrl, htmlContext } = opts;
+
+	// Warning, this will not work with HtmlTransformer, as we’ll receive "false" (string) here instead of `false` (boolean)
+	if (url === false) {
+		throw new Error(
+			`Invalid url transformed in the HTML \`<base>\` plugin.${url === false ? ` Did you attempt to link to a \`permalink: false\` page?` : ""} Received: ${url}`,
+		);
+	}
 
 	// full URL, return as-is
 	if (isValidUrl(url)) {
@@ -43,30 +40,18 @@ function transformUrl(url, base, opts = {}) {
 	if (isValidUrl(base)) {
 		// convert relative paths to absolute path first using pageUrl
 		if (pageUrl && !url.startsWith("/")) {
-			url = new URL(url, `http://example.com${pageUrl}`).pathname;
+			let urlObj = new URL(url, `http://example.com${pageUrl}`);
+			url = urlObj.pathname + (urlObj.hash || "");
 		}
 
 		return addPathPrefixToUrl(url, pathPrefix, base);
 	}
 
 	// Not a full URL, nor a full base URL (call the built-in `url` filter)
-	return urlFilter.call(this, url, base);
+	return urlFilter(url, base);
 }
 
-async function addToAllHtmlUrls(htmlContent, callback, processOptions = {}) {
-	let modifier = posthtml().use(
-		urls({
-			eachURL: function (url) {
-				return callback(url);
-			},
-		}),
-	);
-
-	let result = await modifier.process(htmlContent, processOptions);
-	return result.html;
-}
-
-export default function (eleventyConfig, defaultOptions = {}) {
+function HtmlBasePlugin(eleventyConfig, defaultOptions = {}) {
 	let opts = DeepCopy(
 		{
 			// eleventyConfig.pathPrefix is new in Eleventy 2.0.0-canary.15
@@ -75,41 +60,51 @@ export default function (eleventyConfig, defaultOptions = {}) {
 			baseHref: eleventyConfig.pathPrefix,
 
 			extensions: "html",
-
-			name: "htmlBaseWithPathPrefix",
-			filters: {
-				base: "htmlBaseUrl",
-				html: "transformWithHtmlBase",
-				pathPrefix: "addPathPrefixToFullUrl",
-			},
 		},
 		defaultOptions,
 	);
 
-	if (opts.baseHref === undefined) {
-		throw new Error("The `base` option is required in the Eleventy HTML Base plugin.");
+	// `filters` option to rename filters was removed in 3.0.0-alpha.13
+	// Renaming these would cause issues in other plugins (e.g. RSS)
+	if (opts.filters !== undefined) {
+		throw new Error(
+			"The `filters` option in the HTML Base plugin was removed to prevent future cross-plugin compatibility issues.",
+		);
 	}
 
-	eleventyConfig.addFilter(opts.filters.pathPrefix, function (url) {
+	if (opts.baseHref === undefined) {
+		throw new Error("The `baseHref` option is required in the HTML Base plugin.");
+	}
+
+	eleventyConfig.addFilter("addPathPrefixToFullUrl", function (url) {
 		return addPathPrefixToUrl(url, eleventyConfig.pathPrefix);
 	});
 
-	eleventyConfig.addFilter(opts.filters.base, function (url, baseOverride, pageUrlOverride) {
-		let base = baseOverride || opts.baseHref;
+	// Apply to one URL
+	eleventyConfig.addFilter(
+		"htmlBaseUrl",
 
-		// Do nothing with a default base
-		if (base === "/") {
-			return url;
-		}
+		/** @this {object} */
+		function (url, baseOverride, pageUrlOverride) {
+			let base = baseOverride || opts.baseHref;
 
-		return transformUrl.call(this, url, base, {
-			pathPrefix: eleventyConfig.pathPrefix,
-			pageUrl: pageUrlOverride || this.page?.url,
-		});
-	});
+			// Do nothing with a default base
+			if (base === "/") {
+				return url;
+			}
 
+			return transformUrl(url, base, {
+				pathPrefix: eleventyConfig.pathPrefix,
+				pageUrl: pageUrlOverride || this.page?.url,
+			});
+		},
+	);
+
+	// Apply to a block of HTML
 	eleventyConfig.addAsyncFilter(
-		opts.filters.html,
+		"transformWithHtmlBase",
+
+		/** @this {object} */
 		function (content, baseOverride, pageUrlOverride) {
 			let base = baseOverride || opts.baseHref;
 
@@ -118,39 +113,54 @@ export default function (eleventyConfig, defaultOptions = {}) {
 				return content;
 			}
 
-			return addToAllHtmlUrls(content, (url) => {
-				return transformUrl.call(this, url.trim(), base, {
+			return HtmlTransformer.transformStandalone(content, (url, htmlContext) => {
+				return transformUrl(url.trim(), base, {
 					pathPrefix: eleventyConfig.pathPrefix,
 					pageUrl: pageUrlOverride || this.page?.url,
+					htmlContext,
 				});
 			});
 		},
 	);
 
-	// Skip the transform with a default base
-	if (opts.baseHref !== "/") {
-		let extensionMap = {};
-		for (let ext of (opts.extensions || "").split(",")) {
-			extensionMap[ext] = true;
-		}
+	// Apply to all HTML output in your project
+	eleventyConfig.htmlTransformer.addUrlTransform(
+		opts.extensions,
 
-		// Skip the transform if no extensions are specified
-		if (Object.keys(extensionMap).length > 0) {
-			eleventyConfig.addTransform(opts.name, function (content) {
-				let ext = (this.outputPath || "").split(".").pop();
-				if (extensionMap[ext]) {
-					return addToAllHtmlUrls(content, (url) => {
-						return transformUrl.call(this, url.trim(), opts.baseHref, {
-							pathPrefix: eleventyConfig.pathPrefix,
-							pageUrl: this.url,
-						});
-					});
-				}
-
-				return content;
+		/** @this {object} */
+		function (urlInMarkup, htmlContext) {
+			// baseHref override is via renderTransforms filter for adding the absolute URL (e.g. https://example.com/pathPrefix/) for RSS/Atom/JSON feeds
+			return transformUrl(urlInMarkup.trim(), this.baseHref || opts.baseHref, {
+				pathPrefix: eleventyConfig.pathPrefix,
+				pageUrl: this.url,
+				htmlContext,
 			});
-		}
-	}
+		},
+		{
+			priority: -2, // priority is descending, so this runs last (especially after AutoCopy and InputPathToUrl transform)
+			enabled: function (context) {
+				// Enabled when pathPrefix is non-default or via renderTransforms
+				return Boolean(context.baseHref) || opts.baseHref !== "/";
+			},
+		},
+	);
 }
+
+Object.defineProperty(HtmlBasePlugin, "eleventyPackage", {
+	value: "@11ty/eleventy/html-base-plugin",
+});
+
+Object.defineProperty(HtmlBasePlugin, "eleventyPluginOptions", {
+	value: {
+		unique: true,
+	},
+});
+
+// CommonJS friendly exports on .default
+Object.assign(HtmlBasePlugin, {
+	applyBaseToUrl: transformUrl,
+});
+
+export default HtmlBasePlugin;
 
 export { transformUrl as applyBaseToUrl };

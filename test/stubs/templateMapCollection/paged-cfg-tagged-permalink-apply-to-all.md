@@ -7,7 +7,7 @@ pagination:
   size: 1
   alias: item
   addAllPagesToCollections: true
-permalink: /{{ item.data.title | slug}}/goodbye/
+permalink: /{{ item.data.title | slugify }}/goodbye/
 ---
 
 # {{ title }}

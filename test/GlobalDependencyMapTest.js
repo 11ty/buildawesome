@@ -54,7 +54,7 @@ test("Stringify/restore", (t) => {
 
   t.is(
     origin.stringify(),
-    `{"nodes":{"test.njk":"test.njk","_includes/include.njk":"_includes/include.njk"},"outgoingEdges":{"test.njk":["_includes/include.njk"],"_includes/include.njk":[]},"incomingEdges":{"test.njk":[],"_includes/include.njk":["test.njk"]},"circular":true}`
+    `{"nodes":{"__collection:all":"__collection:all","__collection:[keys]":"__collection:[keys]","__collection:[userconfig]":"__collection:[userconfig]","__collection:[basic]":"__collection:[basic]","test.njk":"test.njk","_includes/include.njk":"_includes/include.njk"},"outgoingEdges":{"__collection:all":["__collection:[keys]"],"__collection:[keys]":["__collection:[userconfig]"],"__collection:[userconfig]":["__collection:[basic]"],"__collection:[basic]":[],"test.njk":["_includes/include.njk"],"_includes/include.njk":[]},"incomingEdges":{"__collection:all":[],"__collection:[keys]":["__collection:all"],"__collection:[userconfig]":["__collection:[keys]"],"__collection:[basic]":["__collection:[userconfig]"],"test.njk":[],"_includes/include.njk":["test.njk"]},"circular":true}`
   );
 
   let map = new GlobalDependencyMap();
@@ -69,4 +69,20 @@ test("Stringify/restore", (t) => {
   // if _includes/include.njk changes, we want to recompile test.njk
   t.true(map.isFileRelevantTo("test.njk", "_includes/include.njk"));
   t.false(map.isFileRelevantTo("_includes/include.njk", "test.njk"));
+});
+
+test("Collection API", (t) => {
+  let map = new GlobalDependencyMap();
+
+  map.setCollectionApiNames(["articles"]);
+  map.addNewNodeRelationships("test.njk", [], ["all"])
+  map.addNewNodeRelationships("feed.njk", ["articles"], ["all"])
+
+  t.deepEqual(map.getTemplateOrder(), [
+    "test.njk",
+    "__collection:[keys]",
+    "__collection:articles",
+    "feed.njk",
+    "__collection:all",
+  ]);
 });

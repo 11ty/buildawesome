@@ -1,25 +1,60 @@
-import NunjucksLib from "nunjucks";
 import { TemplatePath } from "@11ty/eleventy-utils";
 
+// Direct reference to avoid use of `browser` Nunjucks variant in bundles
+import {
+	default as NunjucksLib,
+	Environment,
+	FileSystemLoader,
+	Template,
+} from "@11ty/nunjucks/index.js";
 import TemplateEngine from "./TemplateEngine.js";
-import EleventyErrorUtil from "../EleventyErrorUtil.js";
-import EleventyShortcodeError from "../EleventyShortcodeError.js";
-import EventBusUtil from "../Util/EventBusUtil.js";
+import BaseError from "../Errors/BaseError.js";
+import { augmentObject } from "./Util/ContextAugmenter.js";
+import { createDebug } from "../Util/DebugLogUtil.js";
 
-class Nunjucks extends TemplateEngine {
-	constructor(name, dirs, config) {
-		super(name, dirs, config);
-		this.nunjucksEnvironmentOptions = this.config.nunjucksEnvironmentOptions || {};
+const debug = createDebug("Nunjucks");
+
+class BuildAwesomeNunjucksError extends BaseError {}
+
+export default class Nunjucks extends TemplateEngine {
+	constructor(name, eleventyConfig) {
+		super(name, eleventyConfig);
+
+		this.nunjucksEnvironmentOptions = this.config.nunjucksEnvironmentOptions || { dev: true };
 
 		this.nunjucksPrecompiledTemplates = this.config.nunjucksPrecompiledTemplates || {};
 		this._usingPrecompiled = Object.keys(this.nunjucksPrecompiledTemplates).length > 0;
 
 		this.setLibrary(this.config.libraryOverrides.njk);
-
-		this.cacheable = true;
 	}
 
-	_setEnv(override) {
+	// Nunjucks’ internal cache only covers loader templates (includes, layouts), not compiled strings
+	get cacheable() {
+		return true;
+	}
+
+	#recompiledKeys = new Set();
+
+	// A cached template keeps the environment (and included templates) of the build that compiled it
+	getCompileCacheKey(str, inputPath) {
+		let entry = super.getCompileCacheKey(str, inputPath);
+		if (!this.#recompiledKeys.has(entry.key) && this.config.uses.isChangedFileUsedBy(inputPath)) {
+			this.#recompiledKeys.add(entry.key);
+			entry.useCache = false;
+		}
+		return entry;
+	}
+
+	#getFileSystemDirs() {
+		let paths = new Set();
+		paths.add(super.getIncludesDir());
+		paths.add(TemplatePath.getWorkingDir());
+
+		// Filter out undefined paths
+		return Array.from(paths).filter(Boolean);
+	}
+
+	#setEnv(override) {
 		if (override) {
 			this.njkEnv = override;
 		} else if (this._usingPrecompiled) {
@@ -39,45 +74,102 @@ class Nunjucks extends TemplateEngine {
 				};
 			};
 
-			this.njkEnv = new NunjucksLib.Environment(
-				new NodePrecompiledLoader(),
-				this.nunjucksEnvironmentOptions,
-			);
+			this.njkEnv = new Environment(new NodePrecompiledLoader(), this.nunjucksEnvironmentOptions);
 		} else {
-			let fsLoader = new NunjucksLib.FileSystemLoader([
-				super.getIncludesDir(),
-				TemplatePath.getWorkingDir(),
-			]);
+			let loaders = [];
+			loaders.push(new FileSystemLoader(this.#getFileSystemDirs()));
 
-			this.njkEnv = new NunjucksLib.Environment(fsLoader, this.nunjucksEnvironmentOptions);
+			// These need to come after FileSystemLoader
+			for (let loaderOptions of this.config.nunjucksLoaders) {
+				let loader = NunjucksLib.Loader.extend(loaderOptions);
+				loaders.push(new loader());
+			}
+
+			this.njkEnv = new Environment(loaders, this.nunjucksEnvironmentOptions);
 		}
 
-		this.config.events.emit("eleventy.engine.njk", {
+		this.#trackTemplates();
+
+		this.config.events.emit("buildawesome.engine.njk", {
 			nunjucks: NunjucksLib,
 			environment: this.njkEnv,
 		});
 	}
 
-	setLibrary(override) {
-		this._setEnv(override);
+	// Records `include`, `import`, `from`, and `extends` files in the dependency graph for incremental builds
+	#trackTemplates() {
+		let env = this.njkEnv;
+		let getTemplate = env.getTemplate;
+		if (typeof getTemplate !== "function") {
+			return;
+		}
 
-		// Correct, but overbroad. Better would be to evict more granularly, but
-		// resolution from paths isn't straightforward.
-		EventBusUtil.soloOn("eleventy.resourceModified", (/*path*/) => {
-			this.njkEnv.invalidateCache();
+		let engine = this;
+		env.getTemplate = function (name, ...args) {
+			// (name, eagerCompile, parentName, ignoreMissing, cb), any trailing arguments optional
+			// String templates have no path, so use the engine name (e.g. includes in `renderTemplate`)
+			let parentName =
+				typeof args[1] === "string" ? args[1] : args.length > 1 ? engine.name : undefined;
+			let cbIndex = args.findIndex((arg) => typeof arg === "function");
+			if (parentName && cbIndex > -1) {
+				let cb = args[cbIndex];
+				args[cbIndex] = (error, tmpl) => {
+					engine.addDependency(parentName, tmpl?.path);
+					cb(error, tmpl);
+				};
+			}
+
+			let result = getTemplate.call(this, name, ...args);
+			if (parentName && cbIndex === -1) {
+				engine.addDependency(parentName, result?.path);
+			}
+			return result;
+		};
+	}
+
+	setLibrary(override) {
+		this.#setEnv(override);
+
+		// Note that a new Nunjucks engine instance is created for subsequent builds
+		this.config.events.on("buildawesome#templatemodified", (templatePath) => {
+			// NunjucksEnvironment:
+			// loader.pathToNames: {'ABSOLUTE_PATH/src/_includes/components/possum-home.css': 'components/possum-home.css'}
+			// loader.cache: { 'components/possum-home.css': [Template] }
+			// Nunjucks stores these as Operating System native paths
+			let absTmplPath = TemplatePath.normalizeOperatingSystemFilePath(
+				TemplatePath.absolutePath(templatePath),
+			);
+			for (let loader of this.njkEnv.loaders) {
+				let nunjucksName = loader.pathsToNames[absTmplPath];
+				if (nunjucksName) {
+					debug(
+						"Match found in Nunjucks cache via templateModified for %o, clearing this entry",
+						templatePath,
+					);
+					delete loader.pathsToNames[absTmplPath];
+					delete loader.cache[nunjucksName];
+				}
+			}
+
+			// Behavior prior to v3.1.0-alpha.1:
+			// this.njkEnv.invalidateCache();
 		});
 
-		this.setEngineLib(this.njkEnv);
+		this.setEngineLib(this.njkEnv, Boolean(this.config.libraryOverrides.njk));
 
 		this.addFilters(this.config.nunjucksFilters);
 		this.addFilters(this.config.nunjucksAsyncFilters, true);
 
-		// TODO these all go to the same place (addTag), add warnings for overwrites
-		// TODO(zachleat): variableName should work with quotes or without quotes (same as {% set %})
-		this.addPairedShortcode("setAsync", function (content, variableName) {
-			this.ctx[variableName] = content;
-			return "";
-		});
+		// Changed from sync to async function in v4.0.0-alpha.9 (notably previous versions of synchronous paired shortcodes used CallExtensionAsync)
+		// Deprecated in v4.0.0-alpha.9. Use `{% set %}` which is now async-friendly
+		this.addPairedShortcode(
+			"setAsync",
+			async function (content, variableName) {
+				this.ctx[variableName] = content;
+				return "";
+			},
+			true,
+		);
 
 		this.addCustomTags(this.config.nunjucksTags);
 		this.addAllShortcodes(this.config.nunjucksShortcodes);
@@ -89,20 +181,25 @@ class Nunjucks extends TemplateEngine {
 
 	addFilters(filters, isAsync) {
 		for (let name in filters) {
-			this.njkEnv.addFilter(name, Nunjucks.wrapFilter(filters[name]), isAsync);
+			this.njkEnv.addFilter(name, Nunjucks.wrapFilter(name, filters[name]), isAsync);
 		}
 	}
 
-	static wrapFilter(fn) {
+	static wrapFilter(name, fn) {
 		return function (...args) {
-			if (this.ctx && this.ctx.page) {
-				this.page = this.ctx.page;
-			}
-			if (this.ctx && this.ctx.eleventy) {
-				this.eleventy = this.ctx.eleventy;
-			}
+			try {
+				augmentObject(this, {
+					source: this.ctx,
+					lazy: false, // context.env?.opts.throwOnUndefined,
+				});
 
-			return fn.call(this, ...args);
+				return fn.call(this, ...args);
+			} catch (e) {
+				throw new BuildAwesomeNunjucksError(
+					`Error in Nunjucks Filter \`${name}\`${this.page ? ` (${this.page.inputPath})` : ""}`,
+					e,
+				);
+			}
 		};
 	}
 
@@ -111,14 +208,12 @@ class Nunjucks extends TemplateEngine {
 		let obj = {};
 		if (context.ctx) {
 			obj.ctx = context.ctx;
+			obj.env = context.env;
 
-			if (context.ctx.page) {
-				obj.page = context.ctx.page;
-			}
-
-			if (context.ctx.eleventy) {
-				obj.eleventy = context.ctx.eleventy;
-			}
+			augmentObject(obj, {
+				source: context.ctx,
+				lazy: false, // context.env?.opts.throwOnUndefined,
+			});
 		}
 		return obj;
 	}
@@ -164,71 +259,67 @@ class Nunjucks extends TemplateEngine {
 		}
 	}
 
-	_getShortcodeFn(shortcodeName, shortcodeFn, isAsync = false) {
+	_getShortcodeFn(shortcodeName, shortcodeFn) {
 		return function ShortcodeFunction() {
 			this.tags = [shortcodeName];
 
 			this.parse = function (parser, nodes) {
-				let args;
 				let tok = parser.nextToken();
-
-				args = parser.parseSignature(true, true);
+				let args = parser.parseSignature(true, true);
 
 				// Nunjucks bug with non-paired custom tags bug still exists even
 				// though this issue is closed. Works fine for paired.
 				// https://github.com/mozilla/nunjucks/issues/158
-				if (args.children.length === 0) {
-					args.addChild(new nodes.Literal(0, 0, ""));
-				}
+				// https://github.com/11ty/eleventy/issues/372
+
+				// v4.0.0-alpha.1 changed from an empty string to an empty NodeList
+				// https://github.com/11ty/eleventy/issues/3788
+
+				// v4.0.0-alpha.9 fixed the issue upstream in Nunjucks core.
 
 				parser.advanceAfterBlockEnd(tok.value);
-				if (isAsync) {
-					return new nodes.CallExtensionAsync(this, "run", args);
-				}
-				return new nodes.CallExtension(this, "run", args);
+
+				return new nodes.CallExtensionAsync(this, "run", args, null);
 			};
 
 			this.run = function (...args) {
-				let resolve;
-				if (isAsync) {
-					resolve = args.pop();
-				}
-
+				let resolve = args.pop();
 				let [context, ...argArray] = args;
 
-				if (isAsync) {
-					shortcodeFn
-						.call(Nunjucks.normalizeContext(context), ...argArray)
-						.then(function (returnValue) {
-							resolve(null, new NunjucksLib.runtime.SafeString("" + returnValue));
-						})
-						.catch(function (e) {
-							resolve(
-								new EleventyShortcodeError(
-									`Error with Nunjucks shortcode \`${shortcodeName}\`${EleventyErrorUtil.convertErrorToString(
-										e,
-									)}`,
-								),
-								null,
-							);
-						});
-				} else {
-					try {
-						let ret = shortcodeFn.call(Nunjucks.normalizeContext(context), ...argArray);
-						return new NunjucksLib.runtime.SafeString("" + ret);
-					} catch (e) {
-						throw new EleventyShortcodeError(
-							`Error with Nunjucks shortcode \`${shortcodeName}\`${EleventyErrorUtil.convertErrorToString(
-								e,
-							)}`,
-						);
-					}
+				let ret;
+
+				try {
+					ret = shortcodeFn.call(Nunjucks.normalizeContext(context), ...argArray);
+				} catch (e) {
+					resolve(
+						new BuildAwesomeNunjucksError(`Error with Nunjucks shortcode \`${shortcodeName}\``, e),
+					);
 				}
+
+				// v4.0.0-alpha.9: reverts #3286 error messaging when the shortcode is not a promise to return content
+				if (!ret?.then) {
+					resolve(null, new NunjucksLib.runtime.SafeString("" + ret));
+					return;
+				}
+
+				ret.then(
+					function (returnValue) {
+						resolve(null, new NunjucksLib.runtime.SafeString("" + returnValue));
+					},
+					function (e) {
+						resolve(
+							new BuildAwesomeNunjucksError(
+								`Error with Nunjucks shortcode \`${shortcodeName}\``,
+								e,
+							),
+						);
+					},
+				);
 			};
 		};
 	}
 
-	_getPairedShortcodeFn(shortcodeName, shortcodeFn, isAsync = false) {
+	_getPairedShortcodeFn(shortcodeName, shortcodeFn) {
 		return function PairedShortcodeFunction() {
 			this.tags = [shortcodeName];
 
@@ -252,48 +343,46 @@ class Nunjucks extends TemplateEngine {
 				body(function (e, bodyContent) {
 					if (e) {
 						resolve(
-							new EleventyShortcodeError(
-								`Error with Nunjucks paired shortcode \`${shortcodeName}\`${EleventyErrorUtil.convertErrorToString(
-									e,
-								)}`,
+							new BuildAwesomeNunjucksError(
+								`Error with Nunjucks paired shortcode \`${shortcodeName}\``,
+								e,
 							),
 						);
 					}
 
-					if (isAsync) {
-						shortcodeFn
-							.call(Nunjucks.normalizeContext(context), bodyContent, ...argArray)
-							.then(function (returnValue) {
-								resolve(null, new NunjucksLib.runtime.SafeString(returnValue));
-							})
-							.catch(function (e) {
-								resolve(
-									new EleventyShortcodeError(
-										`Error with Nunjucks paired shortcode \`${shortcodeName}\`${EleventyErrorUtil.convertErrorToString(
-											e,
-										)}`,
-									),
-									null,
-								);
-							});
-					} else {
-						try {
-							resolve(
-								null,
-								new NunjucksLib.runtime.SafeString(
-									shortcodeFn.call(Nunjucks.normalizeContext(context), bodyContent, ...argArray),
-								),
-							);
-						} catch (e) {
-							resolve(
-								new EleventyShortcodeError(
-									`Error with Nunjucks paired shortcode \`${shortcodeName}\`${EleventyErrorUtil.convertErrorToString(
-										e,
-									)}`,
-								),
-							);
-						}
+					let ret;
+
+					try {
+						ret = shortcodeFn.call(Nunjucks.normalizeContext(context), bodyContent, ...argArray);
+					} catch (e) {
+						resolve(
+							new BuildAwesomeNunjucksError(
+								`Error with Nunjucks paired shortcode \`${shortcodeName}\``,
+								e,
+							),
+						);
 					}
+
+					// #3286 error messaging when the shortcode is not a promise
+					// v4.0.0-alpha.9 swapped to handle silently (async-everything)
+					if (!ret?.then) {
+						resolve(null, new NunjucksLib.runtime.SafeString("" + ret));
+						return;
+					}
+
+					ret.then(
+						function (returnValue) {
+							resolve(null, new NunjucksLib.runtime.SafeString("" + returnValue));
+						},
+						function (e) {
+							resolve(
+								new BuildAwesomeNunjucksError(
+									`Error with Nunjucks paired shortcode \`${shortcodeName}\``,
+									e,
+								),
+							);
+						},
+					);
 				});
 			};
 		};
@@ -365,8 +454,14 @@ class Nunjucks extends TemplateEngine {
 
 	/* Outputs an Array of lodash get selectors */
 	parseForSymbols(str) {
+		if (!str) {
+			return [];
+		}
 		const { parser, nodes } = NunjucksLib;
 		let obj = parser.parse(str, this._getParseExtensions());
+		if (!obj) {
+			return [];
+		}
 		let linesplit = str.split("\n");
 		let values = obj.findAll(nodes.Value);
 		let symbols = obj.findAll(nodes.Symbol).map((entry) => {
@@ -399,26 +494,29 @@ class Nunjucks extends TemplateEngine {
 	async compile(str, inputPath) {
 		let tmpl;
 
+		// *All* templates are precompiled to avoid runtime eval
 		if (this._usingPrecompiled) {
 			tmpl = this.njkEnv.getTemplate(str, true);
 		} else if (!inputPath || inputPath === "njk" || inputPath === "md") {
-			tmpl = new NunjucksLib.Template(str, this.njkEnv, null, true);
+			// Template(content, environment, path, eagerCompile)
+			tmpl = new Template(str, this.njkEnv, null, false);
 		} else {
-			tmpl = new NunjucksLib.Template(str, this.njkEnv, inputPath, true);
+			// Template(content, environment, path, eagerCompile)
+			tmpl = new Template(str, this.njkEnv, inputPath, false);
 		}
 
-		return async function (data) {
-			return new Promise(function (resolve, reject) {
-				tmpl.render(data, function (err, res) {
-					if (err) {
-						reject(err);
-					} else {
-						resolve(res);
-					}
-				});
+		return function (data) {
+			let { promise, resolve, reject } = Promise.withResolvers();
+
+			tmpl.render(data, (error, result) => {
+				if (error) {
+					reject(error);
+				} else {
+					resolve(result);
+				}
 			});
+
+			return promise;
 		};
 	}
 }
-
-export default Nunjucks;

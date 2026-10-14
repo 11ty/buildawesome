@@ -1,16 +1,17 @@
 import test from "ava";
-import multimatch from "multimatch";
 
-import TemplateConfig from "../src/TemplateConfig.js";
+import { isGlobMatch } from "../src/Util/GlobMatcher.js";
 import Collection from "../src/TemplateCollection.js";
-import Sortable from "../src/Util/Sortable.js";
-import getNewTemplateForTests from "../test/_getNewTemplateForTests.js";
+import Sortable from "../src/Util/Objects/Sortable.js";
 
-function getNewTemplate(filename, input, output, eleventyConfig) {
-  return getNewTemplateForTests(filename, input, output, null, null, eleventyConfig);
+import getNewTemplateForTests from "../test/_getNewTemplateForTests.js";
+import { getTemplateConfigInstance } from "./_testHelpers.js";
+
+function getNewTemplate(filename, input, output, $config) {
+  return getNewTemplateForTests(filename, input, output, null, null, $config);
 }
 
-function getNewTemplateByNumber(num, eleventyConfig) {
+function getNewTemplateByNumber(num, $config) {
   let extensions = ["md", "md", "md", "md", "md", "html", "njk", "md", "md", "md"];
 
   return getNewTemplateForTests(
@@ -19,7 +20,7 @@ function getNewTemplateByNumber(num, eleventyConfig) {
     "./test/stubs/_site",
     null,
     null,
-    eleventyConfig,
+    $config,
   );
 }
 
@@ -31,12 +32,11 @@ async function addTemplate(collection, template) {
 }
 
 test("Basic setup", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+	let $config = await getTemplateConfigInstance();
 
-  let tmpl1 = await getNewTemplateByNumber(1, eleventyConfig);
-  let tmpl2 = await getNewTemplateByNumber(2, eleventyConfig);
-  let tmpl3 = await getNewTemplateByNumber(3, eleventyConfig);
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl2 = await getNewTemplateByNumber(2, $config);
+  let tmpl3 = await getNewTemplateByNumber(3, $config);
 
   let c = new Collection();
   await addTemplate(c, tmpl1);
@@ -47,12 +47,11 @@ test("Basic setup", async (t) => {
 });
 
 test("sortFunctionDate", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let $config = await getTemplateConfigInstance();
 
-  let tmpl1 = await getNewTemplateByNumber(1, eleventyConfig);
-  let tmpl4 = await getNewTemplateByNumber(4, eleventyConfig);
-  let tmpl5 = await getNewTemplateByNumber(5, eleventyConfig);
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl4 = await getNewTemplateByNumber(4, $config);
+  let tmpl5 = await getNewTemplateByNumber(5, $config);
 
   let c = new Collection();
   await addTemplate(c, tmpl1);
@@ -67,12 +66,11 @@ test("sortFunctionDate", async (t) => {
 });
 
 test("sortFunctionDateInputPath", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let $config = await getTemplateConfigInstance();
 
-  let tmpl1 = await getNewTemplateByNumber(1, eleventyConfig);
-  let tmpl4 = await getNewTemplateByNumber(4, eleventyConfig);
-  let tmpl5 = await getNewTemplateByNumber(5, eleventyConfig);
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl4 = await getNewTemplateByNumber(4, $config);
+  let tmpl5 = await getNewTemplateByNumber(5, $config);
 
   let c = new Collection();
   await addTemplate(c, tmpl1);
@@ -87,12 +85,11 @@ test("sortFunctionDateInputPath", async (t) => {
 });
 
 test("getFilteredByTag", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let $config = await getTemplateConfigInstance();
 
-  let tmpl1 = await getNewTemplateByNumber(1, eleventyConfig);
-  let tmpl2 = await getNewTemplateByNumber(2, eleventyConfig);
-  let tmpl3 = await getNewTemplateByNumber(3, eleventyConfig);
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl2 = await getNewTemplateByNumber(2, $config);
+  let tmpl3 = await getNewTemplateByNumber(3, $config);
 
   let c = new Collection();
   await addTemplate(c, tmpl1);
@@ -115,12 +112,11 @@ test("getFilteredByTag", async (t) => {
 });
 
 test("getFilteredByTag (added out of order, sorted)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let $config = await getTemplateConfigInstance();
 
-  let tmpl1 = await getNewTemplateByNumber(1, eleventyConfig);
-  let tmpl2 = await getNewTemplateByNumber(2, eleventyConfig);
-  let tmpl3 = await getNewTemplateByNumber(3, eleventyConfig);
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl2 = await getNewTemplateByNumber(2, $config);
+  let tmpl3 = await getNewTemplateByNumber(3, $config);
 
   let c = new Collection();
   await addTemplate(c, tmpl3);
@@ -143,13 +139,85 @@ test("getFilteredByTag (added out of order, sorted)", async (t) => {
   t.deepEqual(dogs[0].template, tmpl1);
 });
 
-test("getFilteredByTags", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+test("getFilteredByTag (results are cached, cache is invalidated by add)", async (t) => {
+  let $config = await getTemplateConfigInstance();
 
-  let tmpl1 = await getNewTemplateByNumber(1, eleventyConfig);
-  let tmpl2 = await getNewTemplateByNumber(2, eleventyConfig);
-  let tmpl3 = await getNewTemplateByNumber(3, eleventyConfig);
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl2 = await getNewTemplateByNumber(2, $config);
+  let tmpl3 = await getNewTemplateByNumber(3, $config);
+
+  let c = new Collection();
+  await addTemplate(c, tmpl1);
+
+  let posts = c.getFilteredByTag("post");
+  t.is(posts.length, 1);
+
+  await addTemplate(c, tmpl2);
+  await addTemplate(c, tmpl3);
+
+  t.is(c.getFilteredByTag("post").length, 2);
+  t.is(c.getFilteredByTag("cat").length, 2);
+  t.is(c.getFilteredByTags("post", "cat").length, 1);
+  t.is(c.getAllSorted().length, 3);
+
+  // The result returned before the additions is unaffected
+  t.is(posts.length, 1);
+});
+
+test("getFilteredByTag (results are mutable copies)", async (t) => {
+  let $config = await getTemplateConfigInstance();
+
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl3 = await getNewTemplateByNumber(3, $config);
+
+  let c = new Collection();
+  await addTemplate(c, tmpl1);
+  await addTemplate(c, tmpl3);
+
+  let posts = c.getFilteredByTag("post");
+  posts.reverse();
+  posts.pop();
+
+  let posts2 = c.getFilteredByTag("post");
+  t.is(posts2.length, 2);
+  t.deepEqual(posts2[0].template, tmpl1);
+  t.deepEqual(posts2[1].template, tmpl3);
+
+  let postsPlural = c.getFilteredByTags("post");
+  postsPlural.pop();
+  t.is(c.getFilteredByTags("post").length, 2);
+});
+
+test("getFilteredByTag (no tag name returns everything, sorted)", async (t) => {
+  let $config = await getTemplateConfigInstance();
+
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl4 = await getNewTemplateByNumber(4, $config);
+  let tmpl5 = await getNewTemplateByNumber(5, $config);
+
+  let c = new Collection();
+  await addTemplate(c, tmpl1);
+  await addTemplate(c, tmpl4);
+  await addTemplate(c, tmpl5);
+
+  let all = c.getFilteredByTag();
+  t.is(all.length, 3);
+  t.deepEqual(all[0].template, tmpl4);
+  t.deepEqual(all[1].template, tmpl1);
+  t.deepEqual(all[2].template, tmpl5);
+
+  // `all` is not a tag name, it is filtered out of the included tag names
+  t.is(c.getFilteredByTag("all").length, 0);
+  t.is(c.getFilteredByTag("unknown-tag").length, 0);
+  t.is(c.getFilteredByTags().length, 3);
+});
+
+test("getFilteredByTags", async (t) => {
+  let $config = await getTemplateConfigInstance();
+
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl2 = await getNewTemplateByNumber(2, $config);
+  let tmpl3 = await getNewTemplateByNumber(3, $config);
 
   let c = new Collection();
   await addTemplate(c, tmpl1);
@@ -171,12 +239,11 @@ test("getFilteredByTags", async (t) => {
 });
 
 test("getFilteredByTags (added out of order, sorted)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let $config = await getTemplateConfigInstance();
 
-  let tmpl1 = await getNewTemplateByNumber(1, eleventyConfig);
-  let tmpl2 = await getNewTemplateByNumber(2, eleventyConfig);
-  let tmpl3 = await getNewTemplateByNumber(3, eleventyConfig);
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl2 = await getNewTemplateByNumber(2, $config);
+  let tmpl3 = await getNewTemplateByNumber(3, $config);
 
   let c = new Collection();
   await addTemplate(c, tmpl3);
@@ -201,12 +268,11 @@ test("getFilteredByTags (added out of order, sorted)", async (t) => {
 });
 
 test("getFilteredByGlob", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let $config = await getTemplateConfigInstance();
 
-  let tmpl1 = await getNewTemplateByNumber(1, eleventyConfig);
-  let tmpl6 = await getNewTemplateByNumber(6, eleventyConfig);
-  let tmpl7 = await getNewTemplateByNumber(7, eleventyConfig);
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl6 = await getNewTemplateByNumber(6, $config);
+  let tmpl7 = await getNewTemplateByNumber(7, $config);
 
   let c = new Collection();
   await addTemplate(c, tmpl1);
@@ -219,12 +285,11 @@ test("getFilteredByGlob", async (t) => {
 });
 
 test("getFilteredByGlob no dash dot", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let $config = await getTemplateConfigInstance();
 
-  let tmpl1 = await getNewTemplateByNumber(1, eleventyConfig);
-  let tmpl6 = await getNewTemplateByNumber(6, eleventyConfig);
-  let tmpl7 = await getNewTemplateByNumber(7, eleventyConfig);
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl6 = await getNewTemplateByNumber(6, $config);
+  let tmpl7 = await getNewTemplateByNumber(7, $config);
 
   let c = new Collection();
   await addTemplate(c, tmpl1);
@@ -241,21 +306,41 @@ test("getFilteredByGlob no dash dot", async (t) => {
   t.deepEqual(htmls[1].template, tmpl7);
 });
 
+test("getFilteredByGlob (cache is invalidated by add)", async (t) => {
+  let $config = await getTemplateConfigInstance();
+
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl6 = await getNewTemplateByNumber(6, $config);
+  let tmpl8 = await getNewTemplateByNumber(8, $config);
+
+  let c = new Collection();
+  await addTemplate(c, tmpl1);
+  await addTemplate(c, tmpl6);
+
+  let markdowns = c.getFilteredByGlob("./**/*.md");
+  t.is(markdowns.length, 1);
+
+  await addTemplate(c, tmpl8);
+  t.is(c.getFilteredByGlob("./**/*.md").length, 2);
+
+  // The result returned before the addition is unaffected
+  t.is(markdowns.length, 1);
+});
+
 test("partial match on tag string, issue 95", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let $config = await getTemplateConfigInstance();
 
   let cat = await getNewTemplate(
     "./test/stubs/issue-95/cat.md",
     "./test/stubs/",
     "./test/stubs/_site",
-    eleventyConfig,
+    $config,
   );
   let notacat = await getNewTemplate(
     "./test/stubs/issue-95/notacat.md",
     "./test/stubs/",
     "./test/stubs/_site",
-    eleventyConfig,
+    $config,
   );
 
   let c = new Collection();
@@ -266,35 +351,36 @@ test("partial match on tag string, issue 95", async (t) => {
   t.is(posts.length, 1);
 });
 
-test("multimatch assumptions, issue #127", async (t) => {
-  t.deepEqual(
-    multimatch(["src/bookmarks/test.md"], "**/+(bookmarks|posts|screencasts)/**/!(index)*.md"),
-    ["src/bookmarks/test.md"],
+// Swapped to `micromatch` in 3.0.0-alpha.17, and later to `picomatch`.
+// The test can stay as a sanity check.
+test("micromatch assumptions, issue #127", async (t) => {
+  function isMatch(filepath, globs) {
+    return isGlobMatch(filepath, globs);
+  }
+  t.true(
+    isMatch("src/bookmarks/test.md", ["**/+(bookmarks|posts|screencasts)/**/!(index)*.md"]),
   );
-  t.deepEqual(
-    multimatch(["./src/bookmarks/test.md"], "./**/+(bookmarks|posts|screencasts)/**/!(index)*.md"),
-    ["./src/bookmarks/test.md"],
+
+  t.true(
+    isMatch("./src/bookmarks/test.md", ["./**/+(bookmarks|posts|screencasts)/**/!(index)*.md"]),
   );
 
   let c = new Collection();
   let globs = c.getGlobs("**/+(bookmarks|posts|screencasts)/**/!(index)*.md");
   t.deepEqual(globs, ["./**/+(bookmarks|posts|screencasts)/**/!(index)*.md"]);
 
-  t.deepEqual(multimatch(["./src/bookmarks/test.md"], globs), ["./src/bookmarks/test.md"]);
-  t.deepEqual(multimatch(["./src/bookmarks/index.md"], globs), []);
-  t.deepEqual(multimatch(["./src/bookmarks/index2.md"], globs), []);
-  t.deepEqual(multimatch(["./src/_content/bookmarks/2018-03-27-git-message.md"], globs), [
-    "./src/_content/bookmarks/2018-03-27-git-message.md",
-  ]);
+  t.true(isMatch("./src/bookmarks/test.md", globs));
+  t.false(isMatch("./src/bookmarks/index.md", globs));
+  t.false(isMatch("./src/bookmarks/index2.md", globs));
+  t.true(isMatch("./src/_content/bookmarks/2018-03-27-git-message.md", globs));
 });
 
 test("Sort in place (issue #352)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let $config = await getTemplateConfigInstance();
 
-  let tmpl1 = await getNewTemplateByNumber(1, eleventyConfig);
-  let tmpl4 = await getNewTemplateByNumber(4, eleventyConfig);
-  let tmpl5 = await getNewTemplateByNumber(5, eleventyConfig);
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl4 = await getNewTemplateByNumber(4, $config);
+  let tmpl5 = await getNewTemplateByNumber(5, $config);
 
   let c = new Collection();
   await addTemplate(c, tmpl1);
@@ -321,12 +407,11 @@ test("Sort in place (issue #352)", async (t) => {
 });
 
 test("getFilteredByTag with excludes", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let $config = await getTemplateConfigInstance();
 
-  let tmpl8 = await getNewTemplateByNumber(8, eleventyConfig);
-  let tmpl9 = await getNewTemplateByNumber(9, eleventyConfig);
-  let tmpl10 = await getNewTemplateByNumber(10, eleventyConfig);
+  let tmpl8 = await getNewTemplateByNumber(8, $config);
+  let tmpl9 = await getNewTemplateByNumber(9, $config);
+  let tmpl10 = await getNewTemplateByNumber(10, $config);
 
   let c = new Collection();
   await addTemplate(c, tmpl8);

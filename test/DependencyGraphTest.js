@@ -9,16 +9,17 @@ test("Dependency graph nodes don’t require dependencies", async (t) => {
   graph.addNode("template-b");
   graph.addNode("template-c");
 
-  t.not(graph.overallOrder().indexOf("all"), -1);
-  t.not(graph.overallOrder().indexOf("template-a"), -1);
-  t.not(graph.overallOrder().indexOf("template-b"), -1);
-  t.not(graph.overallOrder().indexOf("template-c"), -1);
+  let order = graph.overallOrder();
+  t.true(order.includes("all"));
+  t.true(order.includes("template-a"));
+  t.true(order.includes("template-b"));
+  t.true(order.includes("template-c"));
 
-  // in order of addition
+  // in order of addNode
   t.deepEqual(graph.overallOrder(), ["all", "template-a", "template-b", "template-c"]);
 });
 
-test("Dependency graph assumptions", async (t) => {
+test("Dependency graph relationships", async (t) => {
   let graph = new DependencyGraph();
 
   graph.addNode("all");
@@ -26,10 +27,12 @@ test("Dependency graph assumptions", async (t) => {
   graph.addNode("template-b");
   graph.addNode("template-c");
   graph.addNode("userCollection");
+
   graph.addDependency("all", "template-a");
   graph.addDependency("all", "template-b");
   graph.addDependency("all", "template-c");
   graph.addDependency("userCollection", "all");
+
   t.deepEqual(graph.overallOrder(), [
     "template-a",
     "template-b",
@@ -39,7 +42,7 @@ test("Dependency graph assumptions", async (t) => {
   ]);
 });
 
-test("Do dependencies get removed when nodes are deleted?", async (t) => {
+test("Do dependencies (edges) get removed when nodes are deleted? (yes)", async (t) => {
   let graph = new DependencyGraph();
 
   graph.addNode("template-a");

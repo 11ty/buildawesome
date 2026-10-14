@@ -1,14 +1,16 @@
 import path from "node:path";
-import normalize from "normalize-path";
 import { TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 
 class TemplatePermalink {
+	#dynamicPermalinkEnabled;
+
 	// `link` with template syntax should have already been rendered in Template.js
-	constructor(link, extraSubdir) {
+	constructor(link, extraSubdir, isDynamicPermalinkEnabled = true) {
 		let isLinkAnObject = isPlainObject(link);
 
 		this._isRendered = true;
 		this._writeToFileSystem = true;
+		this.#dynamicPermalinkEnabled = isDynamicPermalinkEnabled;
 
 		let buildLink;
 
@@ -42,6 +44,12 @@ class TemplatePermalink {
 				);
 			}
 		} else if (buildLink) {
+			if (typeof buildLink !== "string") {
+				let stringToString = "toString" in buildLink ? `:\n\n${buildLink.toString()}` : "";
+				throw new Error(
+					`Expected permalink value to be a string. Received \`${typeof buildLink}\` (dynamicPermalink: ${this.#dynamicPermalinkEnabled})${stringToString}`,
+				);
+			}
 			this.buildLink = buildLink;
 		}
 
@@ -73,7 +81,6 @@ class TemplatePermalink {
 			// empty or false
 			return false;
 		}
-
 		let cleanLink = this._addDefaultLinkFilename(this.buildLink);
 		let parsed = path.parse(cleanLink);
 
@@ -143,7 +150,7 @@ class TemplatePermalink {
 			return false;
 		}
 
-		return normalize(outputDir + "/" + uri);
+		return TemplatePath.addLeadingDotSlash(TemplatePath.normalize(outputDir + "/" + uri));
 	}
 
 	toPathFromRoot() {
@@ -157,7 +164,7 @@ class TemplatePermalink {
 			return false;
 		}
 
-		return normalize(uri);
+		return TemplatePath.addLeadingDotSlash(TemplatePath.normalize(uri));
 	}
 
 	static _hasDuplicateFolder(dir, base) {
@@ -168,7 +175,13 @@ class TemplatePermalink {
 		return folders[folders.length - 1] === base;
 	}
 
-	static generate(dir, filenameNoExt, extraSubdir, suffix, fileExtension = "html") {
+	static generate(
+		dir,
+		filenameNoExt,
+		extraSubdir,
+		fileExtension = "html",
+		isDynamicPermalinkEnabled,
+	) {
 		let path;
 		if (fileExtension === "html") {
 			let hasDupeFolder = TemplatePermalink._hasDuplicateFolder(dir, filenameNoExt);
@@ -176,14 +189,12 @@ class TemplatePermalink {
 			path =
 				(dir ? dir + "/" : "") +
 				(filenameNoExt !== "index" && !hasDupeFolder ? filenameNoExt + "/" : "") +
-				"index" +
-				(suffix || "") +
-				".html";
+				"index.html";
 		} else {
-			path = (dir ? dir + "/" : "") + filenameNoExt + (suffix || "") + "." + fileExtension;
+			path = (dir ? dir + "/" : "") + filenameNoExt + "." + fileExtension;
 		}
 
-		return new TemplatePermalink(path, extraSubdir);
+		return new TemplatePermalink(path, extraSubdir, isDynamicPermalinkEnabled);
 	}
 }
 

@@ -4,6 +4,8 @@ import md from "markdown-it";
 import TemplateConfig from "../src/TemplateConfig.js";
 import defaultConfig from "../src/defaultConfig.js";
 
+import { getTemplateConfigInstance } from "./_testHelpers.js";
+
 test("Template Config local config overrides base config", async (t) => {
   let templateCfg = new TemplateConfig(defaultConfig, "./test/stubs/config.cjs");
   await templateCfg.init();
@@ -17,7 +19,7 @@ test("Template Config local config overrides base config", async (t) => {
   t.true(Object.keys(cfg.keys).length > 1);
   t.truthy(Object.keys(cfg.nunjucksFilters).length);
 
-  t.is(Object.keys(cfg.transforms).length, 1);
+  t.is(Object.keys(cfg.transforms).length, 4);
 
   t.is(
     cfg.transforms.prettyHtml(`<html><body><div></div></body></html>`, "test.html"),
@@ -124,8 +126,8 @@ test("Add namespaced plugin", async (t) => {
   let templateCfg = new TemplateConfig();
 
   templateCfg.userConfig.namespace("testNamespace", function () {
-    templateCfg.userConfig.addPlugin(function (eleventyConfig) {
-      eleventyConfig.addFilter("MyFilterName", function () {});
+    templateCfg.userConfig.addPlugin(function ($config) {
+      $config.addFilter("MyFilterName", function () {});
     });
   });
 
@@ -193,7 +195,7 @@ test("Nested Empty Outer namespace", async (t) => {
 });
 
 // important for backwards compatibility with old
-// `module.exports = function (eleventyConfig, pluginNamespace) {`
+// `module.exports = function ($config, pluginNamespace) {`
 // plugin code
 test("Non-string namespaces are ignored", async (t) => {
   let templateCfg = new TemplateConfig(defaultConfig, "./test/stubs/config.cjs");
@@ -210,9 +212,9 @@ test("Non-string namespaces are ignored", async (t) => {
 test(".addPlugin oddity: I don’t think pluginNamespace was ever passed in here, but we don’t want this to break", async (t) => {
   let templateCfg = new TemplateConfig(defaultConfig, "./test/stubs/config.cjs");
 
-  templateCfg.userConfig.addPlugin(function (eleventyConfig, pluginNamespace) {
-    eleventyConfig.namespace(pluginNamespace, () => {
-      eleventyConfig.addNunjucksFilter("myFilterName", function () {});
+  templateCfg.userConfig.addPlugin(function ($config, pluginNamespace) {
+    $config.namespace(pluginNamespace, () => {
+      $config.addNunjucksFilter("myFilterName", function () {});
     });
   });
 
@@ -280,7 +282,7 @@ test("setTemplateFormats(null)", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.deepEqual(cfg.templateFormats.sort(), ["md", "njk"]);
+  t.deepEqual([...cfg.templateFormats].sort(), ["md", "njk"]);
 });
 
 test("setTemplateFormats(undefined)", async (t) => {
@@ -290,7 +292,7 @@ test("setTemplateFormats(undefined)", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.deepEqual(cfg.templateFormats.sort(), ["md", "njk"]);
+  t.deepEqual([...cfg.templateFormats].sort(), ["md", "njk"]);
 });
 
 test("multiple setTemplateFormats calls", async (t) => {
@@ -314,6 +316,19 @@ test("addTemplateFormats()", async (t) => {
   t.deepEqual(cfg.templateFormats, ["md", "njk", "vue"]);
 });
 
+test("addTemplateFormats() via Plugin", async (t) => {
+  let templateCfg = new TemplateConfig();
+  templateCfg.userConfig.addTemplateFormats("pug");
+  templateCfg.userConfig.addPlugin(cfg => {
+    cfg.addTemplateFormats("webc");
+  });
+  await templateCfg.init();
+
+  let cfg = templateCfg.getConfig();
+  t.deepEqual(cfg.templateFormats, ["liquid", "md", "njk", "html", "11ty.js", "pug", "webc"]);
+});
+
+
 test("both setTemplateFormats and addTemplateFormats", async (t) => {
   // Template Formats can come from three places
   // defaultConfig.js config API (not used yet)
@@ -328,6 +343,18 @@ test("both setTemplateFormats and addTemplateFormats", async (t) => {
 
   let cfg = templateCfg.getConfig();
   t.deepEqual(cfg.templateFormats, ["pug", "vue"]);
+});
+
+test("addTemplateFormats() Array", async (t) => {
+  let templateCfg = new TemplateConfig(defaultConfig, "./test/stubs/config.cjs");
+  templateCfg.userConfig.addTemplateFormats("vue2");
+  templateCfg.userConfig.addTemplateFormats(["vue"]);
+  templateCfg.userConfig.addTemplateFormats(["text", "txt"]);
+  await templateCfg.init();
+
+  let cfg = templateCfg.getConfig();
+  // should have ALL of the original defaults
+  t.deepEqual(cfg.templateFormats, ["md", "njk", "vue2", "vue", "text", "txt"]);
 });
 
 test("libraryOverrides", async (t) => {
@@ -386,10 +413,10 @@ test("Nested .addPlugin calls", async (t) => {
   t.plan(2);
   let templateCfg = new TemplateConfig();
 
-  templateCfg.userConfig.addPlugin(function OuterPlugin(eleventyConfig) {
+  templateCfg.userConfig.addPlugin(function OuterPlugin($config) {
     t.truthy(true);
 
-    eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+    $config.addPlugin(function InnerPlugin($config) {
       t.truthy(true);
     });
   });
@@ -403,13 +430,13 @@ test("Nested .addPlugin calls (×3)", async (t) => {
   t.plan(3);
   let templateCfg = new TemplateConfig();
 
-  templateCfg.userConfig.addPlugin(function OuterPlugin(eleventyConfig) {
+  templateCfg.userConfig.addPlugin(function OuterPlugin($config) {
     t.truthy(true);
 
-    eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+    $config.addPlugin(function InnerPlugin($config) {
       t.truthy(true);
 
-      eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+      $config.addPlugin(function InnerPlugin($config) {
         t.truthy(true);
       });
     });
@@ -425,15 +452,15 @@ test("Nested .addPlugin calls order", async (t) => {
   let templateCfg = new TemplateConfig();
   let order = [];
 
-  templateCfg.userConfig.addPlugin(function OuterPlugin(eleventyConfig) {
+  templateCfg.userConfig.addPlugin(function OuterPlugin($config) {
     order.push(1);
     t.deepEqual(order, [1]);
 
-    eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+    $config.addPlugin(function InnerPlugin($config) {
       order.push(2);
       t.deepEqual(order, [1, 2]);
 
-      eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+      $config.addPlugin(function InnerPlugin($config) {
         order.push(3);
         t.deepEqual(order, [1, 2, 3]);
       });
@@ -450,26 +477,26 @@ test("Nested .addPlugin calls. More complex order", async (t) => {
   let templateCfg = new TemplateConfig();
   let order = [];
 
-  templateCfg.userConfig.addPlugin(function OuterPlugin(eleventyConfig) {
+  templateCfg.userConfig.addPlugin(function OuterPlugin($config) {
     order.push("1");
     t.deepEqual(order, ["1"]);
 
-    eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+    $config.addPlugin(function InnerPlugin($config) {
       order.push("2");
       t.deepEqual(order, ["1", "2"]);
 
-      eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+      $config.addPlugin(function InnerPlugin($config) {
         order.push("3a");
         t.deepEqual(order, ["1", "2", "3a"]);
       });
 
-      eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+      $config.addPlugin(function InnerPlugin($config) {
         order.push("3b");
         t.deepEqual(order, ["1", "2", "3a", "3b"]);
       });
     });
 
-    eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+    $config.addPlugin(function InnerPlugin($config) {
       order.push("2b");
       t.deepEqual(order, ["1", "2", "3a", "3b", "2b"]);
     });
@@ -484,8 +511,8 @@ test(".addPlugin has access to pathPrefix", async (t) => {
   t.plan(1);
   let templateCfg = new TemplateConfig();
 
-  templateCfg.userConfig.addPlugin(function (eleventyConfig) {
-    t.is(eleventyConfig.pathPrefix, "/");
+  templateCfg.userConfig.addPlugin(function ($config) {
+    t.is($config.pathPrefix, "/");
   });
 
   await templateCfg.init();
@@ -498,8 +525,8 @@ test(".addPlugin has access to pathPrefix (override method)", async (t) => {
   let templateCfg = new TemplateConfig();
   templateCfg.setPathPrefix("/test/");
 
-  templateCfg.userConfig.addPlugin(function (eleventyConfig) {
-    t.is(eleventyConfig.pathPrefix, "/test/");
+  templateCfg.userConfig.addPlugin(function ($config) {
+    t.is($config.pathPrefix, "/test/");
   });
 
   await templateCfg.init();
@@ -511,8 +538,8 @@ test("falsy pathPrefix should fall back to default", async (t) => {
   t.plan(1);
   let templateCfg = new TemplateConfig(defaultConfig, "./test/stubs/config-empty-pathprefix.cjs");
 
-  templateCfg.userConfig.addPlugin(function (eleventyConfig) {
-    t.is(eleventyConfig.pathPrefix, "/");
+  templateCfg.userConfig.addPlugin(function ($config) {
+    t.is($config.pathPrefix, "/");
   });
 
   await templateCfg.init();
@@ -523,10 +550,10 @@ test("falsy pathPrefix should fall back to default", async (t) => {
 test("Add async plugin", async (t) => {
   let templateCfg = new TemplateConfig();
 
-  await templateCfg.userConfig.addPlugin(async (eleventyConfig) => {
+  await templateCfg.userConfig.addPlugin(async ($config) => {
     await new Promise((resolve) => {
       setTimeout(() => {
-        eleventyConfig.addFilter("myFilterName", function () {});
+        $config.addFilter("myFilterName", function () {});
         resolve();
       }, 10);
     });
@@ -542,10 +569,10 @@ test("Add async plugin", async (t) => {
 test("Async namespace", async (t) => {
   let templateCfg = new TemplateConfig();
 
-  await templateCfg.userConfig.namespace("testNamespace", async (eleventyConfig) => {
+  await templateCfg.userConfig.namespace("testNamespace", async ($config) => {
     await new Promise((resolve) => {
       setTimeout(() => {
-        eleventyConfig.addFilter("MyFilterName", function () {});
+        $config.addFilter("MyFilterName", function () {});
         resolve();
       }, 10);
     });
@@ -556,4 +583,100 @@ test("Async namespace", async (t) => {
   let cfg = templateCfg.getConfig();
   t.not(Object.keys(cfg.liquidFilters).indexOf("testNamespaceMyFilterName"), -1);
   t.not(Object.keys(cfg.nunjucksFilters).indexOf("testNamespaceMyFilterName"), -1);
+});
+
+test("ProjectDirectories instance exists in user accessible config", async (t) => {
+	let $config = await getTemplateConfigInstance();
+  let cfg = $config.getConfig();
+
+  t.truthy(cfg.directories);
+  t.is(cfg.directories.input, "./");
+  t.is(cfg.directories.data, "./_data/");
+  t.is(cfg.directories.includes, "./_includes/");
+  t.is(cfg.directories.layouts, undefined);
+  t.is(cfg.directories.output, "./_site/");
+
+	t.throws(() => {
+		cfg.directories.input = "should not work";
+	});
+	t.throws(() => {
+		cfg.directories.data = "should not work";
+	});
+	t.throws(() => {
+		cfg.directories.includes = "should not work";
+	});
+	t.throws(() => {
+		cfg.directories.layouts = "should not work";
+	});
+	t.throws(() => {
+		cfg.directories.output = "should not work";
+	});
+});
+
+test("Test getters #3310", async (t) => {
+  let templateCfg = new TemplateConfig();
+  let userCfg = templateCfg.userConfig;
+
+  userCfg.addShortcode("myShortcode", function () {});
+  userCfg.addShortcode("myAsyncShortcode", async function () {});
+
+  userCfg.addPairedShortcode("myPairedShortcode", function () {});
+  userCfg.addPairedShortcode("myPairedAsyncShortcode", async function () {});
+
+  userCfg.addFilter("myFilter", function () {});
+  userCfg.addFilter("myAsyncFilter", async function () {});
+  userCfg.addPlugin(function ($config) {
+    $config.addFilter("myPluginFilter", function () {});
+  });
+
+  await templateCfg.init();
+
+  let filterNames = Object.keys(userCfg.getFilters());
+  t.true(filterNames.includes("myFilter"));
+  t.true(filterNames.includes("myAsyncFilter"));
+  t.true(filterNames.includes("myPluginFilter"));
+
+  let filterNamesSync = Object.keys(userCfg.getFilters({ type: "sync" }));
+  t.true(filterNamesSync.includes("myFilter"));
+  t.false(filterNamesSync.includes("myAsyncFilter"));
+  t.true(filterNamesSync.includes("myPluginFilter"));
+
+  let filterNamesAsync = Object.keys(userCfg.getFilters({ type: "async" }));
+  t.false(filterNamesAsync.includes("myFilter"));
+  t.true(filterNamesAsync.includes("myAsyncFilter"));
+  t.false(filterNamesAsync.includes("myPluginFilter"));
+
+  t.truthy(userCfg.getFilter("myFilter"));
+  t.truthy(userCfg.getFilter("myAsyncFilter"));
+  t.truthy(userCfg.getFilter("myPluginFilter"));
+
+  let shortcodeNames = Object.keys(userCfg.getShortcodes());
+  t.true(shortcodeNames.includes("myShortcode"));
+  t.true(shortcodeNames.includes("myAsyncShortcode"));
+
+  let shortcodeNamesSync = Object.keys(userCfg.getShortcodes({ type: "sync" }));
+  t.true(shortcodeNamesSync.includes("myShortcode"));
+  t.false(shortcodeNamesSync.includes("myAsyncShortcode"));
+
+  let shortcodeNamesAsync = Object.keys(userCfg.getShortcodes({ type: "async" }));
+  t.false(shortcodeNamesAsync.includes("myShortcode"));
+  t.true(shortcodeNamesAsync.includes("myAsyncShortcode"));
+
+  t.truthy(userCfg.getShortcode("myShortcode"));
+  t.truthy(userCfg.getShortcode("myAsyncShortcode"));
+
+  let pairedShortcodeNames = Object.keys(userCfg.getPairedShortcodes());
+  t.true(pairedShortcodeNames.includes("myPairedShortcode"));
+  t.true(pairedShortcodeNames.includes("myPairedAsyncShortcode"));
+
+  let pairedShortcodeNamesSync = Object.keys(userCfg.getPairedShortcodes({ type: "sync" }));
+  t.true(pairedShortcodeNamesSync.includes("myPairedShortcode"));
+  t.false(pairedShortcodeNamesSync.includes("myPairedAsyncShortcode"));
+
+  let pairedShortcodeNamesAsync = Object.keys(userCfg.getPairedShortcodes({ type: "async" }));
+  t.false(pairedShortcodeNamesAsync.includes("myPairedShortcode"));
+  t.true(pairedShortcodeNamesAsync.includes("myPairedAsyncShortcode"));
+
+  t.truthy(userCfg.getPairedShortcode("myPairedShortcode"));
+  t.truthy(userCfg.getPairedShortcode("myPairedAsyncShortcode"));
 });

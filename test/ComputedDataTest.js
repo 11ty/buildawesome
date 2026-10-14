@@ -1,5 +1,5 @@
 import test from "ava";
-import ComputedData from "../src/ComputedData.js";
+import ComputedData from "../src/Data/ComputedData.js";
 import TemplateConfig from "../src/TemplateConfig.js";
 
 test("Basic get/set", async (t) => {

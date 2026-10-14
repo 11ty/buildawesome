@@ -1,0 +1,28 @@
+name: Publish Release to npm
+on:
+  release:
+    types: [published]
+permissions: read-all
+jobs:
+  release:
+    # see https://github.com/11ty/buildawesome/settings/environments
+    environment: GitHub Publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # 7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # 7.0.0
+        with:
+          node-version: "22"
+          registry-url: 'https://registry.npmjs.org'
+          # Explicit opt out of cache (tanstack cache poison vuln)
+          package-manager-cache: false
+      - run: npm install -g npm@latest
+      - if: ${{ github.event.release.tag_name != '' && env.NPM_ELEVENTY_PUBLISH_TAG != '' && env.NPM_BUILDAWESOME_PUBLISH_TAG != '' }}
+        # Also runs npm ci and npm test
+        run: ./scripts/release.sh
+        env:
+          NPM_ELEVENTY_PUBLISH_TAG: ${{ contains(github.event.release.tag_name, '-beta.') && 'beta' || contains(github.event.release.tag_name, '-alpha.') && 'canary' || 'latest' }}
+          NPM_BUILDAWESOME_PUBLISH_TAG: ${{ contains(github.event.release.tag_name, '-beta.') && 'beta' || contains(github.event.release.tag_name, '-alpha.') && 'alpha' || 'latest' }}

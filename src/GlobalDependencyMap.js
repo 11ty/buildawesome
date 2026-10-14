@@ -1,40 +1,134 @@
-import { fileURLToPath } from "node:url";
-
-import { DepGraph } from "dependency-graph";
 import { TemplatePath } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
 
+import { createDebug } from "./Util/DebugLogUtil.js";
+import JavaScriptDependencies from "./Util/JavaScriptDependencies.js";
 import PathNormalizer from "./Util/PathNormalizer.js";
+import { TemplateDepGraph } from "./Util/TemplateDepGraph.js";
 
-const debug = debugUtil("Eleventy:Dependencies");
+const debug = createDebug("Dependencies");
 
 class GlobalDependencyMap {
 	// dependency-graph requires these keys to be alphabetic strings
 	static LAYOUT_KEY = "layout";
-	static COLLECTION_PREFIX = "__collection:";
+	static DATA_FILE_KEY = "data";
+	static COLLECTION_PREFIX = "__collection:"; // must match TemplateDepGraph key
 
-	reset() {
-		this._map = undefined;
+	#map;
+	#templateConfig;
+	#hasAllTemplateDependencies = false;
+	#changedFiles = [];
+	#cachedUserConfigurationCollectionApiNames;
+
+	static isCollection(entry) {
+		return entry.startsWith(this.COLLECTION_PREFIX);
 	}
 
-	setConfig(config) {
-		if (this.config) {
+	static getTagName(entry) {
+		if (this.isCollection(entry)) {
+			return entry.slice(this.COLLECTION_PREFIX.length);
+		}
+	}
+
+	static getCollectionKeyForEntry(entry) {
+		return `${GlobalDependencyMap.COLLECTION_PREFIX}${entry}`;
+	}
+
+	reset() {
+		this.#map = undefined;
+		this.#hasAllTemplateDependencies = false;
+		this.#changedFiles = [];
+	}
+
+	// Files changed since the previous build, e.g. from the watch queue
+	setChangedFiles(files = []) {
+		this.#changedFiles = files;
+	}
+
+	isChangedFileUsedBy(node) {
+		return this.#changedFiles.some((file) => this.hasDependency(node, file, false));
+	}
+
+	// True once every template has rendered (and recorded its includes) without an error
+	get hasAllTemplateDependencies() {
+		return this.#hasAllTemplateDependencies;
+	}
+
+	setHasAllTemplateDependencies(hasAll) {
+		this.#hasAllTemplateDependencies = Boolean(hasAll);
+	}
+
+	// Whether any other file (transitively) uses this one, e.g. an include or layout
+	hasDependants(node) {
+		node = this.normalizeNode(node);
+		if (!node || !this.map.hasNode(node)) {
+			return false;
+		}
+		return this.map
+			.dependantsOf(node)
+			.some((entry) => !entry.startsWith(GlobalDependencyMap.COLLECTION_PREFIX));
+	}
+
+	setTemplateConfig(templateConfig) {
+		this.#templateConfig = templateConfig;
+
+		// These have leading dot slashes, but so do the paths from Eleventy
+		this.#templateConfig.userConfig.events.once("eleventy.layouts", async (layouts) => {
+			await this.addLayoutsToMap(layouts);
+		});
+	}
+
+	get userConfigurationCollectionApiNames() {
+		if (this.#cachedUserConfigurationCollectionApiNames) {
+			return this.#cachedUserConfigurationCollectionApiNames;
+		}
+		return Object.keys(this.#templateConfig.userConfig.getCollections()) || [];
+	}
+
+	initializeUserConfigurationApiCollections() {
+		this.addCollectionApiNames(this.userConfigurationCollectionApiNames);
+	}
+
+	// For Testing
+	setCollectionApiNames(names = []) {
+		this.#cachedUserConfigurationCollectionApiNames = names;
+	}
+
+	addCollectionApiNames(names = []) {
+		if (!names || names.length === 0) {
 			return;
 		}
 
-		this.config = config;
+		for (let collectionName of names) {
+			this.map.addConfigCollectionName(collectionName);
+		}
+	}
 
-		// These have leading dot slashes, but so do the paths from Eleventy
-		this.config.events.once("eleventy.layouts", (layouts) => {
-			this.addLayoutsToMap(layouts);
+	filterOutLayouts(nodes = []) {
+		return nodes.filter((node) => {
+			if (GlobalDependencyMap.isLayoutNode(this.map, node)) {
+				return false;
+			}
+			return true;
+		});
+	}
+
+	filterOutCollections(nodes = []) {
+		return nodes.filter((node) => !node.startsWith(GlobalDependencyMap.COLLECTION_PREFIX));
+	}
+
+	static removeLayoutNodes(graph, nodeList) {
+		return nodeList.filter((node) => {
+			if (this.isLayoutNode(graph, node)) {
+				return false;
+			}
+			return true;
 		});
 	}
 
 	removeLayoutNodes(normalizedLayouts) {
 		let nodes = this.map.overallOrder();
 		for (let node of nodes) {
-			let data = this.map.getNodeData(node);
-			if (!data || !data.type || data.type !== GlobalDependencyMap.LAYOUT_KEY) {
+			if (!GlobalDependencyMap.isLayoutNode(this.map, node)) {
 				continue;
 			}
 
@@ -48,8 +142,9 @@ class GlobalDependencyMap {
 	}
 
 	// Eleventy Layouts don’t show up in the dependency graph, so we handle those separately
-	addLayoutsToMap(layouts) {
+	async addLayoutsToMap(layouts) {
 		let normalizedLayouts = this.normalizeLayoutsObject(layouts);
+
 		// Clear out any previous layout relationships to make way for the new ones
 		this.removeLayoutNodes(normalizedLayouts);
 
@@ -59,25 +154,35 @@ class GlobalDependencyMap {
 				this.map.addNode(layout, {
 					type: GlobalDependencyMap.LAYOUT_KEY,
 				});
+			} else {
+				this.map.setNodeData(layout, {
+					type: GlobalDependencyMap.LAYOUT_KEY,
+				});
 			}
 
 			// Potential improvement: only add the first template in the chain for a template and manage any upstream layouts by their own relationships
 			for (let pageTemplate of normalizedLayouts[layout]) {
 				this.addDependency(pageTemplate, [layout]);
 			}
+
+			if (this.#templateConfig?.shouldSpiderJavaScriptDependencies()) {
+				let deps = await JavaScriptDependencies.getDependencies([layout]);
+				this.addDependency(layout, deps);
+			}
 		}
 	}
 
 	get map() {
-		if (!this._map) {
-			this._map = new DepGraph({ circular: true });
+		if (!this.#map) {
+			// this.#map = new DepGraph({ circular: true });
+			this.#map = new TemplateDepGraph();
 		}
 
-		return this._map;
+		return this.#map;
 	}
 
 	set map(graph) {
-		this._map = graph;
+		this.#map = graph;
 	}
 
 	normalizeNode(node) {
@@ -91,21 +196,11 @@ class GlobalDependencyMap {
 			node = node.toString();
 		}
 
-		// Fix file:///Users/ or file:///C:/ paths passed in
-		if (node.startsWith("file://")) {
-			node = fileURLToPath(node);
-		}
-
 		if (typeof node !== "string") {
 			throw new Error("`addDependencies` files must be strings. Received:" + node);
 		}
 
-		// Paths should not be absolute (we convert absolute paths to relative)
-		// Paths should not have a leading dot slash
-		// Paths should always be `/` independent of OS path separator
-		return TemplatePath.stripLeadingDotSlash(
-			PathNormalizer.normalizeSeperator(TemplatePath.relativePath(node)),
-		);
+		return PathNormalizer.fullNormalization(node);
 	}
 
 	normalizeLayoutsObject(layouts) {
@@ -119,13 +214,13 @@ class GlobalDependencyMap {
 
 	getDependantsFor(node) {
 		if (!node) {
-			return new Set();
+			return [];
 		}
 
 		node = this.normalizeNode(node);
 
 		if (!this.map.hasNode(node)) {
-			return new Set();
+			return [];
 		}
 
 		// Direct dependants and dependencies, both publish and consume from collections
@@ -134,30 +229,6 @@ class GlobalDependencyMap {
 
 	hasNode(node) {
 		return this.map.hasNode(this.normalizeNode(node));
-	}
-
-	findCollectionsRemovedFrom(node, collectionNames) {
-		if (!this.hasNode(node)) {
-			return new Set();
-		}
-
-		let prevDeps = this.getDependantsFor(node)
-			.filter((entry) => {
-				return entry.startsWith(GlobalDependencyMap.COLLECTION_PREFIX);
-			})
-			.map((entry) => {
-				return GlobalDependencyMap.getEntryFromCollectionKey(entry);
-			});
-
-		let prevDepsSet = new Set(prevDeps);
-		let deleted = new Set();
-		for (let dep of prevDepsSet) {
-			if (!collectionNames.has(dep)) {
-				deleted.add(dep);
-			}
-		}
-
-		return deleted;
 	}
 
 	resetNode(node) {
@@ -180,17 +251,47 @@ class GlobalDependencyMap {
 	getTemplatesThatConsumeCollections(collectionNames) {
 		let templates = new Set();
 		for (let name of collectionNames) {
-			let collectionName = GlobalDependencyMap.getCollectionKeyForEntry(name);
-			if (!this.map.hasNode(collectionName)) {
+			let collectionKey = GlobalDependencyMap.getCollectionKeyForEntry(name);
+			if (!this.map.hasNode(collectionKey)) {
 				continue;
 			}
-			for (let node of this.map.dependantsOf(collectionName)) {
+			for (let node of this.map.dependantsOf(collectionKey)) {
 				if (!node.startsWith(GlobalDependencyMap.COLLECTION_PREFIX)) {
-					templates.add(node);
+					if (!GlobalDependencyMap.isLayoutNode(this.map, node)) {
+						templates.add(node);
+					}
 				}
 			}
 		}
 		return templates;
+	}
+
+	// Directory and template data files a template uses
+	addDataFiles(templatePath, dataFiles = []) {
+		this.addDependency(templatePath, dataFiles);
+		for (let file of dataFiles) {
+			this.map.setNodeData(this.normalizeNode(file), { type: GlobalDependencyMap.DATA_FILE_KEY });
+		}
+	}
+
+	static isDataFileNode(graph, node) {
+		if (!graph.hasNode(node)) {
+			return false;
+		}
+		return graph.getNodeData(node)?.type === GlobalDependencyMap.DATA_FILE_KEY;
+	}
+
+	static isLayoutNode(graph, node) {
+		if (!graph.hasNode(node)) {
+			return false;
+		}
+		return graph.getNodeData(node)?.type === GlobalDependencyMap.LAYOUT_KEY;
+	}
+
+	getLayouts() {
+		return Array.from(this.map.nodes.keys()).filter((node) =>
+			GlobalDependencyMap.isLayoutNode(this.map, node),
+		);
 	}
 
 	getLayoutsUsedBy(node) {
@@ -203,19 +304,47 @@ class GlobalDependencyMap {
 		let layouts = [];
 
 		// include self, if layout
-		if (this.map.getNodeData(node)?.type === GlobalDependencyMap.LAYOUT_KEY) {
+		if (GlobalDependencyMap.isLayoutNode(this.map, node)) {
 			layouts.push(node);
 		}
 
 		this.map.dependantsOf(node).forEach((node) => {
-			let data = this.map.getNodeData(node);
 			// we only want layouts
-			if (data && data.type && data.type === GlobalDependencyMap.LAYOUT_KEY) {
+			if (GlobalDependencyMap.isLayoutNode(this.map, node)) {
 				return layouts.push(node);
 			}
 		});
 
 		return layouts;
+	}
+
+	// In order
+	// Does not include original templatePaths (unless *they* are second-order relevant)
+	getTemplatesRelevantToTemplateList(templatePaths) {
+		let overallOrder = this.map.overallOrder();
+		overallOrder = this.filterOutLayouts(overallOrder);
+		overallOrder = this.filterOutCollections(overallOrder);
+
+		let relevantLookup = {};
+		for (let inputPath of templatePaths) {
+			inputPath = TemplatePath.stripLeadingDotSlash(inputPath);
+
+			let deps = this.getDependencies(inputPath, false);
+
+			if (Array.isArray(deps)) {
+				let paths = this.filterOutCollections(deps);
+				for (let node of paths) {
+					relevantLookup[node] = true;
+				}
+			}
+		}
+
+		return overallOrder.filter((node) => {
+			if (relevantLookup[node]) {
+				return true;
+			}
+			return false;
+		});
 	}
 
 	// Layouts are not relevant to compile cache and can be ignored
@@ -227,34 +356,32 @@ class GlobalDependencyMap {
 			return false;
 		}
 
-		return this.map.dependenciesOf(node).filter((node) => {
-			if (includeLayouts) {
-				return true;
-			}
+		if (includeLayouts) {
+			return this.map.dependenciesOf(node).filter(Boolean);
+		}
 
-			// When includeLayouts is `false` we want to filter out layouts
-			let data = this.map.getNodeData(node);
-			if (data && data.type && data.type === GlobalDependencyMap.LAYOUT_KEY) {
-				return false;
-			}
-			return true;
-		});
+		return GlobalDependencyMap.removeLayoutNodes(this.map, this.map.dependenciesOf(node));
+	}
+
+	#addNode(name) {
+		if (this.map.hasNode(name)) {
+			return;
+		}
+
+		this.map.addNode(name);
 	}
 
 	// node arguments are already normalized
-	_addDependency(from, toArray = []) {
-		this.map.addNode(from);
+	#addDependency(from, toArray = []) {
+		this.#addNode(from); // only if not already added
 
 		if (!Array.isArray(toArray)) {
 			throw new Error("Second argument to `addDependency` must be an Array.");
 		}
 
 		// debug("%o depends on %o", from, toArray);
-
 		for (let to of toArray) {
-			if (!this.map.hasNode(to)) {
-				this.map.addNode(to);
-			}
+			this.#addNode(to); // only if not already added
 			if (from !== to) {
 				this.map.addDependency(from, to);
 			}
@@ -262,31 +389,20 @@ class GlobalDependencyMap {
 	}
 
 	addDependency(from, toArray = []) {
-		this._addDependency(
+		this.#addDependency(
 			this.normalizeNode(from),
 			toArray.map((to) => this.normalizeNode(to)),
 		);
 	}
 
-	static getEntryFromCollectionKey(entry) {
-		return entry.slice(GlobalDependencyMap.COLLECTION_PREFIX.length);
-	}
+	addNewNodeRelationships(from, consumes = [], publishes = []) {
+		consumes = consumes.filter(Boolean);
+		publishes = publishes.filter(Boolean);
 
-	static getCollectionKeyForEntry(entry) {
-		return `${GlobalDependencyMap.COLLECTION_PREFIX}${entry}`;
-	}
+		debug("%o consumes %o and publishes to %o", from, consumes, publishes);
+		from = this.normalizeNode(from);
 
-	addDependencyConsumesCollection(from, collectionName) {
-		let nodeName = this.normalizeNode(from);
-		debug("%o depends on collection: %o", nodeName, collectionName);
-		this._addDependency(nodeName, [GlobalDependencyMap.getCollectionKeyForEntry(collectionName)]);
-	}
-
-	addDependencyPublishesToCollection(from, collectionName) {
-		let normalizedFrom = this.normalizeNode(from);
-		this._addDependency(GlobalDependencyMap.getCollectionKeyForEntry(collectionName), [
-			normalizedFrom,
-		]);
+		this.map.addTemplate(from, consumes, publishes);
 	}
 
 	// Layouts are not relevant to compile cache and can be ignored
@@ -318,6 +434,7 @@ class GlobalDependencyMap {
 		}
 
 		// The file that changed is a dependency of the template
+		// comparisonFile is used by fullTemplateInputPath
 		if (this.hasDependency(fullTemplateInputPath, comparisonFile, includeLayouts)) {
 			return true;
 		}
@@ -325,17 +442,52 @@ class GlobalDependencyMap {
 		return false;
 	}
 
+	areFilesUsedBy(parents, child, includeLayouts) {
+		for (let p of parents) {
+			if (this.hasDependency(p, child, includeLayouts)) {
+				// child is used by parent
+				return true;
+			}
+		}
+		return false;
+	}
+
+	getTemplateOrder() {
+		let order = [];
+		for (let entry of this.map.overallOrder()) {
+			order.push(entry);
+		}
+
+		return order;
+	}
+
 	stringify() {
-		return JSON.stringify(this.map);
+		return JSON.stringify(this.map, function replacer(key, value) {
+			// Serialize internal Map objects.
+			if (value instanceof Map) {
+				let obj = {};
+				for (let [k, v] of value) {
+					obj[k] = v;
+				}
+				return obj;
+			}
+
+			return value;
+		});
 	}
 
 	restore(persisted) {
 		let obj = JSON.parse(persisted);
-		let graph = new DepGraph({ circular: true });
+		let graph = new TemplateDepGraph();
 
 		// https://github.com/jriecken/dependency-graph/issues/44
+		// Restore top level serialized Map objects (in stringify above)
 		for (let key in obj) {
-			graph[key] = obj[key];
+			let map = graph[key];
+			for (let k in obj[key]) {
+				let v = obj[key][k];
+				map.set(k, v);
+			}
 		}
 		this.map = graph;
 	}

@@ -2,13 +2,14 @@ import path from "node:path";
 import { TemplatePath } from "@11ty/eleventy-utils";
 
 class TemplateFileSlug {
-	constructor(inputPath, inputDir, extensionMap) {
+	constructor(inputPath, extensionMap, eleventyConfig) {
+		let inputDir = eleventyConfig.directories.input;
 		if (inputDir) {
 			inputPath = TemplatePath.stripLeadingSubPath(inputPath, inputDir);
 		}
 
 		this.inputPath = inputPath;
-		this.cleanInputPath = inputPath.replace(/^.\//, "");
+		this.cleanInputPath = TemplatePath.stripLeadingDotSlash(inputPath);
 
 		let dirs = this.cleanInputPath.split("/");
 		this.dirs = dirs;
@@ -18,7 +19,7 @@ class TemplateFileSlug {
 		this.filenameNoExt = extensionMap.removeTemplateExtension(this.parsed.base);
 	}
 
-	// `page.filePathStem` see https://www.11ty.dev/docs/data-eleventy-supplied/#page-variable
+	// `page.filePathStem` see https://v3.11ty.dev/docs/data-eleventy-supplied/#page-variable
 	getFullPathWithoutExtension() {
 		return "/" + TemplatePath.join(...this.dirs, this._getRawSlug());
 	}
@@ -37,7 +38,7 @@ class TemplateFileSlug {
 		return slug;
 	}
 
-	// `page.fileSlug` see https://www.11ty.dev/docs/data-eleventy-supplied/#page-variable
+	// `page.fileSlug` see https://v3.11ty.dev/docs/data-eleventy-supplied/#page-variable
 	getSlug() {
 		let rawSlug = this._getRawSlug();
 

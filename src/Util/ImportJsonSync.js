@@ -1,62 +1,68 @@
-import fs from "node:fs";
-
+import { existsSync } from "node:fs";
 import { TemplatePath } from "@11ty/eleventy-utils";
-import { normalizeFilePathInEleventyPackage } from "./Require.js";
 
-// async version of this in Require.js
+import { createDebug } from "./DebugLogUtil.js";
+import { importJsonSync, corePackageJson } from "./RequireUtils.js";
 
-// Used for JSON imports, suffering from Node warning that import assertions experimental but also
-// throwing an error if you try to import() a JSON file without an import assertion.
-function loadContentsSync(path, options = {}) {
-	let rawInput;
-	let encoding = "utf8";
-	if ("encoding" in options) {
-		encoding = options.encoding;
+const debug = createDebug("ImportJsonSync");
+
+function findFilePathInParentDirs(dir, filename) {
+	// `package.json` searches look in parent dirs:
+	// https://docs.npmjs.com/cli/v7/configuring-npm/folders#more-information
+	// Fixes issue #3178, limited to working dir paths only
+	let workingDir = TemplatePath.getWorkingDir();
+	// TODO use DirContains
+	let allDirs = TemplatePath.getAllDirs(dir).filter((entry) => entry.startsWith(workingDir));
+
+	for (let dir of allDirs) {
+		let newPath = TemplatePath.join(dir, filename);
+		if (existsSync(newPath)) {
+			debug("Found %o searching parent directories at: %o", filename, dir);
+			return newPath;
+		}
 	}
-
-	try {
-		rawInput = fs.readFileSync(path, encoding);
-	} catch (e) {
-		// if file does not exist, return nothing
-	}
-
-	// Can return a buffer, string, etc
-	if (typeof rawInput === "string") {
-		rawInput = rawInput.trim();
-	}
-
-	return rawInput;
 }
 
-function importJsonSync(filePath) {
-	if (!filePath.endsWith(".json")) {
-		throw new Error(`importJsonSync expects a .json file extension (received: ${filePath})`);
-	}
-
-	let rawInput = loadContentsSync(filePath);
-	return JSON.parse(rawInput);
+function getCorePackageJson() {
+	return corePackageJson;
 }
 
-// TODO cache
-function getEleventyPackageJson() {
-	let filePath = normalizeFilePathInEleventyPackage("package.json");
-	return importJsonSync(filePath);
-}
-
-// TODO cache
+// Used by Serve.js for custom servers only
 function getModulePackageJson(dir) {
-	let filePath = TemplatePath.absolutePath(dir, "package.json");
+	let filePath = findFilePathInParentDirs(TemplatePath.absolutePath(dir), "package.json");
+
+	// Fails nicely
+	if (!filePath) {
+		return {};
+	}
+
 	return importJsonSync(filePath);
 }
 
-// TODO cache
-function getWorkingProjectPackageJson() {
-	return getModulePackageJson(TemplatePath.getWorkingDir());
+// This will *not* find a package.json in a parent directory above root
+function getWorkingProjectPackageJsonPath() {
+	let dir = TemplatePath.absolutePath(TemplatePath.getWorkingDir());
+	return findFilePathInParentDirs(dir, "package.json");
+}
+
+function getWorkingProjectPackageJson(filePath) {
+	if (!filePath) {
+		filePath = getWorkingProjectPackageJsonPath();
+	}
+
+	// Fails nicely
+	if (!filePath) {
+		return {};
+	}
+
+	return importJsonSync(filePath);
 }
 
 export {
 	importJsonSync,
-	getEleventyPackageJson,
+	getCorePackageJson,
 	getModulePackageJson,
 	getWorkingProjectPackageJson,
+	findFilePathInParentDirs,
+	getWorkingProjectPackageJsonPath,
 };

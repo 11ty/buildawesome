@@ -1,11 +1,11 @@
-name: I’m having trouble with Eleventy
+name: I’m having trouble with Build Awesome or Eleventy
 description: Have a problem? It might be a bug! Create a report to help us improve.
 labels: [needs-triage]
 body:
   - type: markdown
     attributes:
       value: |
-        Before opening a bug report, please search for the behavior in the existing issues. 
+        Before opening a bug report, please search for the behavior in the existing issues.
 
         ---
 
@@ -22,36 +22,25 @@ body:
     id: eleventy
     attributes:
       label: Eleventy
-      description: Which version of Eleventy do you use?
-      placeholder: eleventy --version or npx @11ty/eleventy --version
+      description: Which version of Build Awesome or Eleventy do you use?
+      placeholder: npx @awesome.me/buildawesome --version or npx @11ty/eleventy --version
     validations:
       required: true
   - type: textarea
     id: bug-description
     attributes:
       label: Describe the bug
-      description: A clear and concise description of what the bug is.
+      description: A clear and concise description of how to reproduce the bug
+      value: |
+        1. I ran *this* command with *these* flags '...'
+        2. I used the following configuration and template syntax '....'
+        3. I got *this* error or I expected this to happen and it didn’t
     validations:
       required: true
-  - type: textarea
-    id: repro
-    attributes:
-      label: Reproduction steps
-      description: Steps to reproduce the behavior.
-      value: |
-        1. Go to '...'
-        2. Click on '....'
-        3. Scroll down to '....'
-        4. See an error
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected behavior
-      description: A clear and concise description of what you expected to happen.
   - type: input
     id: repro-url
     attributes:
-      label: Reproduction URL
+      label: Reproduction Source Code URL
       description: "Optional: The URL to the **public** repository for the reproduction. _[parser:url]_"
       placeholder: e.g. https://github.com/zachleat/zachleat.com
     validations:

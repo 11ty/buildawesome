@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="">
+<title></title>
+<link rel="stylesheet" href="{{ 'css.njk' | inputPathToUrl }}">
+<script src="{{ 'css.njk' | inputPathToUrl }}"></script>
+</head>
+<body>
+<a href="/">Home</a>
+<a href="{{ 'tmpl.njk' | inputPathToUrl }}">Test</a>
+<a href="{{ 'tmpl.njk#anchor' | inputPathToUrl }}">Anchor</a>
+<a href="#anchor">Anchor</a>
+<a href="./#anchor">Anchor</a>
+<a href="?search=1">Search</a>
+<a href="./?search=1">Search</a>
+</body>
+</html>

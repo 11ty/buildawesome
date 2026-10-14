@@ -1,5 +1,5 @@
 import test from "ava";
-import { ProxyWrap } from "../src/Util/ProxyWrap.js";
+import { ProxyWrap } from "../src/Util/Objects/ProxyWrap.js";
 
 test("Basic wrap", (t) => {
   let test = ProxyWrap({}, { a: 1 });
@@ -54,4 +54,15 @@ test("Fails for invalid target", (t) => {
 
 test("Fails for invalid fallback", (t) => {
   t.throws(() => ProxyWrap({}, true));
+});
+
+test("Frozen Object", (t) => {
+  let test = ProxyWrap({}, Object.freeze({ eleventy: { generator: "Eleventy v3.0.0" } }));
+  t.deepEqual(test.eleventy.generator, "Eleventy v3.0.0");
+});
+
+
+test("Frozen Nested Object", (t) => {
+  let test = ProxyWrap({ eleventy: {} }, { eleventy: Object.freeze({ generator: "Eleventy v3.0.0" }) });
+  t.deepEqual(test.eleventy.generator, "Eleventy v3.0.0");
 });

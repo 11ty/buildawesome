@@ -1,7 +1,7 @@
 import test from "ava";
 
 import { default as HtmlBasePlugin, applyBaseToUrl } from "../src/Plugins/HtmlBasePlugin.js";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 
 function getContentFor(results, filename) {
@@ -36,6 +36,9 @@ test("Using the filter directly", async (t) => {
   t.is(applyBaseToUrl("subdir/", "/pathprefix/"), "subdir/");
   t.is(applyBaseToUrl("../subdir/", "/pathprefix/"), "../subdir/");
   t.is(applyBaseToUrl("./subdir/", "/pathprefix/"), "subdir/");
+  t.is(applyBaseToUrl("#anchor", "/pathprefix/"), "#anchor");
+  t.is(applyBaseToUrl("/test/#anchor", "/pathprefix/"), "/pathprefix/test/#anchor");
+  t.is(applyBaseToUrl("/test/?param=value", "/pathprefix/"), "/pathprefix/test/?param=value");
   t.is(applyBaseToUrl("http://url.com/", "/pathprefix/"), "http://url.com/");
   t.is(applyBaseToUrl("http://url.com/test/", "/pathprefix/"), "http://url.com/test/");
 
@@ -47,6 +50,9 @@ test("Using the filter directly", async (t) => {
   t.is(applyBaseToUrl("./subdir/", "http://example.com/"), "http://example.com/subdir/");
   t.is(applyBaseToUrl("http://url.com/", "http://example.com/"), "http://url.com/");
   t.is(applyBaseToUrl("http://url.com/test/", "http://example.com/"), "http://url.com/test/");
+  t.is(applyBaseToUrl("#anchor", "http://example.com/"), "http://example.com/#anchor");
+	t.is(applyBaseToUrl("/test/#anchor", "http://example.com/"), "http://example.com/test/#anchor");
+	t.is(applyBaseToUrl("/test/?param=value#anchor", "http://example.com/"), "http://example.com/test/?param=value#anchor");
 
   // with a URL base with extra subdirectory
   t.is(applyBaseToUrl("/", "http://example.com/ignored/"), "http://example.com/");
@@ -240,9 +246,9 @@ test("Using the filter directly", async (t) => {
 test("Using the HTML base plugin (default values)", async (t) => {
   let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin);
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin);
     },
   });
   await elev.initializeConfig();
@@ -268,6 +274,7 @@ test("Using the HTML base plugin (default values)", async (t) => {
 <body>
 <a href="/">Home</a>
 <a href="subdir/">Test</a>
+<a href="./subdir/">Test</a>
 <a href="../subdir/">Test</a>
 </body>
 </html>`
@@ -279,9 +286,9 @@ test("Using the HTML base plugin with pathPrefix: /test/", async (t) => {
     pathPrefix: "/test/",
 
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin);
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin);
     },
   });
 
@@ -308,6 +315,7 @@ test("Using the HTML base plugin with pathPrefix: /test/", async (t) => {
 <body>
 <a href="/test/">Home</a>
 <a href="subdir/">Test</a>
+<a href="subdir/">Test</a>
 <a href="../subdir/">Test</a>
 </body>
 </html>`
@@ -319,9 +327,9 @@ test("Using the HTML base plugin with pathPrefix: /test/ and base: http://exampl
     pathPrefix: "/test/",
 
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin, {
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin, {
         baseHref: "http://example.com/",
       });
     },
@@ -350,6 +358,7 @@ test("Using the HTML base plugin with pathPrefix: /test/ and base: http://exampl
 <body>
 <a href="http://example.com/test/">Home</a>
 <a href="http://example.com/test/deep/subdir/">Test</a>
+<a href="http://example.com/test/deep/subdir/">Test</a>
 <a href="http://example.com/test/subdir/">Test</a>
 </body>
 </html>`
@@ -359,9 +368,9 @@ test("Using the HTML base plugin with pathPrefix: /test/ and base: http://exampl
 test("Using the HTML base plugin strips extra path in full URL base (default pathPrefix)", async (t) => {
   let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin, {
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin, {
         baseHref: "http://example.com/hello/", // extra path will be stripped
       });
     },
@@ -390,6 +399,7 @@ test("Using the HTML base plugin strips extra path in full URL base (default pat
 <body>
 <a href="http://example.com/">Home</a>
 <a href="http://example.com/deep/subdir/">Test</a>
+<a href="http://example.com/deep/subdir/">Test</a>
 <a href="http://example.com/subdir/">Test</a>
 </body>
 </html>`
@@ -401,9 +411,9 @@ test("Using the HTML base plugin strips extra path in full URL base (pathPrefix:
     pathPrefix: "/test/",
 
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin, {
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin, {
         baseHref: "http://example.com/hello/", // extra path will be stripped
       });
     },
@@ -432,6 +442,7 @@ test("Using the HTML base plugin strips extra path in full URL base (pathPrefix:
 <body>
 <a href="http://example.com/test/">Home</a>
 <a href="http://example.com/test/deep/subdir/">Test</a>
+<a href="http://example.com/test/deep/subdir/">Test</a>
 <a href="http://example.com/test/subdir/">Test</a>
 </body>
 </html>`
@@ -443,9 +454,9 @@ test("Opt out of the transform with falsy extensions list", async (t) => {
     pathPrefix: "/test/",
 
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin, {
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin, {
         extensions: false,
       });
     },
@@ -474,6 +485,7 @@ test("Opt out of the transform with falsy extensions list", async (t) => {
 <body>
 <a href="/">Home</a>
 <a href="subdir/">Test</a>
+<a href="./subdir/">Test</a>
 <a href="../subdir/">Test</a>
 </body>
 </html>`
@@ -485,9 +497,9 @@ test("Base plugin with permalink: false, #2602", async (t) => {
     pathPrefix: "/test/",
 
     configPath: false,
-    config: function (eleventyConfig) {
-      eleventyConfig.setUseTemplateCache(false);
-      eleventyConfig.addPlugin(HtmlBasePlugin);
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin);
     },
   });
 
@@ -516,6 +528,130 @@ test("Base plugin with permalink: false, #2602", async (t) => {
 <a href="subdir/">Test</a>
 <a href="../subdir/">Test</a>
 </body>
+</html>`
+  );
+});
+
+test("Using the HTML base plugin with pathPrefix: /test/ and transformed attributes are *not* case sensitive", async (t) => {
+  let elev = new Eleventy("./test/stubs-base-case-sens/", "./test/stubs-base-case-sens/_site", {
+    pathPrefix: "/test/",
+
+    configPath: false,
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addPlugin(HtmlBasePlugin);
+    },
+  });
+
+  await elev.initializeConfig();
+
+  elev.setIsVerbose(false);
+  elev.disableLogger();
+
+  let results = await elev.toJSON();
+  t.is(
+    getContentFor(results, "/deep/index.html"),
+    `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="">
+<title></title>
+<style>div { background-image: url(test.jpg); }</style>
+<style>div { background-image: url(/test/test.jpg); }</style>
+<link rel="stylesheet" href="/test/test.css">
+<script SrC="/test.js"></script>
+</head>
+<body>
+<a hreF="/">Home</a>
+<a HrEf="subdir/">Test</a>
+<a href="../subdir/">Test</a>
+</body>
+</html>`
+  );
+});
+
+test("HTML base plugin only adds once (unique)", async (t) => {
+  t.plan(2);
+  let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
+    configPath: false,
+    config: function ($config) {
+      // Runs before defaultConfig.js
+      t.is($config.plugins.length, 0);
+      $config.addPlugin(HtmlBasePlugin);
+      $config.addPlugin(HtmlBasePlugin);
+      $config.addPlugin(HtmlBasePlugin);
+      $config.addPlugin(HtmlBasePlugin);
+      t.is($config.plugins.length, 1);
+    },
+  });
+  await elev.init();
+});
+
+test("HTML base plugin can resolve by name", async (t) => {
+  t.plan(2);
+  let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
+    configPath: false,
+    config: async function ($config) {
+      // Runs before defaultConfig.js
+      t.is($config.plugins.length, 0);
+
+      let plugin = await $config.resolvePlugin("@11ty/eleventy/html-base-plugin");
+      $config.addPlugin(plugin);
+
+      // does not add duplicate
+      $config.addPlugin(plugin);
+
+      // does not add duplicate even with a different reference
+      $config.addPlugin(HtmlBasePlugin);
+      $config.addPlugin(HtmlBasePlugin);
+
+      t.is($config.plugins.length, 1);
+    },
+  });
+  await elev.init();
+});
+
+test("Using recognizeNoValueAttribute for boolean attributes without quotes #2766", async (t) => {
+  let elev = new Eleventy({
+    input: "./test/stubs-virtual/",
+    pathPrefix: "/prefixed/",
+    configPath: false,
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addTemplate("index.njk", `---
+permalink: /deep/
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="description" content="">
+<link rel="stylesheet" crossorigin>
+<link rel="stylesheet" href="/test.css">
+</head>
+</html>`)
+      $config.addPlugin(HtmlBasePlugin);
+    },
+  });
+
+  await elev.initializeConfig();
+
+  elev.setIsVerbose(false);
+  elev.disableLogger();
+
+  let results = await elev.toJSON();
+  t.is(
+    getContentFor(results, "/deep/index.html"),
+    `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="description" content="">
+<link rel="stylesheet" crossorigin>
+<link rel="stylesheet" href="/prefixed/test.css">
+</head>
 </html>`
   );
 });

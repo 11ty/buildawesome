@@ -1,16 +1,24 @@
-import semver from "semver";
-import debugUtil from "debug";
+import { satisfies } from "../Adapters/Packages/semver.js";
+import { getCorePackageJson, getWorkingProjectPackageJson } from "./ImportJsonSync.js";
 
-import { getEleventyPackageJson, getWorkingProjectPackageJson } from "./ImportJsonSync.js";
+const pkg = getCorePackageJson();
 
-const pkg = getEleventyPackageJson();
-const debug = debugUtil("Eleventy:Compatibility");
-
+// Used in user config versionCheck method.
 class Compatibility {
 	static NORMALIZE_PRERELEASE_REGEX = /-canary\b/g;
 
+	static #projectPackageJson;
+
 	constructor(compatibleRange) {
 		this.compatibleRange = Compatibility.getCompatibilityValue(compatibleRange);
+	}
+
+	static get projectPackageJson() {
+		if (!this.#projectPackageJson) {
+			this.#projectPackageJson = getWorkingProjectPackageJson();
+		}
+
+		return this.#projectPackageJson;
 	}
 
 	static normalizeIdentifier(identifier) {
@@ -22,13 +30,9 @@ class Compatibility {
 			return compatibleRange;
 		}
 
-		try {
-			// fetch from project’s package.json
-			let projectPackageJson = getWorkingProjectPackageJson();
-			return projectPackageJson["11ty"]?.compatibility;
-		} catch (e) {
-			debug("Could not find a project package.json for compatibility version check: %O", e);
-			return; // do nothing, no compatibility information to check
+		// fetch from project’s package.json
+		if (this.projectPackageJson?.["11ty"]?.compatibility) {
+			return this.projectPackageJson["11ty"].compatibility;
 		}
 	}
 
@@ -37,7 +41,7 @@ class Compatibility {
 	}
 
 	static satisfies(version, compatibleRange) {
-		return semver.satisfies(
+		return satisfies(
 			Compatibility.normalizeIdentifier(version),
 			Compatibility.normalizeIdentifier(compatibleRange),
 			{

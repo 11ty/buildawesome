@@ -1,32 +1,18 @@
 import TemplateEngine from "./TemplateEngine.js";
 
-class Html extends TemplateEngine {
-	constructor(name, dirs, config) {
-		super(name, dirs, config);
-		this.cacheable = true;
+export default class Html extends TemplateEngine {
+	constructor(name, eleventyConfig) {
+		super(name, eleventyConfig);
 	}
 
-	async compile(str, inputPath, preTemplateEngine) {
-		if (preTemplateEngine) {
-			let engine = await this.engineManager.getEngine(
-				preTemplateEngine,
-				this.dirs,
-				this.extensionMap,
-			);
-			let fnReady = engine.compile(str, inputPath);
+	get cacheable() {
+		return true;
+	}
 
-			return async function (data) {
-				let fn = await fnReady;
-
-				return fn(data);
-			};
-		} else {
-			return function () {
-				// do nothing with data if parseHtmlWith is falsy
-				return str;
-			};
-		}
+	// Preprocessing template engines run before this in the TemplateRender pipeline
+	async compile(str) {
+		return function () {
+			return str;
+		};
 	}
 }
-
-export default Html;

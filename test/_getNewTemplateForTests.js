@@ -1,7 +1,10 @@
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
-import TemplateConfig from "../src/TemplateConfig.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 import Template from "../src/Template.js";
 import FileSystemSearch from "../src/FileSystemSearch.js";
+import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
+
+import { getTemplateConfigInstance } from "./_testHelpers.js";
+import ConsoleLogger from "../src/Util/ConsoleLogger.js";
 
 export default async function getNewTemplate(
   path,
@@ -9,20 +12,32 @@ export default async function getNewTemplate(
   outputDir,
   templateData = null,
   map = null,
-  eleventyConfig = null
+  $config = null
 ) {
-  if (!eleventyConfig) {
-    eleventyConfig = new TemplateConfig();
-    await eleventyConfig.init();
+  if (!$config) {
+    $config = await getTemplateConfigInstance({
+      dir: {
+        input: inputDir,
+        output: outputDir,
+      }
+    });
   }
 
+  let engineManager = new TemplateEngineManager($config);
   if (!map) {
-    map = new EleventyExtensionMap(["liquid", "md", "njk", "html", "11ty.js"], eleventyConfig);
+    map = new ExtensionMap($config);
+    map.setFormats(["liquid", "md", "njk", "html", "11ty.js"]);
+    map.engineManager = engineManager;
   }
   if (templateData) {
     templateData.setFileSystemSearch(new FileSystemSearch());
+    templateData.extensionMap = map;
   }
-  let tmpl = new Template(path, inputDir, outputDir, templateData, map, eleventyConfig);
+  let tmpl = new Template(path, templateData, map, $config);
+  let logger = new ConsoleLogger();
+  logger.isVerbose = false;
+  tmpl.logger = logger;
+
   await tmpl.getTemplateRender();
 
   return tmpl;

@@ -39,7 +39,7 @@ test("Message styles", (t) => {
   cl.info("test");
   t.deepEqual(logged, {
     msg: "test",
-    type: "warn",
+    type: "log",
     color: "blue",
     forceToConsole: undefined,
   });
@@ -58,19 +58,5 @@ test("Message styles", (t) => {
     type: "error",
     color: "red",
     forceToConsole: undefined,
-  });
-});
-
-test("Close Stream", (t) => {
-  return new Promise((resolve, reject) => {
-    let cl = new ConsoleLogger();
-    cl.outputStream.on("close", () => {
-      t.pass();
-      resolve();
-    });
-    cl.outputStream.on("error", reject);
-    // We need to listen for data, so a pushed null closes the stream
-    cl.outputStream.on("data", reject);
-    cl.closeStream();
   });
 });

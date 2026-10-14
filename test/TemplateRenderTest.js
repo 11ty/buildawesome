@@ -1,15 +1,23 @@
 import test from "ava";
 
 import TemplateRender from "../src/TemplateRender.js";
-import TemplateConfig from "../src/TemplateConfig.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
+import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
+import { TemplatePipeline } from "../src/TemplatePipeline.js";
+
+import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback } from "./_testHelpers.js";
 
 async function getNewTemplateRender(name, inputDir) {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: inputDir
+    }
+  });
 
-  let tr = new TemplateRender(name, inputDir, eleventyConfig);
-  tr.extensionMap = new EleventyExtensionMap([], eleventyConfig);
+  let tr = new TemplateRender(name, eleventyConfig);
+  tr.extensionMap = new ExtensionMap(eleventyConfig);
+  tr.extensionMap.engineManager = new TemplateEngineManager(eleventyConfig);
+  tr.extensionMap.setFormats([]);
   await tr.init();
   return tr;
 }
@@ -23,7 +31,7 @@ test("Basic", async (t) => {
 
 test("Includes Dir", async (t) => {
   let tr = await getNewTemplateRender("liquid", "./test/stubs");
-  t.is(tr.getIncludesDir(), "test/stubs/_includes");
+  t.is(tr.getIncludesDir(), "./test/stubs/_includes/");
 });
 
 test("Invalid override", async (t) => {
@@ -40,26 +48,47 @@ test("Valid Override", async (t) => {
   t.truthy(tr.isEngine("njk"));
 });
 
-test("Parse Overrides to get Prioritized Engine List", async (t) => {
-  t.deepEqual(TemplateRender.parseEngineOverrides(""), []);
-  t.deepEqual(TemplateRender.parseEngineOverrides(null), []);
-  t.deepEqual(TemplateRender.parseEngineOverrides(undefined), []);
-  t.deepEqual(TemplateRender.parseEngineOverrides(false), []);
-  t.deepEqual(TemplateRender.parseEngineOverrides("html"), []);
-  t.deepEqual(TemplateRender.parseEngineOverrides("html,html"), []);
-  t.deepEqual(TemplateRender.parseEngineOverrides("html,md,md"), ["md"]);
-  t.deepEqual(TemplateRender.parseEngineOverrides("liquid,md"), ["md", "liquid"]);
-  t.deepEqual(TemplateRender.parseEngineOverrides("liquid"), ["liquid"]);
-  t.deepEqual(TemplateRender.parseEngineOverrides("njk"), ["njk"]);
-  t.deepEqual(TemplateRender.parseEngineOverrides("liquid,html"), ["liquid"]);
-  t.deepEqual(TemplateRender.parseEngineOverrides("liquid,md,html"), ["md", "liquid"]);
-  t.deepEqual(TemplateRender.parseEngineOverrides("njk,njk"), ["njk"]);
+test("Parse template syntax into pipeline steps (execution order)", async (t) => {
+  t.deepEqual(TemplatePipeline.parse(""), []);
+  t.deepEqual(TemplatePipeline.parse(null), []);
+  t.deepEqual(TemplatePipeline.parse(undefined), []);
+  t.deepEqual(TemplatePipeline.parse(false), []);
+  t.deepEqual(TemplatePipeline.parse("html"), []);
+  t.deepEqual(TemplatePipeline.parse("html,html"), []);
+  t.deepEqual(TemplatePipeline.parse("html,md,md"), ["md"]);
+  t.deepEqual(TemplatePipeline.parse("liquid,md"), ["liquid", "md"]);
+  t.deepEqual(TemplatePipeline.parse("md,liquid"), ["liquid", "md"]);
+  t.deepEqual(TemplatePipeline.parse("liquid"), ["liquid"]);
+  t.deepEqual(TemplatePipeline.parse("njk"), ["njk"]);
+  t.deepEqual(TemplatePipeline.parse("liquid,html"), ["liquid"]);
+  t.deepEqual(TemplatePipeline.parse("liquid,md,html"), ["liquid", "md"]);
+  t.deepEqual(TemplatePipeline.parse("njk,njk"), ["njk"]);
 
-  t.throws(function () {
-    TemplateRender.parseEngineOverrides("njk,liquid");
+  t.throws(() => TemplatePipeline.parse("njk,liquid"));
+  t.throws(() => TemplatePipeline.parse("liquid,njk,html"));
+});
+
+test("Validate pipeline steps against the allow list", async (t) => {
+  t.notThrows(() => TemplatePipeline.validate(["md"]));
+  t.notThrows(() => TemplatePipeline.validate(["liquid", "md"]));
+  t.notThrows(() => TemplatePipeline.validate(["liquid", "html"]));
+  t.notThrows(() => TemplatePipeline.validate(["njk"]));
+
+  t.throws(() => TemplatePipeline.validate(["md", "html"]), { message: /Unsupported template pipeline/ });
+  t.throws(() => TemplatePipeline.validate(["md", "liquid"]), { message: /Unsupported template pipeline/ });
+  t.throws(() => TemplatePipeline.validate(["liquid", "njk", "md"]), { message: /Only one template engine/ });
+});
+
+test("Preprocessing a format with another format throws", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, (cfg) => {
+    cfg.setHtmlTemplateEngine("md");
   });
-  t.throws(function () {
-    TemplateRender.parseEngineOverrides("liquid,njk,html");
+  let tr = new TemplateRender("html", eleventyConfig);
+  tr.extensionMap = new ExtensionMap(eleventyConfig);
+  tr.extensionMap.engineManager = new TemplateEngineManager(eleventyConfig);
+
+  await t.throwsAsync(() => tr.init(), {
+    message: "The `htmlTemplateEngine` configuration property must be a template engine, received the output format: md",
   });
 });
 

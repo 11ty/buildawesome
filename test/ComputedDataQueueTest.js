@@ -1,5 +1,5 @@
 import test from "ava";
-import ComputedDataQueue from "../src/ComputedDataQueue.js";
+import ComputedDataQueue from "../src/Data/ComputedDataQueue.js";
 
 test("Standard uses", (t) => {
   let queue = new ComputedDataQueue();

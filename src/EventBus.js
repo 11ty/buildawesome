@@ -1,8 +1,7 @@
-import debugUtil from "debug";
-
+import { createDebug } from "./Util/DebugLogUtil.js";
 import EventEmitter from "./Util/AsyncEventEmitter.js";
 
-const debug = debugUtil("Eleventy:EventBus");
+const debug = createDebug("EventBus");
 
 /**
  * @module 11ty/eleventy/EventBus
@@ -16,6 +15,8 @@ debug("Setting up global EventBus.");
  * @type {module:11ty/eleventy/Util/AsyncEventEmitter~AsyncEventEmitter}
  */
 let bus = new EventEmitter();
-bus.setMaxListeners(100);
+bus.setMaxListeners(100); // defaults to 10
+
+debug("EventBus max listener count: %o", bus.getMaxListeners());
 
 export default bus;

@@ -1,9 +1,12 @@
 import test from "ava";
 
-import TemplateData from "../src/TemplateData.js";
-import TemplateConfig from "../src/TemplateConfig.js";
+import Eleventy from "../src/Core.js";
+import TemplateData from "../src/Data/TemplateData.js";
+import ExtensionMap from "../src/ExtensionMap.js";
+
 import getNewTemplate from "./_getNewTemplateForTests.js";
 import { renderTemplate } from "./_getRenderedTemplates.js";
+import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback, sortEleventyResults } from "./_testHelpers.js";
 
 async function getRenderedData(tmpl, pageNumber = 0) {
   let data = await tmpl.getData();
@@ -121,10 +124,16 @@ test("eleventyComputed true primitive", async (t) => {
 });
 
 test("eleventyComputed relies on global data", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs",
+      output: "dist",
+    }
+  });
 
-  let dataObj = new TemplateData("./test/stubs/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
   let tmpl = await getNewTemplate(
     "./test/stubs/eleventyComputed/use-global-data.njk",
     "./test/stubs/",
@@ -141,11 +150,17 @@ test("eleventyComputed relies on global data", async (t) => {
 });
 
 test("eleventyComputed intermixes with global data", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  eleventyConfig.userConfig.setDataDeepMerge(true);
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs-computed-global",
+    output: "dist",
+  }, function(cfg) {
+    // Defaulted in v1
+    // cfg.setDataDeepMerge(true);
+  });
 
-  let dataObj = new TemplateData("./test/stubs-computed-global/", eleventyConfig);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
     "./test/stubs-computed-global/intermix.njk",
@@ -171,15 +186,18 @@ test("eleventyComputed intermixes with global data", async (t) => {
 });
 
 test("eleventyComputed using symbol parsing on template strings (nunjucks)", async (t) => {
-  let eleventyConfig = await new TemplateConfig();
-  eleventyConfig.userConfig.addNunjucksFilter("fail", function (str) {
-    // Filter expects a certain String format, don’t use the (((11ty))) string hack
-    if (!str || str.length !== 1) {
-      throw new Error("Expect a one character string");
-    }
-    return `${str}`;
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs-computed-symbolparse",
+    output: "dist",
+  }, function(cfg) {
+    cfg.addNunjucksFilter("fail", function (str) {
+      // Filter expects a certain String format, don’t use the (((11ty))) string hack
+      if (!str || str.length !== 1) {
+        throw new Error("Expect a one character string");
+      }
+      return `${str}`;
+    });
   });
-  await eleventyConfig.init();
 
   let tmpl = await getNewTemplate(
     "./test/stubs-computed-symbolparse/test.njk",
@@ -197,15 +215,18 @@ test("eleventyComputed using symbol parsing on template strings (nunjucks)", asy
 });
 
 test("eleventyComputed using symbol parsing on template strings (liquid)", async (t) => {
-  let eleventyConfig = await new TemplateConfig();
-  eleventyConfig.userConfig.addLiquidFilter("fail", function (str) {
-    // Filter expects a certain String format, don’t use the (((11ty))) string hack
-    if (!str || str.length !== 1) {
-      throw new Error("Expect a one character string: " + str);
-    }
-    return `${str}`;
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs-computed-symbolparse",
+    output: "dist",
+  }, function(cfg) {
+    cfg.addLiquidFilter("fail", function (str) {
+      // Filter expects a certain String format, don’t use the (((11ty))) string hack
+      if (!str || str.length !== 1) {
+        throw new Error("Expect a one character string: " + str);
+      }
+      return `${str}`;
+    });
   });
-  await eleventyConfig.init();
 
   let tmpl = await getNewTemplate(
     "./test/stubs-computed-symbolparse/test.liquid",
@@ -232,4 +253,98 @@ test("eleventyComputed render strings in arrays", async (t) => {
   let data = await getRenderedData(tmpl);
   t.deepEqual(data.array, ["static value", "test"]);
   t.is(data.notArray, "test");
+});
+
+test("Issue #3728 Computed data with arrays of different sizes, arrays are treated as a single unit", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      $config.addTemplate("index.njk", `---js
+const arr = [1,2,3,4,5];
+const eleventyComputed = {
+  arr: ["a", "b", "c"]
+}
+---
+{{ arr }}`);
+    }
+  });
+  elev.disableLogger();
+
+  let result = await elev.toJSON();
+  t.is(result.length, 1);
+  t.is(result[0].content, `a,b,c`);
+});
+
+test("Issue #3827 with Computed data with arrays and layouts (×2 eleventyComputed)", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      $config.setUseTemplateCache(false);
+      $config.addTemplate("_includes/base.njk", `---js
+const eleventyComputed = {
+  arr: ["base", "base2"]
+};
+---
+{{ content | safe }}`);
+
+      $config.addTemplate("page1.njk", `---js
+const layout = "base.njk";
+---
+{{ arr }}`);
+
+    $config.addTemplate("page2.njk", `---js
+const layout = "base.njk";
+const eleventyComputed = {
+  arr: ["override", "override2"]
+}
+---
+{{ arr }}`);
+    }
+  });
+
+  elev.disableLogger();
+
+  let result = await elev.toJSON();
+  result.sort(sortEleventyResults);
+
+  t.is(result.length, 2);
+
+  t.is(result[0].inputPath, `./test/stubs-virtual/page2.njk`);
+  // A merge happened here because it was eleventyComputed -> eleventyComputed array merge before computed data
+  t.is(result[0].content, `base,base2,override,override2`);
+
+  t.is(result[1].inputPath, `./test/stubs-virtual/page1.njk`);
+  t.is(result[1].content, `base,base2`);
+});
+
+test("Issue #3728 with Computed data with arrays and layouts (×1 eleventyComputed)", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      $config.addTemplate("_includes/base.njk", `---js
+const arr = ["base", 1];
+---
+{{ content | safe }}`);
+
+      $config.addTemplate("page1.njk", `---js
+const layout = "base.njk";
+---
+{{ arr }}`);
+
+    $config.addTemplate("page2.njk", `---js
+const layout = "base.njk";
+const eleventyComputed = {
+  arr: ["override", 2]
+}
+---
+{{ arr }}`);
+    }
+  });
+
+  elev.disableLogger();
+
+  let result = await elev.toJSON();
+  result.sort(sortEleventyResults);
+
+  t.is(result.length, 2);
+
+  t.is(result[0].content, `override,2`);
+  t.is(result[1].content, `base,1`);
 });

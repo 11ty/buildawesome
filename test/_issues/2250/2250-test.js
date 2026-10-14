@@ -1,10 +1,10 @@
 import test from "ava";
-import Eleventy from "../../../src/Eleventy.js";
+import Eleventy from "../../../src/Core.js";
 
 test("Issue #2250, page is available in filters", async (t) => {
   let elev = new Eleventy("./test/_issues/2250/", "./test/_issues/2250/_site", {
-    config: function (eleventyConfig) {
-      eleventyConfig.addFilter("getUrl", function () {
+    config: function ($config) {
+      $config.addFilter("getUrl", function () {
         return this.page.url;
       });
     },

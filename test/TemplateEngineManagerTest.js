@@ -1,6 +1,7 @@
 import test from "ava";
 
-import TemplateEngineManager from "../src/TemplateEngineManager.js";
+import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 import TemplateConfig from "../src/TemplateConfig.js";
 
 test("Unsupported engine", async (t) => {
@@ -33,10 +34,12 @@ test("Supported custom engine", async (t) => {
   });
   await eleventyConfig.init();
 
+  let extensionMap = new ExtensionMap(eleventyConfig);
+
   let tem = new TemplateEngineManager(eleventyConfig);
 
   t.truthy(tem.hasEngine("txt"));
-  let engine = await tem.getEngine("txt");
+  let engine = await tem.getEngine("txt", extensionMap);
   let fn = await engine.compile("<p>This is plaintext</p>");
   t.is(await fn({ author: "zach" }), "<p>This is plaintext</p>");
 });
@@ -59,11 +62,13 @@ test("Custom engine with custom init", async (t) => {
   });
   await eleventyConfig.init();
 
-  let config = eleventyConfig.getConfig();
+  let extensionMap = new ExtensionMap(eleventyConfig);
+
+  // let config = eleventyConfig.getConfig();
   let tem = new TemplateEngineManager(eleventyConfig);
 
   t.truthy(tem.hasEngine("custom1"));
-  let engine = await tem.getEngine("custom1");
+  let engine = await tem.getEngine("custom1", extensionMap);
   let fn = await engine.compile("<p>This is plaintext</p>");
   t.is(await fn({}), "<p>This is plaintext</p>");
 
@@ -80,8 +85,9 @@ test("Custom engine with custom init", async (t) => {
 test("getEngineLib", async (t) => {
   let eleventyConfig = new TemplateConfig();
   await eleventyConfig.init();
+  let extensionMap = new ExtensionMap(eleventyConfig);
 
   let tem = new TemplateEngineManager(eleventyConfig);
-  let engine = await tem.getEngine("md");
+  let engine = await tem.getEngine("md", extensionMap);
   t.truthy(engine.getEngineLib());
 });

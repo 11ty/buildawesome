@@ -1,14 +1,6 @@
 import { TemplatePath } from "@11ty/eleventy-utils";
 
-function isValidUrl(url) {
-	try {
-		new URL(url);
-		return true;
-	} catch (e) {
-		// invalid url OR local path
-		return false;
-	}
-}
+import { isValidUrl } from "../Util/UrlUtil.js";
 
 // Note: This filter is used in the Eleventy Navigation plugin in versions prior to 0.3.4
 export default function (url, pathPrefix) {

@@ -1,6 +1,6 @@
 import test from "ava";
 import { Comparator, LangUtils, default as I18nPlugin } from "../src/Plugins/I18nPlugin.js";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 
 test("Comparator.isLangCode", (t) => {
@@ -27,44 +27,16 @@ test("LangUtils.swapLanguageCode", (t) => {
   t.is(LangUtils.swapLanguageCode("/es/es/es/", "en"), "/en/es/es/"); // first only
 });
 
-test("Comparator.matchLanguageFolder", (t) => {
-  t.deepEqual(Comparator.matchLanguageFolder("/en/test.liquid", "/es/test.liquid"), ["en", "es"]);
-
-  // Note that template extensions and input directory paths are removed upstream by the plugin
-  t.deepEqual(Comparator.matchLanguageFolder("/en/test", "/es/test"), ["en", "es"]);
-  t.deepEqual(Comparator.matchLanguageFolder("/en-us/test", "/es/test"), ["en-us", "es"]);
-  t.deepEqual(Comparator.matchLanguageFolder("/es-mx/test", "/en-us/test"), ["es-mx", "en-us"]);
-  t.deepEqual(Comparator.matchLanguageFolder("en/test", "es/test"), ["en", "es"]);
-  t.deepEqual(Comparator.matchLanguageFolder("en/test", "src/test"), false);
-  t.deepEqual(Comparator.matchLanguageFolder("en/test", "xx/test"), false);
-
-  // Even though `src` is possibly valid, we only match the first one
-  t.deepEqual(Comparator.matchLanguageFolder("en/src/test", "es/src/test"), ["en", "es"]);
-
-  // invalid first
-  t.is(Comparator.matchLanguageFolder("/e/test.liquid", "/es/test.liquid"), false);
-  t.is(Comparator.matchLanguageFolder("/n/test", "/es/test"), false);
-  t.is(Comparator.matchLanguageFolder("/eus/test", "/es/test"), false);
-
-  // invalid second
-  t.is(Comparator.matchLanguageFolder("/en/test.liquid", "/e/test.liquid"), false);
-  t.is(Comparator.matchLanguageFolder("/en/test", "/e/test"), false);
-  t.is(Comparator.matchLanguageFolder("/en-us/test", "/s/test"), false);
-
-  // invalid both
-  t.deepEqual(Comparator.matchLanguageFolder("/esx/test", "/ens/test"), false);
-});
-
 test("contentMap Event from Eleventy", async (t) => {
   t.plan(4);
   let elev = new Eleventy("./test/stubs-i18n/", "./test/stubs-i18n/_site", {
-    config: function (eleventyConfig) {
-      eleventyConfig.addPlugin(I18nPlugin, {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, {
         defaultLanguage: "en",
         errorMode: "allow-fallback",
       });
 
-      eleventyConfig.on("eleventy.contentMap", (maps) => {
+      $config.on("buildawesome.contentmap", (maps) => {
         t.truthy(maps);
 
         // if future maps are added, they should be tested here
@@ -98,7 +70,7 @@ test("contentMap Event from Eleventy", async (t) => {
     },
   });
 
-  let results = await elev.toJSON();
+  await elev.toJSON();
 });
 
 function getContentFor(results, filename) {
@@ -109,8 +81,8 @@ function getContentFor(results, filename) {
 test("errorMode default (strict)", async (t) => {
   let elev = new Eleventy("./test/stubs-i18n/", "./test/stubs-i18n/_site", {
     quietMode: true,
-    config: function (eleventyConfig) {
-      eleventyConfig.addPlugin(I18nPlugin, {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, {
         _test: "this is from errorMode default (strict)",
         defaultLanguage: "en",
         // errorMode: "allow-fallback"
@@ -130,8 +102,8 @@ test("errorMode default (strict)", async (t) => {
 
 test("locale_url and locale_links Filters", async (t) => {
   let elev = new Eleventy("./test/stubs-i18n/", "./test/stubs-i18n/_site", {
-    config: function (eleventyConfig) {
-      eleventyConfig.addPlugin(I18nPlugin, {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, {
         _test: "this is from locale_url and locale_links Filters",
         defaultLanguage: "en",
         errorMode: "allow-fallback",

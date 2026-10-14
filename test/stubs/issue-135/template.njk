@@ -3,6 +3,6 @@ pagination:
   data: articles
   size: 1
   alias: article
-permalink: blog/{{ article.title | slug }}/index.html
+permalink: blog/{{ article.title | slugify }}/index.html
 ---
 {{ article.body | safe }}

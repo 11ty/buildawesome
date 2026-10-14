@@ -1,0 +1,39 @@
+{
+  "name": "@awesome.me/buildawesome",
+  "description": "A simpler way to build awesome web sites.",
+  "version": "PRIVATE",
+  "private": true,
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/Core.js",
+    "./UserConfig": {
+      "types": "./types/UserConfig.d.ts"
+    },
+    "./utils/git": "./src/Util/Git.js"
+  },
+  "scripts": {
+    "test": "",
+    "typescript": "tsc"
+  },
+  "bin": {
+    "buildawesome": "cmd.js"
+  },
+  "license": "MIT",
+  "author": "Zach Leatherman (https://zachleat.com/)",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/11ty/buildawesome.git"
+  },
+  "bugs": "https://github.com/11ty/buildawesome/issues",
+  "homepage": "https://build.awesome.me/",
+  "dependencies": {
+    "@11ty/eleventy": "file:../../"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

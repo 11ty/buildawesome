@@ -1,5 +1,5 @@
 import test from "ava";
-import Benchmark from "../src/Benchmark.js";
+import Benchmark from "../src/Benchmark/Benchmark.js";
 
 test("Standard Benchmark", async (t) => {
   await new Promise((resolve) => {

@@ -1,19 +1,24 @@
 import test from "ava";
 import { Liquid, Drop } from "liquidjs";
 
+import Eleventy from "../src/Core.js";
 import TemplateRender from "../src/TemplateRender.js";
-import TemplateConfig from "../src/TemplateConfig.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
+
+import { getTemplateConfigInstance } from "./_testHelpers.js";
+import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
 
 async function getNewTemplateRender(name, inputDir, userConfig = {}) {
-  let eleventyConfig = new TemplateConfig();
-  for (let key in userConfig) {
-    eleventyConfig.userConfig[key] = userConfig[key];
-  }
-  await eleventyConfig.init();
+	let eleventyConfig = await getTemplateConfigInstance({
+		dir: {
+			input: inputDir
+		}
+	}, null, userConfig);
 
-  let tr = new TemplateRender(name, inputDir, eleventyConfig);
-  tr.extensionMap = new EleventyExtensionMap([], eleventyConfig);
+  let tr = new TemplateRender(name, eleventyConfig);
+  tr.extensionMap = new ExtensionMap(eleventyConfig);
+  tr.extensionMap.engineManager = new TemplateEngineManager(eleventyConfig);
+  tr.extensionMap.setFormats([]);
   await tr.init();
   return tr;
 }
@@ -209,6 +214,19 @@ test("Liquid Async Filter", async (t) => {
 
   let fn = await tr.getCompiledTemplate("{{ 'test' | myAsyncFilter }}");
   t.is((await fn()).trim(), "HItest");
+});
+
+test("Issue 3206: Strict variables and custom filters in includes", async (t) => {
+  let tr = await getNewTemplateRender("liquid", "test/stubs", {
+    liquidOptions: {
+      strictVariables: true
+    }
+  });
+  tr.engine.addFilter("makeItFoo", function () {
+    return "foo";
+  });
+  let fn = await tr.getCompiledTemplate(`<p>{% render "custom-filter", name: "Zach" %}</p>`);
+  t.is((await fn()), "<p>foo</p>");
 });
 
 test("Liquid Custom Tag prefixWithZach", async (t) => {
@@ -674,8 +692,9 @@ test("Liquid Render Scope Leak", async (t) => {
   t.is(tr1.getEngineName(), "liquid");
 
   let tr2 = await getNewTemplateRender("liquid", "./test/stubs/");
-  let fn = await tr2.getCompiledTemplate("<p>{% render 'scopeleak' %}{{ test }}</p>");
-  t.is(await fn({ test: 1 }), "<p>21</p>");
+  // see scopeleak.liquid
+  let fn = await tr2.getCompiledTemplate("<p>{% render 'scopeleak' %}-{{ test }}</p>");
+  t.is(await fn({ test: 1 }), "<p>2-1</p>");
 });
 
 // Note: this strictFilters default changed in 1.0 from false to true
@@ -1024,4 +1043,143 @@ test("Liquid Parse for Symbols", async (t) => {
   t.deepEqual(engine.parseForSymbols("{{ collections.mine }}>"), ["collections.mine"]);
 
   t.deepEqual(engine.parseForSymbols("{{ collections.mine | test }}>"), ["collections.mine"]);
+});
+
+test("Eleventy shortcode uses new built-in Liquid argument parsing behavior (spaces)", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      $config.setLiquidParameterParsing("builtin");
+      $config.addShortcode("test", (...args) => {
+        return JSON.stringify(args);
+      })
+      $config.addTemplate("index.liquid", `{% test abc def %}`, {
+        abc: 123,
+        def: 456
+      });
+    }
+  });
+  elev.disableLogger();
+
+  let [result] = await elev.toJSON();
+  t.deepEqual(result.content, "[123,456]");
+});
+
+test("Eleventy shortcode uses new built-in Liquid argument parsing behavior (commas)", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      $config.setLiquidParameterParsing("builtin");
+      $config.addShortcode("test", (...args) => {
+        return JSON.stringify(args);
+      })
+      $config.addTemplate("index.liquid", `{% test abc, def %}`, {
+        abc: 123,
+        def: 456
+      });
+    }
+  });
+  elev.disableLogger();
+
+  let [result] = await elev.toJSON();
+  t.deepEqual(result.content, "[123,456]");
+});
+
+test("Eleventy shortcode uses new built-in Liquid argument parsing behavior (commas, no spaces)", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      $config.setLiquidParameterParsing("builtin");
+      $config.addShortcode("test", (...args) => {
+        return JSON.stringify(args);
+      })
+      $config.addTemplate("index.liquid", `{% test abc,def %}`, {
+        abc: 123,
+        def: 456
+      });
+    }
+  });
+  elev.disableLogger();
+
+  let [result] = await elev.toJSON();
+  t.deepEqual(result.content, "[123,456]");
+});
+
+test("Eleventy paired shortcode uses new built-in Liquid argument parsing behavior (spaces)", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      $config.setLiquidParameterParsing("builtin");
+      $config.addPairedShortcode("test", (...args) => {
+        return JSON.stringify(args);
+      })
+      $config.addTemplate("index.liquid", `{% test abc def %}hi{% endtest %}`, {
+        abc: 123,
+        def: 456
+      });
+    }
+  });
+  elev.disableLogger();
+
+  let [result] = await elev.toJSON();
+  t.deepEqual(result.content, `["hi",123,456]`);
+});
+
+test("Eleventy paired shortcode uses new built-in Liquid argument parsing behavior (commas)", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      $config.setLiquidParameterParsing("builtin");
+      $config.addPairedShortcode("test", (...args) => {
+        return JSON.stringify(args);
+      })
+      $config.addTemplate("index.liquid", `{% test abc, def %}hi{% endtest %}`, {
+        abc: 123,
+        def: 456
+      });
+    }
+  });
+  elev.disableLogger();
+
+  let [result] = await elev.toJSON();
+  t.deepEqual(result.content, `["hi",123,456]`);
+});
+
+test("Eleventy paired shortcode uses new built-in Liquid argument parsing behavior (commas, no spaces)", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      $config.setLiquidParameterParsing("builtin");
+      $config.addPairedShortcode("test", (...args) => {
+        return JSON.stringify(args);
+      })
+      $config.addTemplate("index.liquid", `{% test abc,def %}hi{% endtest %}`, {
+        abc: 123,
+        def: 456
+      });
+    }
+  });
+  elev.disableLogger();
+
+  let [result] = await elev.toJSON();
+  t.deepEqual(result.content, `["hi",123,456]`);
+});
+
+test("jsTruthy default changed, breaking in v4 #3507", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      $config.addTemplate("index.liquid", `{% if emptyString %}notempty{% endif %}-{% if zero %}notzero{% endif %}-{% if not emptyString %}empty{% endif %}-{% if not zero %}zero{% endif %}`, {
+        emptyString: "",
+        zero: 0
+      });
+    }
+  });
+
+  let [result] = await elev.toJSON();
+  t.deepEqual(result.content, `--empty-zero`);
+});
+
+test("Use globals for page/eleventy/collections for use inside {% render %} #1541", async (t) => {
+  let elev = new Eleventy("./test/stubs/stubs-1541/", undefined, {
+    config: $config => {
+      $config.addTemplate("index.liquid", `{% render "render-source.liquid" %}`);
+    }
+  });
+
+  let [result] = await elev.toJSON();
+  t.deepEqual(result.content, `/ via script collections.all size: 1`);
 });

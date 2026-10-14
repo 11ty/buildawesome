@@ -1,24 +1,40 @@
-name: Node Unit Tests
-on:
-  push:
-    branches-ignore:
-      - "gh-pages"
+name: Unit Tests
+on: push
+permissions: read-all
 jobs:
-  build:
+  server:
+    name: Node.js v${{ matrix.node }} on ${{ matrix.os }}
+    if: ${{ !startsWith(github.ref, 'refs/heads/dependabot/github_actions/') }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
-        node: ["18", "20"]
-    name: Node.js ${{ matrix.node }} on ${{ matrix.os }}
+        node: ["22", "24", "26"]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # 7.0.1
       - name: Setup node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # 7.0.0
         with:
           node-version: ${{ matrix.node }}
           # cache: npm
-      - run: npm install
-      - run: npm test
+      - run: npm ci
+      - run: npm run test:server
+  client:
+    name: Vitest on ${{ matrix.os }} (Node.js v${{ matrix.node }})
+    if: ${{ !startsWith(github.ref, 'refs/heads/dependabot/github_actions/') }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+        node: ["22"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # 7.0.1
+      - name: Setup node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # 7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci
+      - run: npx playwright install
+      - run: npm run test:browser
 env:
   YARN_GPG: no

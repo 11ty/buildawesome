@@ -1,14 +1,21 @@
 import test from "ava";
 import TemplateRender from "../src/TemplateRender.js";
-import TemplateConfig from "../src/TemplateConfig.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
+import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
+
+import { getTemplateConfigInstance } from "./_testHelpers.js";
 
 async function getNewTemplateRender(name, inputDir) {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init();
+  let eleventyConfig = await getTemplateConfigInstance({
+		dir: {
+			input: inputDir
+		}
+	});
 
-  let tr = new TemplateRender(name, inputDir, eleventyConfig);
-  tr.extensionMap = new EleventyExtensionMap([], eleventyConfig);
+  let tr = new TemplateRender(name, eleventyConfig);
+  tr.extensionMap = new ExtensionMap(eleventyConfig);
+  tr.extensionMap.engineManager = new TemplateEngineManager(eleventyConfig);
+  tr.extensionMap.setFormats([]);
   await tr.init();
   return tr;
 }
@@ -34,7 +41,7 @@ test("HTML Render: Parses HTML using liquid engine (default, with data)", async 
 
 test("HTML Render: Set HTML engine to false, don’t parse", async (t) => {
   let tr = await getNewTemplateRender("html");
-  tr.setHtmlEngine(false);
+  tr.setPreprocessingEngine(false);
 
   let fn = await tr.getCompiledTemplate("<h1>{{title}}</h1>");
   t.is((await fn()).trim(), "<h1>{{title}}</h1>");
@@ -42,7 +49,7 @@ test("HTML Render: Set HTML engine to false, don’t parse", async (t) => {
 
 test("HTML Render: Pass in an override (liquid)", async (t) => {
   let tr = await getNewTemplateRender("html");
-  tr.setHtmlEngine("liquid");
+  tr.setPreprocessingEngine("liquid");
   let fn = await tr.getCompiledTemplate("<h1>{{title}}</h1>");
 
   t.is((await fn({ title: "My Title" })).trim(), "<h1>My Title</h1>");

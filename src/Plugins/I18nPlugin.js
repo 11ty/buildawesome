@@ -1,7 +1,6 @@
 import { bcp47Normalize } from "bcp-47-normalize";
 import iso639 from "iso-639-1";
-
-import { DeepCopy } from "../Util/Merge.js";
+import { DeepCopy } from "@11ty/eleventy-utils";
 
 // pathPrefix note:
 // When using `locale_url` filter with the `url` filter, `locale_url` must run first like
@@ -66,37 +65,6 @@ class Comparator {
 		}
 
 		return url.split("/").some((entry) => entry === code);
-	}
-
-	// Search for same input path files with only differing locale folders
-	//    matches /en/about.html and /es/about.html
-	// Folders can exist anywhere in the hierarchy!
-	//    matches /testing/en/about.html and /testing/es/about.html
-
-	// Returns an array of the first matched language codes in the path
-	// [inputPathLangCode, inputPath2LangCode]
-	static matchLanguageFolder(inputPath, inputPath2) {
-		if (inputPath === inputPath2) {
-			return false;
-		}
-
-		let langCodes = [];
-		let s1 = inputPath.split("/");
-		let s2 = inputPath2.split("/");
-		for (let j = 0, k = s1.length; j < k; j++) {
-			if (Comparator.isLangCode(s1[j]) && Comparator.isLangCode(s2[j])) {
-				// Return the first match only
-				if (langCodes.length === 0) {
-					langCodes = [s1[j], s2[j]];
-				}
-				continue;
-			}
-			if (s1[j] !== s2[j]) {
-				return false;
-			}
-		}
-
-		return langCodes;
 	}
 }
 
@@ -186,7 +154,7 @@ function getLocaleUrlsMap(urlToInputPath, extensionMap, options = {}) {
 	return urlMap;
 }
 
-function EleventyPlugin(eleventyConfig, opts = {}) {
+function I18nPlugin(eleventyConfig, opts = {}) {
 	let options = DeepCopy(
 		{
 			defaultLanguage: "",
@@ -205,22 +173,21 @@ function EleventyPlugin(eleventyConfig, opts = {}) {
 		);
 	}
 
-	let benchmarkManager = eleventyConfig.benchmarkManager.get("Aggregate");
-
 	let extensionMap;
-	eleventyConfig.on("eleventy.extensionmap", (map) => {
+	eleventyConfig.on("buildawesome.extensionmap", (map) => {
 		extensionMap = map;
 	});
 
+	let bench = eleventyConfig.benchmarkManager.get("Aggregate");
 	let contentMaps = {};
-	eleventyConfig.on("eleventy.contentMap", function ({ urlToInputPath, inputPathToUrl }) {
-		let bench = benchmarkManager.get("(i18n Plugin) Setting up content map.");
-		bench.before();
+	eleventyConfig.on("buildawesome.contentmap", function ({ urlToInputPath, inputPathToUrl }) {
+		let b = bench.get("(i18n Plugin) Setting up content map.");
+		b.before();
 		contentMaps.inputPathToUrl = inputPathToUrl;
 		contentMaps.urlToInputPath = urlToInputPath;
 
 		contentMaps.localeUrlsMap = getLocaleUrlsMap(urlToInputPath, extensionMap, options);
-		bench.after();
+		b.after();
 	});
 
 	eleventyConfig.addGlobalData("eleventyComputed.page.lang", () => {
@@ -337,4 +304,20 @@ function EleventyPlugin(eleventyConfig, opts = {}) {
 
 export { Comparator, LangUtils };
 
-export default EleventyPlugin;
+Object.defineProperty(I18nPlugin, "eleventyPackage", {
+	value: "@11ty/eleventy/i18n-plugin",
+});
+
+Object.defineProperty(I18nPlugin, "eleventyPluginOptions", {
+	value: {
+		unique: true,
+	},
+});
+
+// CommonJS friendly exports on .default
+Object.assign(I18nPlugin, {
+	Comparator,
+	LangUtils,
+});
+
+export default I18nPlugin;

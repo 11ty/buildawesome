@@ -1,9 +1,9 @@
 import test from "ava";
 import semver from "semver";
 
-import TemplateConfig from "../src/TemplateConfig.js";
 import getNewTemplate from "./_getNewTemplateForTests.js";
 import { getRenderedTemplates as getRenderedTmpls } from "./_getRenderedTemplates.js";
+import { getTemplateConfigInstanceCustomCallback } from "./_testHelpers.js";
 
 test("JavaScript template type (function)", async (t) => {
   let tmpl = await getNewTemplate("./test/stubs/function.11ty.cjs", "./test/stubs/", "./dist");
@@ -90,13 +90,13 @@ test("JavaScript template type (class with async data method)", async (t) => {
 });
 
 test("JavaScript template type (class with data getter and a javascriptFunction)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init({
-    javascriptFunctions: {
-      upper: function (val) {
-        return new String(val).toUpperCase();
-      },
-    },
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs",
+    output: "dist",
+  }, function(cfg) {
+    cfg.addJavaScriptFunction("upper", function (val) {
+      return new String(val).toUpperCase();
+    });
   });
 
   let tmpl = await getNewTemplate(
@@ -116,13 +116,13 @@ test("JavaScript template type (class with data getter and a javascriptFunction)
 });
 
 test("JavaScript template type (class with data method and a javascriptFunction)", async (t) => {
-  let eleventyConfig = new TemplateConfig();
-  await eleventyConfig.init({
-    javascriptFunctions: {
-      upper: function (val) {
-        return new String(val).toUpperCase();
-      },
-    },
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs",
+    output: "dist",
+  }, function(cfg) {
+    cfg.addJavaScriptFunction("upper", function (val) {
+      return new String(val).toUpperCase();
+    });
   });
 
   let tmpl = await getNewTemplate(
