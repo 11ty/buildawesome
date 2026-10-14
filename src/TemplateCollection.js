@@ -5,19 +5,11 @@ import Sortable from "./Util/Objects/Sortable.js";
 import { isGlobMatch } from "./Util/GlobMatcher.js";
 
 export default class TemplateCollection extends Sortable {
-	// Both caches are invalidated in `add`, the only entry point that mutates `items`
-	#allSortedCache;
-	#tagIndexCache;
-
-	constructor() {
-		super();
-
-		this._filteredByGlobsCache = new Map();
-	}
+	// Sorted items, tag index, and glob matches, reset by `add`, the only entry point that mutates `items`
+	#cache = {};
 
 	add(item) {
-		this.#allSortedCache = undefined;
-		this.#tagIndexCache = undefined;
+		this.#cache = {};
 		super.add(item);
 	}
 
@@ -25,18 +17,14 @@ export default class TemplateCollection extends Sortable {
 		return this.items.slice();
 	}
 
-	// Sorted once per mutation instead of once per collection API call
 	#getAllSorted() {
-		if (!this.#allSortedCache) {
-			this.#allSortedCache = this.sort(Sortable.sortFunctionDateInputPath);
-		}
-
-		return this.#allSortedCache;
+		this.#cache.sorted ??= this.sort(Sortable.sortFunctionDateInputPath);
+		return this.#cache.sorted;
 	}
 
 	// Tag name to items (in sorted order), so tag lookups don’t walk the full collection
 	#getTagIndex() {
-		if (!this.#tagIndexCache) {
+		if (!this.#cache.tags) {
 			let index = new Map();
 
 			for (let item of this.#getAllSorted()) {
@@ -50,10 +38,10 @@ export default class TemplateCollection extends Sortable {
 				}
 			}
 
-			this.#tagIndexCache = index;
+			this.#cache.tags = index;
 		}
 
-		return this.#tagIndexCache;
+		return this.#cache.tags;
 	}
 
 	getAllSorted() {
@@ -78,23 +66,15 @@ export default class TemplateCollection extends Sortable {
 	getFilteredByGlob(globs) {
 		globs = this.getGlobs(globs);
 
+		this.#cache.globs ??= new Map();
+
 		let key = globs.join("::");
-		if (!this._dirty) {
-			// Try to find a pre-sorted list and clone it.
-			if (this._filteredByGlobsCache.has(key)) {
-				return [...this._filteredByGlobsCache.get(key)];
-			}
-		} else if (this._filteredByGlobsCache.size) {
-			// Blow away cache
-			this._filteredByGlobsCache = new Map();
+		if (!this.#cache.globs.has(key)) {
+			let filtered = this.#getAllSorted().filter((item) => isGlobMatch(item.inputPath, globs));
+			this.#cache.globs.set(key, filtered);
 		}
 
-		let filtered = this.getAllSorted().filter((item) => {
-			return isGlobMatch(item.inputPath, globs);
-		});
-		this._dirty = false;
-		this._filteredByGlobsCache.set(key, [...filtered]);
-		return filtered;
+		return this.#cache.globs.get(key).slice();
 	}
 
 	getFilteredByTag(tagName) {

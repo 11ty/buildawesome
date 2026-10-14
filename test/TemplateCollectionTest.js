@@ -306,6 +306,27 @@ test("getFilteredByGlob no dash dot", async (t) => {
   t.deepEqual(htmls[1].template, tmpl7);
 });
 
+test("getFilteredByGlob (cache is invalidated by add)", async (t) => {
+  let $config = await getTemplateConfigInstance();
+
+  let tmpl1 = await getNewTemplateByNumber(1, $config);
+  let tmpl6 = await getNewTemplateByNumber(6, $config);
+  let tmpl8 = await getNewTemplateByNumber(8, $config);
+
+  let c = new Collection();
+  await addTemplate(c, tmpl1);
+  await addTemplate(c, tmpl6);
+
+  let markdowns = c.getFilteredByGlob("./**/*.md");
+  t.is(markdowns.length, 1);
+
+  await addTemplate(c, tmpl8);
+  t.is(c.getFilteredByGlob("./**/*.md").length, 2);
+
+  // The result returned before the addition is unaffected
+  t.is(markdowns.length, 1);
+});
+
 test("partial match on tag string, issue 95", async (t) => {
   let $config = await getTemplateConfigInstance();
 
