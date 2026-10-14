@@ -1463,64 +1463,51 @@ test("Throws a Premature Template Content Error (njk)", async (t) => {
   t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
 });
 
-test("Throws a Premature Template Content Error from rendering (njk)", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/stubs/prematureTemplateContent/test.njk",
-    "./test/stubs/",
-    "./test/stubs/_site"
-  );
+// Renders like TemplateMap (no layouts) so the error comes from the template, not the page entry’s own templateContent.
+async function getPrematureErrorFromRendering(t, inputPath, configCallback) {
+  let sampleRead = false;
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, configCallback || function () {});
+  let tmpl = await getNewTemplate(inputPath, "./test/stubs/", "./test/stubs/_site", null, null, eleventyConfig);
 
   let data = await tmpl.getData();
   await tmpl.getTemplateMapEntry(data);
 
-  let pageEntries = await tmpl.getTemplates({
-    page: {},
-    sample: {
-      get templateContent() {
-        throw new TemplateContentPrematureUseError(
-          "Tried to use templateContent too early (test.njk)"
-        );
-      },
+  let sample = {
+    get templateContent() {
+      sampleRead = true;
+      throw new TemplateContentPrematureUseError(`Tried to use templateContent too early (${inputPath})`);
     },
-  });
+  };
+  let pageEntries = await tmpl.getTemplates({ page: {}, sample, samples: [sample], collections: { all: [sample] } });
   let error = await t.throwsAsync(async () => {
-    await tmpl.renderPageEntry(pageEntries[0]);
+    await tmpl.renderPageEntryWithoutLayout(pageEntries[0]);
   });
+  t.true(sampleRead);
+  return error;
+}
+
+test("Throws a Premature Template Content Error from rendering (njk)", async (t) => {
+  let error = await getPrematureErrorFromRendering(t, "./test/stubs/prematureTemplateContent/test.njk");
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
+});
+
+test("Throws a Premature Template Content Error from rendering (liquid)", async (t) => {
+  let error = await getPrematureErrorFromRendering(t, "./test/stubs/prematureTemplateContent/test.liquid");
   t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
 });
 
 test("Recognizes a Premature Template Content Error wrapped by a Nunjucks filter", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function (cfg) {
+  let error = await getPrematureErrorFromRendering(t, "./test/stubs/prematureTemplateContent/filter.njk", function (cfg) {
     cfg.addFilter("renderedContent", (items) => items[0].templateContent);
   });
-  let tmpl = await getNewTemplate(
-    "./test/stubs/prematureTemplateContent/filter.njk",
-    "./test/stubs/",
-    "./test/stubs/_site",
-    null,
-    null,
-    eleventyConfig
-  );
+  t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
+});
 
-  let data = await tmpl.getData();
-  await tmpl.getTemplateMapEntry(data);
-
-  let pageEntries = await tmpl.getTemplates({
-    page: {},
-    samples: [
-      {
-        get templateContent() {
-          throw new TemplateContentPrematureUseError(
-            "Tried to use templateContent too early (filter.njk)"
-          );
-        },
-      },
-    ],
+test("Recognizes a Premature Template Content Error wrapped by a Nunjucks filter (dev: false)", async (t) => {
+  let error = await getPrematureErrorFromRendering(t, "./test/stubs/prematureTemplateContent/filter.njk", function (cfg) {
+    cfg.setNunjucksEnvironmentOptions({ dev: false });
+    cfg.addFilter("renderedContent", (items) => items[0].templateContent);
   });
-  let error = await t.throwsAsync(async () => {
-    await tmpl.renderPageEntry(pageEntries[0]);
-  });
-
   t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
 });
 
@@ -1579,28 +1566,7 @@ test("Throws a Premature Template Content Error (md)", async (t) => {
 });
 
 test("Throws a Premature Template Content Error from rendering (md)", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/stubs/prematureTemplateContent/test.md",
-    "./test/stubs/",
-    "./test/stubs/_site"
-  );
-
-  let data = await tmpl.getData();
-  await tmpl.getTemplateMapEntry(data);
-
-  let pageEntries = await tmpl.getTemplates({
-    page: {},
-    sample: {
-      get templateContent() {
-        throw new TemplateContentPrematureUseError(
-          "Tried to use templateContent too early (test.md)"
-        );
-      },
-    },
-  });
-  let error = await t.throwsAsync(async () => {
-    await tmpl.renderPageEntry(pageEntries[0]);
-  });
+  let error = await getPrematureErrorFromRendering(t, "./test/stubs/prematureTemplateContent/test.md");
   t.is(ErrorUtil.isPrematureTemplateContentError(error), true);
 });
 

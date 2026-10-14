@@ -141,7 +141,7 @@
 		"@11ty/gray-matter": "^3.0.0",
 		"@11ty/lodash-custom": "^4.17.21",
 		"@11ty/node-version-check": "^1.0.1",
-		"@11ty/nunjucks": "^4.0.0-alpha.3",
+		"@11ty/nunjucks": "^4.0.0-alpha.4",
 		"@11ty/parse-date-strings": "^2.0.6",
 		"@11ty/posthtml-urls": "^2.0.0",
 		"@11ty/recursive-copy": "^5.0.2",

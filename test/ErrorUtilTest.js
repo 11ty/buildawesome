@@ -57,11 +57,3 @@ test("isPrematureTemplateContentError() follows nested Error.cause values", (t) 
 
   t.true(ErrorUtil.isPrematureTemplateContentError(error));
 });
-
-test("isPrematureTemplateContentError() ignores matching text in nested errors", (t) => {
-  let error = new Error("Outer error", {
-    cause: new Error("Documentation mentions TemplateContentPrematureUseError"),
-  });
-
-  t.false(ErrorUtil.isPrematureTemplateContentError(error));
-});
