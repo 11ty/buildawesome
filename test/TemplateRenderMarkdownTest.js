@@ -55,30 +55,27 @@ test("Markdown Render: Parses markdown using liquid engine (default, with data)"
 
 test("Markdown Render: Ignore markdown, use only preprocess engine (useful for variable resolution in permalinks)", async (t) => {
   let tr = await getNewTemplateRender("md");
-  tr.setUseMarkdown(false);
-
-  let fn = await tr.getCompiledTemplate("{{title}}");
+  let fn = await tr.getCompiledTemplate("{{title}}", { templateOnly: true });
   t.is((await fn({ title: "My Title" })).trim(), "My Title");
 });
 
 test("Markdown Render: Skip markdown and preprocess engine (issue #466)", async (t) => {
   let tr = await getNewTemplateRender("md");
-  tr.setMarkdownEngine(false);
-  tr.setUseMarkdown(false);
-  let fn = await tr.getCompiledTemplate("404.html");
+  tr.setPreprocessingEngine(false);
+  let fn = await tr.getCompiledTemplate("404.html", { templateOnly: true });
   t.is((await fn({ title: "My Title" })).trim(), "404.html");
 });
 
 test("Markdown Render: Set markdown engine to false, don’t parse", async (t) => {
   let tr = await getNewTemplateRender("md");
-  tr.setMarkdownEngine(false);
+  tr.setPreprocessingEngine(false);
   let fn = await tr.getCompiledTemplate("# {{title}}");
   t.is((await fn()).trim(), "<h1>{{title}}</h1>");
 });
 
 test("Markdown Render: Set markdown engine to false, don’t parse (test with HTML input)", async (t) => {
   let tr = await getNewTemplateRender("md");
-  tr.setMarkdownEngine(false);
+  tr.setPreprocessingEngine(false);
   let fn = await tr.getCompiledTemplate("<h1>{{title}}</h1>");
 
   t.is((await fn()).trim(), "<h1>{{title}}</h1>");
@@ -86,7 +83,7 @@ test("Markdown Render: Set markdown engine to false, don’t parse (test with HT
 
 test("Markdown Render: Pass in an override (liquid)", async (t) => {
   let tr = await getNewTemplateRender("md");
-  tr.setMarkdownEngine("liquid");
+  tr.setPreprocessingEngine("liquid");
   let fn = await tr.getCompiledTemplate("# {{title}}");
 
   t.is((await fn({ title: "My Title" })).trim(), "<h1>My Title</h1>");
@@ -287,7 +284,7 @@ test("Markdown Render: use Markdown inside of a Liquid shortcode (Issue #536)", 
   liquidEngine.addShortcode("testShortcode", function () {
     return "## My Other Title";
   });
-  tr.setMarkdownEngine(liquidEngine);
+  tr.setPreprocessingEngine(liquidEngine);
 
   let fn = await tr.getCompiledTemplate(`# {{title}}
 {% testShortcode %}`);
@@ -310,7 +307,7 @@ test("Markdown Render: use Markdown inside of a Nunjucks shortcode (Issue #536)"
   nunjucksEngine.addShortcode("testShortcode", function () {
     return "## My Other Title";
   });
-  tr.setMarkdownEngine(nunjucksEngine);
+  tr.setPreprocessingEngine(nunjucksEngine);
 
   let fn = await tr.getCompiledTemplate(`# {{title}}
 {% testShortcode %}`);
@@ -334,7 +331,7 @@ test("Markdown Render: use Markdown inside of a Liquid paired shortcode (Issue #
   liquidEngine.addPairedShortcode("testShortcode", function (content) {
     return content;
   });
-  tr.setMarkdownEngine(liquidEngine);
+  tr.setPreprocessingEngine(liquidEngine);
 
   let fn = await tr.getCompiledTemplate(`# {{title}}
 {% testShortcode %}## My Other Title{% endtestShortcode %}`);
@@ -358,7 +355,7 @@ test("Markdown Render: use Markdown inside of a Nunjucks paired shortcode (Issue
   nunjucksEngine.addPairedShortcode("testShortcode", function (content) {
     return content;
   });
-  tr.setMarkdownEngine(nunjucksEngine);
+  tr.setPreprocessingEngine(nunjucksEngine);
 
   let fn = await tr.getCompiledTemplate(`# {{title}}
 {% testShortcode %}## My Other Title{% endtestShortcode %}`);

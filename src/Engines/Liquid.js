@@ -1,5 +1,5 @@
 import moo from "moo";
-import { Tokenizer, TokenKind, evalToken, Liquid as LiquidJs } from "liquidjs";
+import { Tokenizer, TokenKind, LookupType, Parser, evalToken, Liquid as LiquidJs } from "liquidjs";
 import { TemplatePath } from "@11ty/eleventy-utils";
 
 import TemplateEngine from "./TemplateEngine.js";
@@ -32,6 +32,7 @@ export default class Liquid extends TemplateEngine {
 		// warning, the include syntax supported here does not exactly match what Jekyll uses.
 		this.liquidLib = override || new LiquidJs(this.getLiquidOptions());
 		this.setEngineLib(this.liquidLib, Boolean(this.config.libraryOverrides.liquid));
+		this.#trackPartialFiles();
 
 		this.addFilters(this.config.liquidFilters);
 
@@ -54,6 +55,38 @@ export default class Liquid extends TemplateEngine {
 		// debug("Liquid constructor options: %o", options);
 
 		return options;
+	}
+
+	// Records `include`, `render`, and `layout` files in the dependency graph for incremental builds
+	#trackPartialFiles() {
+		let lib = this.liquidLib;
+		if (typeof lib._parsePartialFile !== "function" || typeof lib._parseLayoutFile !== "function") {
+			return;
+		}
+
+		let engine = this;
+		let track = (lookupType) =>
+			function (file, sync, currentFile) {
+				let parser = new Parser(this);
+				let lookup = parser.loader.lookup;
+				parser.loader.lookup = function* (...args) {
+					let filepath = yield* lookup.apply(this, args);
+					// String templates have no file, so use the engine name (e.g. includes in `renderTemplate`)
+					engine.addDependency(currentFile || engine.name, filepath);
+					return filepath;
+				};
+				// A cached parse skips the lookup
+				if (parser.cache) {
+					return (function* () {
+						yield parser.loader.lookup(file, lookupType, sync, currentFile);
+						return yield parser.parseFile(file, sync, lookupType, currentFile);
+					})();
+				}
+				return parser.parseFile(file, sync, lookupType, currentFile);
+			};
+
+		lib._parsePartialFile = track(LookupType.Partials);
+		lib._parseLayoutFile = track(LookupType.Layouts);
 	}
 
 	static wrapFilter(name, fn) {

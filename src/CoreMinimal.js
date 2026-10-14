@@ -7,11 +7,13 @@ import TemplateWriter from "./TemplateWriter.js";
 import ExtensionMap from "./ExtensionMap.js";
 import { ErrorHandler } from "./Errors/ErrorHandler.js";
 import TemplateConfig from "./TemplateConfig.js";
+import GlobalDependencyMap from "./GlobalDependencyMap.js";
 import TemplateEngineManager from "./Engines/TemplateEngineManager.js";
 
 /* Utils */
 import { createDebug } from "./Util/DebugLogUtil.js";
 import { readableFileSize } from "./Util/FileSize.js";
+import { isEligibleJavaScriptFileExtension } from "./Util/FilePathUtil.js";
 import simplePlural from "./Util/Pluralize.js";
 import ConsoleLogger from "./Util/ConsoleLogger.js";
 import ProjectDirectories from "./Util/ProjectDirectories.js";
@@ -60,6 +62,8 @@ export class CoreMinimal {
 	#isEsm;
 	/** @type {string} */
 	#activeConfigurationPath;
+	/** @type {object|undefined} */
+	#reporter;
 
 	// Support both new Eleventy(options) and new Eleventy(input, output, options)
 	#normalizeConstructorArguments(...args) {
@@ -267,6 +271,11 @@ export class CoreMinimal {
 		}
 
 		this.eleventyConfig.userConfig.directories = this.directories;
+
+		// Re-runs on config resets in watch mode
+		if (this.#reporter) {
+			await this.#reporter.config(this.eleventyConfig.userConfig);
+		}
 
 		/* Programmatic API config, this runs before the default config is initialized */
 		if (this.options.config && typeof this.options.config === "function") {
@@ -567,6 +576,15 @@ Verbose Output: ${this.verboseMode}`;
 		this.logger.overrideLogger(false);
 	}
 
+	/**
+	 * Call before init().
+	 *
+	 * @param {{ config: Function }} reporter
+	 */
+	setReporter(reporter) {
+		this.#reporter = reporter;
+	}
+
 	/** @type {ErrorHandler} */
 	get errorHandler() {
 		if (!this.#errorHandler) {
@@ -758,14 +776,45 @@ Verbose Output: ${this.verboseMode}`;
 	 * If the active queue has a mix of template/non-template files (includes, etc), swap to run a full build
 	 */
 	isIncrementalBuildPossible(queuedFiles = []) {
-		let hasNonTemplateFiles = Boolean(
-			queuedFiles.find((path) => !this.directories.isTemplateFile(path)),
-		);
-		if (hasNonTemplateFiles) {
+		let uses = this.eleventyConfig.usesGraph;
+		return queuedFiles.every((path) => {
+			// e.g. an include or layout file
+			if (uses.hasDependants(path)) {
+				return this.#isTrackedTemplateDependency(path);
+			}
+			return this.directories.isTemplateFile(path) || this.#isPassthroughCopyFile(path);
+		});
+	}
+
+	// Passthrough copy can be configured outside of the input directory
+	#isPassthroughCopyFile(path) {
+		return Boolean(this.passthroughManager?.filterToPassthroughCopyFilesOnly([], [path]).length);
+	}
+
+	// The dependency graph knows every template that uses this file
+	#isTrackedTemplateDependency(path) {
+		let uses = this.eleventyConfig.usesGraph;
+		if (!uses.hasAllTemplateDependencies) {
 			return false;
 		}
 
-		return true;
+		// e.g. `{% if site %}` changes without reading anything from a deleted global data file
+		if (!this.eleventyConfig.existsCache.exists(path)) {
+			return false;
+		}
+
+		let node = uses.normalizeNode(path);
+		return (
+			GlobalDependencyMap.isLayoutNode(uses.map, node) ||
+			GlobalDependencyMap.isDataFileNode(uses.map, node) ||
+			!isEligibleJavaScriptFileExtension(TemplatePath.getExtension(path)) ||
+			this.isJavaScriptDependencyOfTemplatesOnly(path)
+		);
+	}
+
+	// A JavaScript module also used by data or configuration files needs a full build (unknown here)
+	isJavaScriptDependencyOfTemplatesOnly() {
+		return false;
 	}
 
 	/**
@@ -794,13 +843,21 @@ Verbose Output: ${this.verboseMode}`;
 		}
 
 		let incrementalFiles = this.watchQueue?.getActiveQueue() || [];
-		if (this.isIncremental && this.isIncrementalBuildPossible(incrementalFiles)) {
+		let isIncrementalBuild =
+			this.isIncremental &&
+			incrementalFiles.length > 0 &&
+			this.isIncrementalBuildPossible(incrementalFiles);
+		if (isIncrementalBuild) {
 			// This really controls whether a build is incremental or not (internally)
 			this.writer.setIncrementalFiles(incrementalFiles);
 		}
+		let rendersAllTemplates = !isIncrementalBuild && this.isRunInitialBuild;
+		this.eleventyConfig.usesGraph.setChangedFiles(incrementalFiles);
 
 		let returnObj;
 		let hasError = false;
+		// Also used in catch
+		let eventsArg;
 		let outputMode = String(to);
 		// normalize fs:templates or fs:copy to `fs`
 		if (outputMode.includes(":")) {
@@ -809,7 +866,7 @@ Verbose Output: ${this.verboseMode}`;
 
 		try {
 			let directories = this.directories.getUserspaceInstance();
-			let eventsArg = {
+			eventsArg = {
 				directories,
 
 				// v3.0.0-alpha.6, changed to use `directories` instead (this was only used by serverless plugin)
@@ -852,6 +909,10 @@ Verbose Output: ${this.verboseMode}`;
 				returnObj = [resolved.passthroughCopy, resolved.templates];
 			}
 
+			if (rendersAllTemplates) {
+				this.eleventyConfig.usesGraph.setHasAllTemplateDependencies(true);
+			}
+
 			// always reset after first build
 			this.setIgnoreInitial(false);
 			this.writer.resetIncremental();
@@ -864,9 +925,22 @@ Verbose Output: ${this.verboseMode}`;
 		} catch (error) {
 			hasError = true;
 
+			// A template that failed may not have recorded all of its includes
+			this.eleventyConfig.usesGraph.setHasAllTemplateDependencies(false);
+
 			// Issue #2405: Don’t change the exitCode for programmatic scripts
 			let errorSeverity = this.source === "script" ? "error" : "fatal";
 			this.errorHandler.once(errorSeverity, error, "Problem writing Eleventy templates");
+
+			// Don’t let a failing listener mask the original error
+			try {
+				await this.config.events.emit("buildawesome.aftererror", { ...eventsArg, error });
+			} catch (listenerError) {
+				this.errorHandler.warn(
+					listenerError,
+					"Problem in `buildawesome.aftererror` event listener",
+				);
+			}
 
 			throw error;
 		} finally {

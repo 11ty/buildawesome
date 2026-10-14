@@ -370,3 +370,26 @@ test("isFileInOutputFolder (change output folder)", t => {
 	t.is(d.isFileInOutputFolder("../_site/test.html"), false);
 	t.is(d.isFileInOutputFolder("yolo/test.html"), true);
 });
+
+test("isTemplateFile with project root relative paths", t => {
+	let d = new ProjectDirectories();
+	d.setInput("test/stubs");
+
+	t.is(d.isTemplateFile("./test/stubs/index.njk"), true);
+	t.is(d.isTemplateFile("test/stubs/sub/index.njk"), true);
+	t.is(d.isTemplateFile(`${process.cwd()}/test/stubs/index.njk`), true);
+	t.is(d.isTemplateFile("./test/stubs/_includes/base.njk"), false);
+	t.is(d.isTemplateFile("./test/stubs/_data/site.json"), false);
+	t.is(d.isTemplateFile("./test/stubs-other/index.njk"), false);
+	t.is(d.isTemplateFile("./index.njk"), false);
+});
+
+test("isTemplateFile with the default input directory", t => {
+	let d = new ProjectDirectories();
+
+	t.is(d.isTemplateFile("index.njk"), true);
+	t.is(d.isTemplateFile("./sub/index.njk"), true);
+	t.is(d.isTemplateFile("./_includes/base.njk"), false);
+	t.is(d.isTemplateFile("./_data/site.json"), false);
+	t.is(d.isTemplateFile("../index.njk"), false);
+});

@@ -28,10 +28,22 @@ export default class Nunjucks extends TemplateEngine {
 		this.setLibrary(this.config.libraryOverrides.njk);
 	}
 
-	// v3.1.0-alpha.1 we’ve moved to use Nunjucks’ internal cache instead of Eleventy’s
-	// get cacheable() {
-	// 	return false;
-	// }
+	// Nunjucks’ internal cache only covers loader templates (includes, layouts), not compiled strings
+	get cacheable() {
+		return true;
+	}
+
+	#recompiledKeys = new Set();
+
+	// A cached template keeps the environment (and included templates) of the build that compiled it
+	getCompileCacheKey(str, inputPath) {
+		let entry = super.getCompileCacheKey(str, inputPath);
+		if (!this.#recompiledKeys.has(entry.key) && this.config.uses.isChangedFileUsedBy(inputPath)) {
+			this.#recompiledKeys.add(entry.key);
+			entry.useCache = false;
+		}
+		return entry;
+	}
 
 	#getFileSystemDirs() {
 		let paths = new Set();
@@ -76,17 +88,49 @@ export default class Nunjucks extends TemplateEngine {
 			this.njkEnv = new Environment(loaders, this.nunjucksEnvironmentOptions);
 		}
 
+		this.#trackTemplates();
+
 		this.config.events.emit("buildawesome.engine.njk", {
 			nunjucks: NunjucksLib,
 			environment: this.njkEnv,
 		});
 	}
 
+	// Records `include`, `import`, `from`, and `extends` files in the dependency graph for incremental builds
+	#trackTemplates() {
+		let env = this.njkEnv;
+		let getTemplate = env.getTemplate;
+		if (typeof getTemplate !== "function") {
+			return;
+		}
+
+		let engine = this;
+		env.getTemplate = function (name, ...args) {
+			// (name, eagerCompile, parentName, ignoreMissing, cb), any trailing arguments optional
+			// String templates have no path, so use the engine name (e.g. includes in `renderTemplate`)
+			let parentName =
+				typeof args[1] === "string" ? args[1] : args.length > 1 ? engine.name : undefined;
+			let cbIndex = args.findIndex((arg) => typeof arg === "function");
+			if (parentName && cbIndex > -1) {
+				let cb = args[cbIndex];
+				args[cbIndex] = (error, tmpl) => {
+					engine.addDependency(parentName, tmpl?.path);
+					cb(error, tmpl);
+				};
+			}
+
+			let result = getTemplate.call(this, name, ...args);
+			if (parentName && cbIndex === -1) {
+				engine.addDependency(parentName, result?.path);
+			}
+			return result;
+		};
+	}
+
 	setLibrary(override) {
 		this.#setEnv(override);
 
 		// Note that a new Nunjucks engine instance is created for subsequent builds
-		// Eleventy Nunjucks is set to `cacheable` false above to opt out of Eleventy cache
 		this.config.events.on("buildawesome#templatemodified", (templatePath) => {
 			// NunjucksEnvironment:
 			// loader.pathToNames: {'ABSOLUTE_PATH/src/_includes/components/possum-home.css': 'components/possum-home.css'}

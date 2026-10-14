@@ -307,3 +307,28 @@ test("Missing `parser` property to addDataExtension object throws error", async 
     message: "Expected `parser` property in second argument object to `eleventyConfig.addDataExtension`"
   });
 });
+
+test("Async parser rejection is wrapped with the data file path", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback(
+    {
+      input: "test/stubs-630"
+    },
+    function(cfg) {
+      cfg.addDataExtension("yaml", {
+        parser: async () => {
+          throw new Error("Async parser failure");
+        },
+      });
+    }
+  );
+
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
+  dataObj.setFileSystemSearch(new FileSystemSearch());
+
+  let e = await t.throwsAsync(() => dataObj.getGlobalData());
+
+  t.true(e.message.startsWith("Having trouble parsing data file"));
+  t.true(e.filePath.endsWith(".yaml"));
+});

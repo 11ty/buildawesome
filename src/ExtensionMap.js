@@ -76,12 +76,17 @@ export default class ExtensionMap {
 	// on paths found from the file system glob search.
 	// TODO: Method name might just need to be renamed to something more accurate.
 	isFullTemplateFilePath(path) {
-		for (let extension of this.validTemplateLanguageKeys) {
+		for (let extension of this.#getValidTemplateExtensions()) {
 			if (path.endsWith(`.${extension}`)) {
 				return true;
 			}
 		}
 		return false;
+	}
+
+	// e.g. the `11ty.js` key includes `11ty.mjs`, `server.js`, and `11ty.ts`
+	#getValidTemplateExtensions() {
+		return new Set(this.validTemplateLanguageKeys.flatMap((key) => this.getExtensionsFromKey(key)));
 	}
 
 	getCustomExtensionEntry(extension) {
@@ -106,8 +111,9 @@ export default class ExtensionMap {
 
 		// if multiple extensions are valid, sort from longest to shortest
 		// e.g. .11ty.js and .js
+		let validExtensions = this.#getValidTemplateExtensions();
 		let sorted = Array.from(extensions)
-			.filter((extension) => this.validTemplateLanguageKeys.includes(extension))
+			.filter((extension) => validExtensions.has(extension))
 			.sort((a, b) => b.length - a.length);
 
 		return sorted;
@@ -120,7 +126,9 @@ export default class ExtensionMap {
 				return this._spiderJsDepsCache[extension];
 			}
 
-			let cls = await this.engineManager.getEngineClassByExtension(extension);
+			// e.g. `server.js` uses the `11ty.js` engine
+			let key = this.extensionToKeyMap[extension]?.key ?? extension;
+			let cls = await this.engineManager.getEngineClassByExtension(key);
 			if (cls) {
 				let entry = this.getCustomExtensionEntry(extension);
 				let shouldSpider = cls.shouldSpiderJavaScriptDependencies(entry);

@@ -35,6 +35,7 @@ class TemplateMap {
 		this.eleventyConfig = eleventyConfig;
 		this.map = [];
 		this.inputPathMap = new Map(); // NEW: O(1) lookup Map for performance
+		this.absoluteInputPaths = new Map();
 		this.collectionsData = null;
 		this.cached = false;
 		this.collection = new TemplateCollection();
@@ -66,6 +67,9 @@ class TemplateMap {
 		}
 
 		let data = await template.getData();
+		// Layouts load data too, but only pages record their reads
+		template.trackGlobalDataReads(data);
+
 		let map = await template.getTemplateMapEntry(data);
 		let { skippedVia } = await template.runPreprocessors(data);
 
@@ -83,8 +87,17 @@ class TemplateMap {
 
 	#addToInputPathMap(mapEntry) {
 		// Store under absolute path
-		let absoluteInputPath = TemplatePath.absolutePath(mapEntry.inputPath);
-		this.inputPathMap.set(absoluteInputPath, mapEntry);
+		this.inputPathMap.set(this.#getAbsoluteInputPath(mapEntry.inputPath), mapEntry);
+	}
+
+	// Looked up many times per template, and `absolutePath` is slow
+	#getAbsoluteInputPath(inputPath) {
+		let absoluteInputPath = this.absoluteInputPaths.get(inputPath);
+		if (!absoluteInputPath) {
+			absoluteInputPath = TemplatePath.absolutePath(inputPath);
+			this.absoluteInputPaths.set(inputPath, absoluteInputPath);
+		}
+		return absoluteInputPath;
 	}
 
 	getTagTarget(str) {
@@ -335,8 +348,7 @@ class TemplateMap {
 	}
 
 	getMapEntryForInputPath(inputPath) {
-		let absoluteInputPath = TemplatePath.absolutePath(inputPath);
-		return this.inputPathMap.get(absoluteInputPath);
+		return this.inputPathMap.get(this.#getAbsoluteInputPath(inputPath));
 	}
 
 	#removeTagsFromTemplateOrder(maps) {
@@ -494,9 +506,14 @@ class TemplateMap {
 				// This check skips precompiled collections
 				if (entry) {
 					let index = item.pageNumber || 0;
-					let content = entry._pages[index]._templateContent;
+					let page = entry._pages[index];
+					let content = page._templateContent;
 					if (content !== undefined) {
 						item.templateContent = content;
+						// Copies of page entries (e.g. spread in a collection callback) don’t have the getter
+						if (item !== page) {
+							item.contentPipeline = page.contentPipeline;
+						}
 					}
 				}
 			}

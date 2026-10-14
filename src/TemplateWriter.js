@@ -126,7 +126,7 @@ class TemplateWriter {
 			let virtualTemplates = Object.keys(this.config.virtualTemplates)
 				.filter((path) => {
 					// Filter out includes/layouts
-					return this.dirs.isTemplateFile(path);
+					return this.dirs.isTemplateFile(this.dirs.getInputPath(path));
 				})
 				.map((path) => {
 					let fullVirtualPath = this.dirs.getInputPath(path);
@@ -209,6 +209,13 @@ class TemplateWriter {
 		let templates = [];
 		let cacheResetTracker = new Set();
 
+		// Delete incremental file from the dependency graph so we get fresh entries!
+		// This _must_ happen before any additions: data files and global data reads (via TemplateMap->add),
+		// Custom.js, and GlobalDependencyMap.js (from the eleventy.layouts Event)
+		for (let p of this.#incrementalFiles) {
+			this.config.uses.resetNode(p);
+		}
+
 		let promises = [];
 		for (let path of paths) {
 			let { template: tmpl } = this.createTemplate(path, to);
@@ -243,12 +250,6 @@ class TemplateWriter {
 
 		// Important to set up template dependency relationships first
 		await Promise.all(promises);
-
-		// Delete incremental file from the dependency graph so we get fresh entries!
-		// This _must_ happen before any additions, the other ones are in Custom.js and GlobalDependencyMap.js (from the eleventy.layouts Event)
-		for (let p of this.#incrementalFiles) {
-			this.config.uses.resetNode(p);
-		}
 
 		// write new template relationships to the global dependency graph for next time
 		this.templateMap.addAllToGlobalDependencyGraph();
@@ -449,7 +450,7 @@ class TemplateWriter {
 							new TemplateError(
 								`Having trouble writing to ${outputPaths} from "${mapEntry.inputPath}"`,
 								e,
-							),
+							).setFilePath(mapEntry.inputPath),
 						);
 					}
 				}),
@@ -463,7 +464,7 @@ class TemplateWriter {
 						new TemplateError(
 							`Having trouble writing to (second pass) "${mapEntry.outputPath}" from "${mapEntry.inputPath}"`,
 							e,
-						),
+						).setFilePath(mapEntry.inputPath),
 					);
 				}),
 			);

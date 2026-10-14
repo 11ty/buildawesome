@@ -50,6 +50,11 @@ class TemplateData {
 	#rawImports;
 	#globalData;
 	#templateDirectoryData = {};
+	// Directory data files are shared by every template in the directory
+	#dataFileContents = new Map();
+	#directoryDataPaths = new Map();
+	// Global data files for each top-level key
+	#globalDataFilesByKey = new Map();
 
 	constructor(templateConfig) {
 		if (!templateConfig || templateConfig.constructor.name !== "TemplateConfig") {
@@ -167,6 +172,8 @@ class TemplateData {
 		this.#globalData = null;
 		this.configApiGlobalData = null;
 		this.#templateDirectoryData = {};
+		this.#dataFileContents = new Map();
+		this.#directoryDataPaths = new Map();
 	}
 
 	_getGlobalDataGlobByExtension(extension) {
@@ -363,6 +370,12 @@ class TemplateData {
 
 			lodashSet(globalData, objectPathTarget, data);
 
+			let [key] = objectPathTarget;
+			if (!this.#globalDataFilesByKey.has(key)) {
+				this.#globalDataFilesByKey.set(key, []);
+			}
+			this.#globalDataFilesByKey.get(key).push(file);
+
 			if (this.config.freezeReservedData) {
 				ReservedData.check(globalData, file);
 			}
@@ -423,6 +436,11 @@ class TemplateData {
 
 		// OK: Shallow merge when combining rawImports (pkg) with global data files
 		return Object.assign({}, mergedGlobalData, rawImports);
+	}
+
+	// Available after `getGlobalData()`
+	getGlobalDataFilesByKey() {
+		return this.#globalDataFilesByKey;
 	}
 
 	async getGlobalData() {
@@ -490,6 +508,12 @@ class TemplateData {
 			let localDataPaths = await this.getLocalDataPaths(templatePath);
 			let importedData = await this.combineLocalData(localDataPaths);
 
+			// For incremental builds, a changed data file only affects the templates using it
+			this.config.uses?.addDataFiles(
+				templatePath,
+				localDataPaths.filter((path) => this.exists(path)),
+			);
+
 			this.#templateDirectoryData[templatePath] = importedData;
 		}
 
@@ -523,7 +547,15 @@ class TemplateData {
 		let rawInput;
 
 		if (readFile) {
-			rawInput = LoadContent(path, options);
+			let cacheKey = `${options.encoding}:${path}`;
+			rawInput = this.#dataFileContents.get(cacheKey);
+			if (rawInput === undefined) {
+				rawInput = LoadContent(path, options);
+				// Buffers are mutable, so only strings are shared
+				if (typeof rawInput === "string") {
+					this.#dataFileContents.set(cacheKey, rawInput);
+				}
+			}
 		}
 
 		if (readFile && !rawInput) {
@@ -531,15 +563,24 @@ class TemplateData {
 		}
 
 		try {
+			let result;
 			if (readFile) {
-				return parser(rawInput, path);
+				result = parser(rawInput, path);
 			} else {
 				// path as a first argument is when `read: false`
 				// path as a second argument is for consistency with `read: true` API
-				return parser(path, path);
+				result = parser(path, path);
 			}
+
+			// Await inside try so async parser rejections are wrapped too
+			if (typeof result?.then === "function") {
+				return await result;
+			}
+			return result;
 		} catch (e) {
-			throw new TemplateDataParseError(`Having trouble parsing data file ${path}`, e);
+			throw new TemplateDataParseError(`Having trouble parsing data file ${path}`, e).setFilePath(
+				path,
+			);
 		}
 	}
 
@@ -636,8 +677,6 @@ class TemplateData {
 	async getLocalDataPaths(templatePath) {
 		let paths = [];
 		let parsed = path.parse(templatePath);
-		let inputDir = this.inputDir;
-
 		let userExtensions = this.getUserDataExtensions();
 
 		if (parsed.dir) {
@@ -650,46 +689,62 @@ class TemplateData {
 			let filePathNoExt = parsed.dir + "/" + fileNameNoExt;
 			this._addBaseToPaths(paths, filePathNoExt, userExtensions);
 
-			// Directory data file paths
-			let allDirs = TemplatePath.getAllDirs(parsed.dir);
-
-			for (let dir of allDirs) {
-				let lastDir = TemplatePath.getLastPathSegment(dir);
-				let dirPathNoExt = dir + "/" + lastDir;
-
-				// TODO use DirContains
-				if (!inputDir || (dir.startsWith(inputDir) && dir !== inputDir)) {
-					if (this.config.dataFileDirBaseNameOverride) {
-						let indexDataFile = dir + "/" + this.config.dataFileDirBaseNameOverride;
-						this._addBaseToPaths(paths, indexDataFile, userExtensions, true);
-					} else {
-						this._addBaseToPaths(paths, dirPathNoExt, userExtensions);
-					}
-				}
-			}
-
-			// 0.11.0+ include root input dir files
-			// if using `docs/` as input dir, looks for docs/docs.json et al
-			if (inputDir) {
-				let lastInputDir = TemplatePath.addLeadingDotSlash(
-					TemplatePath.join(inputDir, TemplatePath.getLastPathSegment(inputDir)),
-				);
-
-				// in root input dir, search for index.data.json et al
-				if (this.config.dataFileDirBaseNameOverride) {
-					let indexDataFile =
-						TemplatePath.getDirFromFilePath(lastInputDir) +
-						"/" +
-						this.config.dataFileDirBaseNameOverride;
-					this._addBaseToPaths(paths, indexDataFile, userExtensions, true);
-				} else if (lastInputDir !== "./") {
-					this._addBaseToPaths(paths, lastInputDir, userExtensions);
-				}
-			}
+			paths.push(...this.#getDirectoryDataPaths(parsed.dir, userExtensions));
 		}
 
 		debug("getLocalDataPaths(%o): %o", templatePath, paths);
 		return unique(paths).reverse();
+	}
+
+	// Shared by every template in the directory
+	#getDirectoryDataPaths(parsedDir, userExtensions) {
+		let cached = this.#directoryDataPaths.get(parsedDir);
+		if (cached) {
+			return cached;
+		}
+
+		let paths = [];
+		let inputDir = this.inputDir;
+
+		// Directory data file paths
+		let allDirs = TemplatePath.getAllDirs(parsedDir);
+
+		for (let dir of allDirs) {
+			let lastDir = TemplatePath.getLastPathSegment(dir);
+			let dirPathNoExt = dir + "/" + lastDir;
+
+			// TODO use DirContains
+			if (!inputDir || (dir.startsWith(inputDir) && dir !== inputDir)) {
+				if (this.config.dataFileDirBaseNameOverride) {
+					let indexDataFile = dir + "/" + this.config.dataFileDirBaseNameOverride;
+					this._addBaseToPaths(paths, indexDataFile, userExtensions, true);
+				} else {
+					this._addBaseToPaths(paths, dirPathNoExt, userExtensions);
+				}
+			}
+		}
+
+		// 0.11.0+ include root input dir files
+		// if using `docs/` as input dir, looks for docs/docs.json et al
+		if (inputDir) {
+			let lastInputDir = TemplatePath.addLeadingDotSlash(
+				TemplatePath.join(inputDir, TemplatePath.getLastPathSegment(inputDir)),
+			);
+
+			// in root input dir, search for index.data.json et al
+			if (this.config.dataFileDirBaseNameOverride) {
+				let indexDataFile =
+					TemplatePath.getDirFromFilePath(lastInputDir) +
+					"/" +
+					this.config.dataFileDirBaseNameOverride;
+				this._addBaseToPaths(paths, indexDataFile, userExtensions, true);
+			} else if (lastInputDir !== "./") {
+				this._addBaseToPaths(paths, lastInputDir, userExtensions);
+			}
+		}
+
+		this.#directoryDataPaths.set(parsedDir, paths);
+		return paths;
 	}
 
 	/* Like cleanupData() but does not mutate */

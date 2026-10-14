@@ -179,6 +179,9 @@ export default class TemplateEngine {
 		return true;
 	}
 
+	// Runs at compile time for pipeline steps that compile later, during render
+	async ready() {}
+
 	/**
 	 * Make sure compile is implemented downstream.
 	 * @abstract
@@ -198,6 +201,15 @@ export default class TemplateEngine {
 			return false;
 		}
 		return true;
+	}
+
+	// e.g. a template’s include, import, extends, or layout file, recorded when it is used
+	// `from` is the engine name for string templates (e.g. the Render plugin’s `renderTemplate`)
+	addDependency(from, to) {
+		if (!from || !to) {
+			return;
+		}
+		this.config.uses.addDependency(from, [to]);
 	}
 
 	isFileRelevantTo(inputPath, comparisonFile) {

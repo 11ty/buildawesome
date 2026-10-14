@@ -5,10 +5,18 @@ import Sortable from "./Util/Objects/Sortable.js";
 import { isGlobMatch } from "./Util/GlobMatcher.js";
 
 class TemplateCollection extends Sortable {
+	// tag name => sorted items, rebuilt after any `add()`
+	#tagIndex;
+
 	constructor() {
 		super();
 
 		this._filteredByGlobsCache = new Map();
+	}
+
+	add(item) {
+		this.#tagIndex = undefined;
+		super.add(item);
 	}
 
 	getAll() {
@@ -56,12 +64,23 @@ class TemplateCollection extends Sortable {
 	}
 
 	getFilteredByTag(tagName) {
-		return this.getAllSorted().filter((item) => {
-			if (!tagName || TemplateData.getIncludedTagNames(item.data).includes(tagName)) {
-				return true;
+		if (!tagName) {
+			return this.getAllSorted();
+		}
+
+		if (!this.#tagIndex) {
+			this.#tagIndex = new Map();
+			for (let item of this.getAllSorted()) {
+				for (let tag of new Set(TemplateData.getIncludedTagNames(item.data))) {
+					if (!this.#tagIndex.has(tag)) {
+						this.#tagIndex.set(tag, []);
+					}
+					this.#tagIndex.get(tag).push(item);
+				}
 			}
-			return false;
-		});
+		}
+
+		return this.#tagIndex.get(tagName)?.slice() ?? [];
 	}
 
 	getFilteredByTags(...tags) {

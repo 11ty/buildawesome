@@ -1,8 +1,6 @@
 import BaseError from "./Errors/BaseError.js";
 import TemplateEngineManager from "./Engines/TemplateEngineManager.js";
-import { createDebug } from "./Util/DebugLogUtil.js";
-
-const debugConfiguration = createDebug("UserConfig");
+import { TemplatePipeline } from "./TemplatePipeline.js";
 
 class TemplateRenderUnknownEngineError extends BaseError {}
 
@@ -10,6 +8,8 @@ class TemplateRenderUnknownEngineError extends BaseError {}
 export default class TemplateRender {
 	#extensionMap;
 	#config;
+	// Steps (engine names or instances) that run before the primary engine, in execution order
+	#precedingSteps = [];
 
 	constructor(tmplPath, config) {
 		if (!tmplPath) {
@@ -18,14 +18,10 @@ export default class TemplateRender {
 		this.#setConfig(config);
 
 		this.engineNameOrPath = tmplPath;
-		this.parseMarkdownWith = this.config.markdownTemplateEngine;
-		if (this.parseMarkdownWith === "md") {
-			this.parseMarkdownWith = false;
-			debugConfiguration(
-				"Misconfiguration warning: the preprocessing template syntax for Markdown files cannot be Markdown, we’re assuming you meant `false` to skip preprocessing altogether (via the `markdownTemplateEngine` configuration property or the `setMarkdownTemplateEngine` configuration method). Read more: https://www.11ty.dev/docs/config/#default-template-engine-for-markdown-files",
-			);
-		}
-		this.parseHtmlWith = this.config.htmlTemplateEngine;
+	}
+
+	isFormat(engineName) {
+		return TemplatePipeline.isFormat(engineName);
 	}
 
 	#setConfig(config) {
@@ -98,9 +94,26 @@ export default class TemplateRender {
 
 		this._engine = await this.getEngineByName(this._engineName);
 
-		if (this.useMarkdown === undefined) {
-			this.setUseMarkdown(this._engineName === "md");
+		this.#setPrecedingSteps(this.#getDefaultPrecedingSteps());
+	}
+
+	#getDefaultPrecedingSteps() {
+		let chain = TemplatePipeline.getChain(this._engineName);
+		if (!chain) {
+			return [];
 		}
+
+		let preprocessor = TemplatePipeline.getPreprocessor(chain, this.config);
+		return [...(preprocessor ? [preprocessor] : []), ...chain.slice(0, -1)];
+	}
+
+	#setPrecedingSteps(steps) {
+		TemplatePipeline.validate([...TemplateRender.#getStepNames(steps), this._engineName]);
+		this.#precedingSteps = steps;
+	}
+
+	static #getStepNames(steps) {
+		return steps.map((step) => (typeof step === "string" ? step : step.getName()));
 	}
 
 	get engineName() {
@@ -115,54 +128,6 @@ export default class TemplateRender {
 			throw new Error("TemplateRender needs a call to the init() method.");
 		}
 		return this._engine;
-	}
-
-	static parseEngineOverrides(engineName) {
-		if (typeof (engineName || "") !== "string") {
-			throw new Error("Expected String passed to parseEngineOverrides. Received: " + engineName);
-		}
-
-		let overlappingEngineWarningCount = 0;
-		let engines = [];
-		let uniqueLookup = {};
-		let usingMarkdown = false;
-		(engineName || "")
-			.split(",")
-			.map((name) => {
-				return name.toLowerCase().trim();
-			})
-			.forEach((name) => {
-				// html is assumed (treated as plaintext by the system)
-				if (!name || name === "html") {
-					return;
-				}
-
-				if (name === "md") {
-					usingMarkdown = true;
-					return;
-				}
-
-				if (!uniqueLookup[name]) {
-					engines.push(name);
-					uniqueLookup[name] = true;
-
-					// we already short circuit md and html types above
-					overlappingEngineWarningCount++;
-				}
-			});
-
-		if (overlappingEngineWarningCount > 1) {
-			throw new Error(
-				`Don’t mix multiple templating engines in your front matter overrides (exceptions for HTML and Markdown). You used: ${engineName}`,
-			);
-		}
-
-		// markdown should always be first
-		if (usingMarkdown) {
-			engines.unshift("md");
-		}
-
-		return engines;
 	}
 
 	// used for error logging and console output.
@@ -185,11 +150,8 @@ export default class TemplateRender {
 			}
 		}
 
-		if (this.engineName === "md" && this.useMarkdown && this.parseMarkdownWith) {
-			return this.parseMarkdownWith;
-		}
-		if (this.engineName === "html" && this.parseHtmlWith) {
-			return this.parseHtmlWith;
+		if (this.#precedingSteps.length > 0) {
+			return TemplateRender.#getStepNames(this.#precedingSteps).join(",");
 		}
 
 		// templateEngineOverride in play and template language differs from file extension
@@ -198,58 +160,43 @@ export default class TemplateRender {
 		}
 	}
 
-	// TODO templateEngineOverride
+	// The engine that compiles the template source (first step of the pipeline)
 	getPreprocessorEngineName() {
-		if (this.engineName === "md" && this.parseMarkdownWith) {
-			return this.parseMarkdownWith;
+		if (this.#precedingSteps.length > 0) {
+			return TemplateRender.#getStepNames(this.#precedingSteps)[0];
 		}
-		if (this.engineName === "html" && this.parseHtmlWith) {
-			return this.parseHtmlWith;
-		}
-		// TODO do we need this?
 		return this.extensionMap.getKey(this.engineNameOrPath);
 	}
 
 	// We pass in templateEngineOverride here because it isn’t yet applied to templateRender
 	getEnginesList(engineOverride) {
 		if (engineOverride) {
-			let engines = TemplateRender.parseEngineOverrides(engineOverride).reverse();
-			return engines.join(",");
+			return TemplatePipeline.parse(engineOverride).join(",");
 		}
 
-		if (this.engineName === "md" && this.useMarkdown && this.parseMarkdownWith) {
-			return `${this.parseMarkdownWith},md`;
-		}
-		if (this.engineName === "html" && this.parseHtmlWith) {
-			return this.parseHtmlWith;
+		if (this.#precedingSteps.length > 0) {
+			let names = TemplateRender.#getStepNames(this.#precedingSteps);
+			if (this.engineName !== TemplatePipeline.PLAINTEXT_FORMAT) {
+				names.push(this.engineName);
+			}
+			return names.join(",");
 		}
 
 		// templateEngineOverride in play
 		return this.extensionMap.getKey(this.engineNameOrPath);
 	}
 
-	async setEngineOverride(engineName, bypassMarkdown) {
-		let engines = TemplateRender.parseEngineOverrides(engineName);
+	async setEngineOverride(engineName) {
+		let steps = TemplatePipeline.parse(engineName);
 
-		// when overriding, Template Engines with HTML will instead use the Template Engine as primary and output HTML
-		// So any HTML engine usage here will never use a preprocessor templating engine.
-		this.setHtmlEngine(false);
-
-		if (!engines.length) {
-			await this.init("html");
+		if (!steps.length) {
+			await this.init(TemplatePipeline.PLAINTEXT_FORMAT);
+			this.#setPrecedingSteps([]);
 			return;
 		}
 
-		await this.init(engines[0]);
-
-		let usingMarkdown = engines[0] === "md" && !bypassMarkdown;
-
-		this.setUseMarkdown(usingMarkdown);
-
-		if (usingMarkdown) {
-			// false means only parse markdown and not with a preprocessor template engine
-			this.setMarkdownEngine(engines.length > 1 ? engines[1] : false);
-		}
+		await this.init(steps.at(-1));
+		this.#setPrecedingSteps(steps.slice(0, -1));
 	}
 
 	getEngineName() {
@@ -260,37 +207,78 @@ export default class TemplateRender {
 		return this.engineName === engine;
 	}
 
-	setUseMarkdown(useMarkdown) {
-		this.useMarkdown = !!useMarkdown;
+	// Replaces the template engine step: an engine name, engine instance, or `false` to skip it
+	setPreprocessingEngine(engine) {
+		let formatSteps = this.#precedingSteps.filter(
+			(step) => typeof step === "string" && this.isFormat(step),
+		);
+		this.#setPrecedingSteps([...(engine ? [engine] : []), ...formatSteps]);
 	}
 
-	// this is only called for templateEngineOverride
-	setMarkdownEngine(markdownEngine) {
-		this.parseMarkdownWith = markdownEngine;
+	async #getEngine(step) {
+		if (typeof step === "string") {
+			return this.getEngineByName(step);
+		}
+		return step;
 	}
 
-	// this is only called for templateEngineOverride
-	setHtmlEngine(htmlEngineName) {
-		this.parseHtmlWith = htmlEngineName;
+	// Engine names in execution order
+	getPipelineStepNames() {
+		return [...TemplateRender.#getStepNames(this.#precedingSteps), this.engineName];
+	}
+
+	// Removes output format steps, e.g. for permalinks and computed data
+	static #getTemplateOnlySteps(steps, engineName, config) {
+		let names = [...TemplateRender.#getStepNames(steps.slice(0, -1)), engineName];
+		let templateSteps = steps.filter((step, j) => !TemplatePipeline.isFormat(names[j]));
+
+		// e.g. permalinks with `templateEngineOverride: md` use the format’s default preprocessor (#446)
+		let chain = TemplatePipeline.getChain(engineName);
+		if (templateSteps.length === 0 && chain) {
+			let preprocessor = TemplatePipeline.getPreprocessor(chain, config);
+			return preprocessor ? [preprocessor] : [];
+		}
+
+		return templateSteps;
 	}
 
 	async _testRender(str, data) {
 		return this.engine._testRender(str, data);
 	}
 
-	async getCompiledTemplate(str) {
-		// TODO refactor better, move into TemplateEngine logic
-		if (this.engineName === "md") {
-			return this.engine.compile(
-				str,
-				this.engineNameOrPath,
-				this.parseMarkdownWith,
-				!this.useMarkdown,
-			);
-		} else if (this.engineName === "html") {
-			return this.engine.compile(str, this.engineNameOrPath, this.parseHtmlWith);
-		} else {
-			return this.engine.compile(str, this.engineNameOrPath);
+	// `templateOnly` skips the output format step (e.g. Markdown) for permalinks and computed data
+	async getCompiledTemplate(str, { templateOnly = false } = {}) {
+		let steps = [...this.#precedingSteps, this.engine];
+		if (templateOnly) {
+			steps = TemplateRender.#getTemplateOnlySteps(steps, this.engineName, this.config);
 		}
+
+		if (steps.length === 0) {
+			return function () {
+				return str;
+			};
+		}
+
+		let [first, ...rest] = await Promise.all(steps.map((step) => this.#getEngine(step)));
+		let inputPath = this.engineNameOrPath;
+		let fnReady = first.compile(str, inputPath);
+
+		if (rest.length === 0) {
+			return fnReady;
+		}
+
+		await Promise.all(rest.map((engine) => engine.ready()));
+
+		// Later steps compile the previous step’s output on every render
+		return async function (data, renderContext) {
+			let fn = await fnReady;
+			let content = await fn(data);
+			for (let engine of rest) {
+				renderContext?.stepInputs?.push(content);
+				let nextFn = await engine.compile(content, inputPath);
+				content = await nextFn(data);
+			}
+			return content;
+		};
 	}
 }

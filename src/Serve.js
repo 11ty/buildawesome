@@ -232,7 +232,8 @@ export default class Serve {
 			let copyWatch = new Watch(this.eleventyConfig);
 			copyWatch.watchTargets(this.#watchTargets);
 			// Careful with ignores here: https://github.com/11ty/eleventy/issues/1134
-			// copyWatch.addIgnores();
+			// v4.0.0-alpha.11: reuses watchIgnores here to fix #4351
+			copyWatch.addIgnores(this.eleventyConfig?.userConfig?.watchIgnores ?? []);
 
 			await copyWatch.start();
 

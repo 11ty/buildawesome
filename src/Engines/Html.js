@@ -9,24 +9,9 @@ export default class Html extends TemplateEngine {
 		return true;
 	}
 
-	async #getPreEngine(preTemplateEngine) {
-		return this.engineManager.getEngine(preTemplateEngine, this.extensionMap);
-	}
-
-	async compile(str, inputPath, preTemplateEngine) {
-		if (preTemplateEngine) {
-			let engine = await this.#getPreEngine(preTemplateEngine);
-			let fnReady = engine.compile(str, inputPath);
-
-			return async function (data) {
-				let fn = await fnReady;
-
-				return fn(data);
-			};
-		}
-
+	// Preprocessing template engines run before this in the TemplateRender pipeline
+	async compile(str) {
 		return function () {
-			// do nothing with data if preTemplateEngine is falsy
 			return str;
 		};
 	}

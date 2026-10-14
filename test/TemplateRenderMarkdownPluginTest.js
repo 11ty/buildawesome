@@ -52,7 +52,7 @@ test("Markdown Render: without HTML prerender, sends context data to the markdow
   const plugin = createTestMarkdownPlugin();
   let mdLib = md().use(plugin);
   tr.engine.setLibrary(mdLib);
-  tr.setHtmlEngine(false);
+  tr.setPreprocessingEngine(false);
 
   const data = { some: "data" };
 
@@ -70,7 +70,7 @@ test("Markdown Render: renderer that only implements the render function", async
       return `<p><a href="${href}">${text}</a></p>\n`;
     },
   });
-  tr.setHtmlEngine(false);
+  tr.setPreprocessingEngine(false);
 
   let fn = await tr.getCompiledTemplate("[link text](http://link.com)");
   let result = await fn();

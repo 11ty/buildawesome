@@ -20,7 +20,8 @@ class TemplateContentCompileError extends BaseError {}
 class TemplateContentRenderError extends BaseError {}
 
 class TemplateContent {
-	#initialized = false;
+	// The template render the preprocessor engine was looked up for (engines are recreated with it)
+	#initializedFor;
 	#config;
 	#templateRender;
 	#renderPreprocessorEngine;
@@ -41,10 +42,11 @@ class TemplateContent {
 			await this.getTemplateRender();
 		}
 
-		if (this.#initialized) {
+		if (this.#initializedFor === this.#templateRender) {
 			return;
 		}
-		this.#initialized = true;
+		this.#initializedFor = this.#templateRender;
+		this.#renderPreprocessorEngine = undefined;
 
 		let preprocessorEngineName = this.templateRender.getPreprocessorEngineName();
 		if (preprocessorEngineName && this.templateRender.engine.getName() !== preprocessorEngineName) {
@@ -262,7 +264,7 @@ class TemplateContent {
 				throw new TemplateContentFrontMatterError(
 					`Having trouble reading front matter from template ${this.inputPath}`,
 					e,
-				);
+				).setFilePath(this.inputPath);
 			}
 
 			if (typeof fm.data?.then === "function") {
@@ -472,6 +474,10 @@ class TemplateContent {
 
 		let cacheable = this.isTemplateCacheable();
 		let { useCache, key } = this.engine.getCompileCacheKey(str, this.inputPath);
+		// e.g. Markdown preprocessed by Nunjucks
+		if (useCache && this.#renderPreprocessorEngine) {
+			useCache = this.#renderPreprocessorEngine.getCompileCacheKey(str, this.inputPath).useCache;
+		}
 
 		// We also tie the compile cache key to the UserConfig instance, to alleviate issues with global template cache
 		// Better to move the cache to the Eleventy instance instead, no?
@@ -482,7 +488,7 @@ class TemplateContent {
 	}
 
 	async compile(str, options = {}) {
-		let { type, bypassMarkdown, engineOverride } = options;
+		let { type, templateOnly, engineOverride } = options;
 
 		// Must happen before cacheable fetch below
 		// Likely only necessary for Eleventy Layouts, see TemplateMap->initDependencyMap
@@ -491,11 +497,9 @@ class TemplateContent {
 		// this.templateRender is guaranteed here
 		let tr = await this.getTemplateRender();
 		if (engineOverride !== undefined) {
-			await tr.setEngineOverride(engineOverride, bypassMarkdown);
-		} else {
-			tr.setUseMarkdown(!bypassMarkdown);
+			await tr.setEngineOverride(engineOverride);
 		}
-		if (bypassMarkdown && !this.engine.needsCompilation(str)) {
+		if (templateOnly && !this.engine.needsCompilation(str)) {
 			return function () {
 				return str;
 			};
@@ -530,7 +534,7 @@ class TemplateContent {
 			templateBenchmark.before();
 			inputPathBenchmark.before();
 
-			let fn = await tr.getCompiledTemplate(str);
+			let fn = await tr.getCompiledTemplate(str, { templateOnly });
 			inputPathBenchmark.after();
 			templateBenchmark.after();
 
@@ -547,7 +551,7 @@ class TemplateContent {
 			throw new TemplateContentCompileError(
 				`Having trouble compiling template ${this.inputPath}`,
 				e,
-			);
+			).setFilePath(this.inputPath);
 		}
 	}
 
@@ -596,7 +600,7 @@ class TemplateContent {
 
 		return this._render(str, data, {
 			type: "Computed Data",
-			bypassMarkdown: true,
+			templateOnly: true,
 		});
 	}
 
@@ -632,14 +636,15 @@ class TemplateContent {
 
 		return this._render(permalink, data, {
 			type: "Permalink",
-			bypassMarkdown: true,
+			templateOnly: true,
 		});
 	}
 
-	async render(str, data, bypassMarkdown) {
+	async render(str, data, templateOnly, renderContext) {
 		return this._render(str, data, {
 			type: "Content",
-			bypassMarkdown,
+			templateOnly,
+			renderContext,
 		});
 	}
 
@@ -660,15 +665,15 @@ class TemplateContent {
 	}
 
 	async _render(str, data, options = {}) {
-		let { bypassMarkdown, type } = options;
+		let { templateOnly, type, renderContext } = options;
 
 		try {
-			if (bypassMarkdown && !this.engine.needsCompilation(str)) {
+			if (templateOnly && !this.engine.needsCompilation(str)) {
 				return str;
 			}
 
 			let fn = await this.compile(str, {
-				bypassMarkdown,
+				templateOnly,
 				engineOverride: data[this.config.keys.engineOverride],
 				type,
 			});
@@ -690,7 +695,8 @@ class TemplateContent {
 				inputPathBenchmark.before();
 			}
 
-			let rendered = await fn(data);
+			// `renderContext` collects intermediate output between pipeline steps
+			let rendered = await (renderContext ? fn(data, renderContext) : fn(data));
 
 			if (inputPathBenchmark) {
 				inputPathBenchmark.after();
@@ -709,7 +715,7 @@ class TemplateContent {
 					new TemplateContentRenderError(
 						`Having trouble rendering ${engine} template ${this.inputPath}`,
 						e,
-					),
+					).setFilePath(this.inputPath),
 				);
 			}
 		}
