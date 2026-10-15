@@ -1524,6 +1524,28 @@ This is content.`
   t.is(fulldata.page.excerpt.trim(), "This is an excerpt.");
 });
 
+test("Custom Front Matter Parsing Options (excerpt function receives a Buffer)", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
+    cfg.setFrontMatterParsingOptions({
+      excerpt: (file) => {
+        t.true(Buffer.isBuffer(file.orig));
+        file.excerpt = file.orig.toString().split("\n")[3];
+      },
+    })
+  });
+  let tmpl = await getNewTemplate(
+    "./test/stubs/custom-frontmatter/template.njk",
+    "./test/stubs/",
+    "./dist",
+    undefined,
+    undefined,
+    eleventyConfig,
+  );
+
+  let frontmatter = await tmpl._testGetFrontMatter();
+  t.is(frontmatter.excerpt, "This is an excerpt.");
+});
+
 test("Custom Front Matter Parsing Options (using alias)", async (t) => {
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
     cfg.setFrontMatterParsingOptions({

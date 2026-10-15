@@ -22,6 +22,24 @@ class TemplateContentFrontMatterError extends EleventyBaseError {}
 class TemplateContentCompileError extends EleventyBaseError {}
 class TemplateContentRenderError extends EleventyBaseError {}
 
+// @11ty/gray-matter uses Uint8Array, custom excerpt functions received a Buffer from gray-matter@4
+function withBufferExcerpt(options) {
+	if (typeof options.excerpt !== "function") {
+		return options;
+	}
+
+	let excerpt = options.excerpt;
+	return {
+		...options,
+		excerpt(file, opts) {
+			if (file.orig instanceof Uint8Array && !Buffer.isBuffer(file.orig)) {
+				file.orig = Buffer.from(file.orig.buffer, file.orig.byteOffset, file.orig.byteLength);
+			}
+			return excerpt(file, opts);
+		},
+	};
+}
+
 class TemplateContent {
 	#initialized = false;
 	#config;
@@ -225,7 +243,7 @@ class TemplateContent {
 			try {
 				// Added in 3.0, passed along to front matter engines
 				options.filePath = this.inputPath;
-				fm = matter(content, options);
+				fm = matter(content, withBufferExcerpt(options));
 			} catch (e) {
 				throw new TemplateContentFrontMatterError(
 					`Having trouble reading front matter from template ${this.inputPath}`,
