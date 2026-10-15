@@ -13,16 +13,15 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # 6.4.0
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: 'https://registry.npmjs.org'
           # Explicit opt out of cache (tanstack cache poison vuln)
           package-manager-cache: false
-      - run: npm install -g npm@latest
-      - run: npm ci
-      - run: npm test
       - if: ${{ github.event.release.tag_name != '' && env.NPM_PUBLISH_TAG != '' }}
-        run: npm publish --provenance --access=public --tag=${{ env.NPM_PUBLISH_TAG }}
+        run: npm stage publish --ignore-scripts --provenance --access=public --tag=${{ env.NPM_PUBLISH_TAG }}
         env:
           NPM_PUBLISH_TAG: ${{ contains(github.event.release.tag_name, '-beta.') && 'beta' || contains(github.event.release.tag_name, '-alpha.') && 'canary' || 'latest' }}
