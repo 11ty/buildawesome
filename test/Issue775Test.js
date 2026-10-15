@@ -17,6 +17,7 @@ test("#775 Using data cascade in Collection API", async (t) => {
 	});
 
 
-	let [result] = await elev.toJSON();
+	let results = await elev.toJSON();
+	let result = results.find(entry => entry.inputPath === "./test/noop/index.njk");
 	t.is(result.content, "1");
 });
