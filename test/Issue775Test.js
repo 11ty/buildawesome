@@ -17,6 +17,7 @@ test("#775 Using data cascade in Collection API", async (t) => {
 	});
 
 
-	let [result] = await elev.toJSON();
+	let results = await elev.toJSON();
+	let [result] = results.filter((entry) => entry.url === "/");
 	t.is(result.content, "1");
 });
