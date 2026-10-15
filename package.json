@@ -139,7 +139,7 @@
 		"dependency-graph": "^1.0.0",
 		"entities": "^6.0.1",
 		"filesize": "^10.1.6",
-		"gray-matter": "^4.0.3",
+		"gray-matter": "npm:@11ty/gray-matter@^1.0.0",
 		"iso-639-1": "^3.1.6",
 		"js-yaml": "^4.1.1",
 		"kleur": "^4.1.5",
@@ -157,10 +157,5 @@
 		"semver": "^7.8.5",
 		"slugify": "^1.6.9",
 		"tinyglobby": "^0.2.16"
-	},
-	"overrides": {
-		"gray-matter": {
-			"js-yaml": "$js-yaml"
-		}
 	}
 }
