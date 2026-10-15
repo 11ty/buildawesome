@@ -1529,7 +1529,7 @@ test("Custom Front Matter Parsing Options (excerpt function receives a Buffer)",
     cfg.setFrontMatterParsingOptions({
       excerpt: (file) => {
         t.true(Buffer.isBuffer(file.orig));
-        file.excerpt = file.orig.toString().split("\n")[3];
+        file.excerpt = file.orig.toString().split(/\r?\n/)[3];
       },
     })
   });
