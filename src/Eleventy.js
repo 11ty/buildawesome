@@ -1201,7 +1201,7 @@ Arguments:
 		let chokidar;
 		// eslint-disable-next-line no-useless-catch
 		try {
-			let moduleName = "chokidar";
+			let moduleName = "@11ty/chokidar-with-glob-support";
 			let chokidarImport = await import(moduleName);
 			chokidar = chokidarImport.default;
 		} catch (e) {

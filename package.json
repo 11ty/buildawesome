@@ -124,9 +124,10 @@
 		"zod-validation-error": "^5.0.0"
 	},
 	"dependencies": {
+		"@11ty/chokidar-with-glob-support": "^1.1.0",
 		"@11ty/dependency-tree": "^4.0.2",
 		"@11ty/dependency-tree-esm": "^2.0.4",
-		"@11ty/eleventy-dev-server": "^2.0.8",
+		"@11ty/eleventy-dev-server": "^2.1.2",
 		"@11ty/eleventy-plugin-bundle": "^3.0.7",
 		"@11ty/eleventy-utils": "^2.0.7",
 		"@11ty/lodash-custom": "^4.17.21",
@@ -134,7 +135,6 @@
 		"@11ty/recursive-copy": "^4.0.4",
 		"@sindresorhus/slugify": "^2.2.1",
 		"bcp-47-normalize": "^2.3.0",
-		"chokidar": "^3.6.0",
 		"debug": "^4.4.3",
 		"dependency-graph": "^1.0.0",
 		"entities": "^6.0.1",
