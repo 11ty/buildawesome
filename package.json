@@ -134,6 +134,7 @@
 		"zod-validation-error": "^5.0.0"
 	},
 	"dependencies": {
+		"@11ty/chokidar-with-glob-support": "^2.0.0",
 		"@11ty/dependency-tree": "^5.0.0-alpha.3",
 		"@11ty/eleventy-dev-server": "^3.0.0-alpha.13",
 		"@11ty/eleventy-plugin-bundle": "^4.0.3",
@@ -147,7 +148,6 @@
 		"@11ty/recursive-copy": "^5.0.2",
 		"@sindresorhus/slugify": "^3.0.1",
 		"bcp-47-normalize": "^2.3.0",
-		"chokidar": "^5.0.0",
 		"dependency-graph": "^1.0.0",
 		"entities": "^8.1.0",
 		"import-module-string": "^3.0.0",

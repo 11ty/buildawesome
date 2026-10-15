@@ -1,18 +1,12 @@
 import { TemplatePath } from "@11ty/eleventy-utils";
-import chokidar from "chokidar";
-
-import { createDebug } from "./Util/DebugLogUtil.js";
-import { isGlobMatch } from "./Util/GlobMatcher.js";
-import { GlobStripper } from "./Util/GlobStripper.js";
-
-const debug = createDebug("Watch");
+import chokidar from "@11ty/chokidar-with-glob-support";
 
 export class Watch {
 	/** @type {module:chokidar} */
 	#chokidar;
-	/** @type {Set} */
+	/** @type {Array} */
 	#watchedGlobs = [];
-	/** @type {Set} */
+	/** @type {Array} */
 	#ignoredGlobs = [];
 	/** @type {Promise} */
 	#ready;
@@ -28,6 +22,7 @@ export class Watch {
 		let options = Object.assign(
 			{
 				ignoreInitial: true,
+				nocase: true,
 				awaitWriteFinish: {
 					stabilityThreshold: 150,
 					pollInterval: 25,
@@ -36,10 +31,8 @@ export class Watch {
 			this.templateConfig.userConfig.chokidarConfig,
 		);
 
-		// unsupported: using your own `ignored`
-		if (options.ignored) {
-			delete options.ignored;
-		}
+		// globs, paths, RegExps, or functions
+		options.ignored = [options.ignored ?? []].flat();
 
 		return options;
 	}
@@ -50,18 +43,9 @@ export class Watch {
 	}
 
 	watchTargets(targets = []) {
-		let uniqueSet = new Set();
-		for (let target of targets) {
-			this.#watchedGlobs.push(TemplatePath.stripLeadingDotSlash(target));
-
-			// strip globs off of target, chokidar@4
-			let { path } = GlobStripper.parse(target);
-			if (path) {
-				uniqueSet.add(path);
-			}
-		}
-
-		this.#chokidar?.add(Array.from(uniqueSet));
+		let globs = targets.map((target) => TemplatePath.stripLeadingDotSlash(target));
+		this.#watchedGlobs.push(...globs);
+		this.#chokidar?.add(globs);
 	}
 
 	addIgnores(ignores) {
@@ -70,49 +54,14 @@ export class Watch {
 		}
 	}
 
-	#isDirectory(path) {
-		return this.templateConfig.existsCache.isDirectory(path);
-	}
-
 	async start() {
 		let options = this.getChokidarConfig();
+		options.ignored = [...this.#ignoredGlobs, ...options.ignored];
 
-		options.ignored = (filepath) => {
-			// don’t ignore root (if specified)
-			if (filepath === ".") {
-				return false;
-			}
-
-			if (this.#ignoredGlobs.length > 0 && isGlobMatch(filepath, this.#ignoredGlobs)) {
-				debug("Ignore file (ignore globs)", filepath);
-				return true;
-			}
-
-			// don’t ignore directories that are not in ignores
-			if (this.#isDirectory(filepath)) {
-				return false;
-			}
-
-			// make sure this matches at least one of the original globs
-			if (this.#watchedGlobs.length === 0 || !isGlobMatch(filepath, this.#watchedGlobs)) {
-				debug("Ignore file (no glob match)", filepath, this.#watchedGlobs);
-				return true;
-			}
-
-			return false;
-		};
-
-		// strip globs off of target, chokidar@4
-		let targets = this.#watchedGlobs
-			.map((target) => {
-				let { path } = GlobStripper.parse(target);
-				return path;
-			})
-			.filter(Boolean);
-		this.#chokidar = chokidar.watch(targets, options);
+		this.#chokidar = chokidar.watch(this.#watchedGlobs, options);
 
 		// Note: if there are no watch targets the `ready` event doesn’t fire so skip it
-		if (targets.length > 0) {
+		if (this.#watchedGlobs.length > 0) {
 			this.#ready = await new Promise((resolve) => {
 				this.#chokidar.on("ready", () => resolve());
 			});
