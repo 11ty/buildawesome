@@ -17,3 +17,8 @@ test("User `ignored` is normalized to an array", (t) => {
   config.userConfig.setChokidarConfig({ ignored: [/\.tmp$/, ignoreFn] });
   t.deepEqual(new Watch(config).getChokidarConfig().ignored, [/\.tmp$/, ignoreFn]);
 });
+
+test("watchTargets accepts a Set", (t) => {
+  let watch = new Watch(new TemplateConfig());
+  t.notThrows(() => watch.watchTargets(new Set(["./_site/**/*.css"])));
+});

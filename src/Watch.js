@@ -43,7 +43,8 @@ export class Watch {
 	}
 
 	watchTargets(targets = []) {
-		let globs = targets.map((target) => TemplatePath.stripLeadingDotSlash(target));
+		// Any iterable (Serve passes a Set)
+		let globs = Array.from(targets, (target) => TemplatePath.stripLeadingDotSlash(target));
 		this.#watchedGlobs.push(...globs);
 		this.#chokidar?.add(globs);
 	}
