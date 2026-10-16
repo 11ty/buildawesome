@@ -49,15 +49,15 @@ export default class UserConfig {
 		this.ignores = new Set();
 		this.events = new EventEmitter();
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.directories = {};
-		/** @type {undefined} */
-		this.logger;
-		/** @type {string} */
-		this.dir;
-		/** @type {string} */
-		this.pathPrefix;
-		/** @type {object} */
+		/** @type {any} */
+		this.logger = undefined;
+		/** @type {string|undefined} */
+		this.dir = undefined;
+		/** @type {string|undefined} */
+		this.pathPrefix = undefined;
+		/** @type {Record<string, any>} */
 		this.errorReporting = {};
 
 		this.reset();
@@ -79,33 +79,33 @@ export default class UserConfig {
 		/** @type {BenchmarkManager} */
 		this.benchmarkManager = new BenchmarkManager();
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.benchmarks = {
-			/** @type {import('./Benchmark/BenchmarkGroup.js')} */
+			/** @type {import('./Benchmark/BenchmarkGroup.js').default} */
 			config: this.benchmarkManager.get("Configuration"),
-			/** @type {import('./Benchmark/BenchmarkGroup.js')} */
+			/** @type {import('./Benchmark/BenchmarkGroup.js').default} */
 			aggregate: this.benchmarkManager.get("Aggregate"),
 		};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.directoryAssignments = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.collections = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.collectionOptions = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.precompiledCollections = {};
 		this.templateFormats = undefined;
 		this.templateFormatsAdded = [];
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.universal = {
 			filters: {},
 			shortcodes: {},
 			pairedShortcodes: {},
 		};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.liquid = {
 			options: {},
 			tags: {},
@@ -115,7 +115,7 @@ export default class UserConfig {
 			parameterParsing: "builtin", // or legacy (Breaking: default swapped in v4.0.0)
 		};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.nunjucks = {
 			// `dev: true` gives us better error messaging
 			environmentOptions: { dev: true },
@@ -131,7 +131,7 @@ export default class UserConfig {
 			asyncPairedShortcodes: {},
 		};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.javascript = {
 			functions: {},
 			filters: {},
@@ -141,23 +141,23 @@ export default class UserConfig {
 
 		this.markdownHighlighter = null;
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.libraryOverrides = {};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.passthroughCopies = {};
 		this.passthroughCopiesHtmlRelative = new Set();
 		this.passthroughCopyOptions = {};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.layoutAliases = {};
 		this.layoutResolution = true; // extension-less layout files
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.linters = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.transforms = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.preprocessors = {};
 
 		this.activeNamespace = "";
@@ -173,16 +173,16 @@ export default class UserConfig {
 
 		this.extensionMap = new Set();
 		this.extensionMapClasses = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.extensionConflictMap = {};
 		this.watchJavaScriptDependencies = true;
 		this.additionalWatchTargets = [];
 		this.watchTargetsConfigReset = new Set();
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.serverOptions = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.globalData = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.chokidarConfig = {};
 		this.watchThrottleWaitTime = 100; //ms
 
@@ -196,7 +196,7 @@ export default class UserConfig {
 		this.useTemplateCache = true;
 		this.dataFilterSelectors = new Set();
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.libraryAmendments = {};
 		this.serverPassthroughCopyBehavior = "copy"; // or "passthrough"
 		this.skipUnchangedWrites = true;
@@ -206,16 +206,16 @@ export default class UserConfig {
 		this.dataFileSuffixesOverride = false;
 		this.dataFileDirBaseNameOverride = false;
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		// Moved into TemplateContent->getFrontMatterParsingOptions
 		this.frontMatterParsingOptions = {};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.virtualTemplates = {};
 		this.freezeReservedData = true;
 		this.customDateParsingCallbacks = new Set();
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.errorReporting = {};
 
 		// Before using os.availableParallelism(); see https://github.com/11ty/eleventy/issues/3596
@@ -635,12 +635,14 @@ export default class UserConfig {
 	}
 
 	/**
-	 * @typedef {Function|Promise<Function>|object} PluginDefinition
+	 * @typedef {object} PluginObject
 	 * @property {Function} [configFunction]
 	 * @property {string} [eleventyPackage]
 	 * @property {object} [eleventyPluginOptions={}]
 	 * @property {boolean} [eleventyPluginOptions.unique]
 	 */
+
+	/** @typedef {Function & PluginObject | Promise<Function> & PluginObject | PluginObject} PluginDefinition */
 
 	/**
 	 * addPlugin: async friendly in 3.0
@@ -759,7 +761,7 @@ export default class UserConfig {
 	 *
 	 * @param {string|object} fileOrDir The path to the file or directory that should
 	 * be copied. OR an object where the key is the input glob and the property is the output directory
-	 * @param {object} copyOptions options for recursive-copy.
+	 * @param {Record<string, any>} copyOptions options for recursive-copy.
 	 * see https://www.npmjs.com/package/recursive-copy#arguments
 	 * default options are defined in TemplatePassthrough copyOptionsDefault
 	 * @returns {any} a reference to the `EleventyConfig` object.
@@ -958,7 +960,7 @@ export default class UserConfig {
 			}
 			this.extensionConflictMap[extension] = true;
 
-			/** @type {object} */
+			/** @type {Record<string, any>} */
 			let extensionOptions = Object.assign(
 				{
 					// Might be overridden for aliasing in options.key

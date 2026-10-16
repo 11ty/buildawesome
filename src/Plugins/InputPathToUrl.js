@@ -129,6 +129,7 @@ function TransformPlugin(eleventyConfig, defaultOptions = {}) {
 		defaultOptions,
 	);
 
+	/** @type {Record<string, string[]> | null} */
 	let contentMap = null;
 	eleventyConfig.on("buildawesome.contentmap", function ({ inputPathToUrl }) {
 		contentMap = inputPathToUrl;

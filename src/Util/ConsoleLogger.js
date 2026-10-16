@@ -18,7 +18,7 @@ class ConsoleLogger {
 	#logger;
 	/** @type {string} */
 	#defaultLogPrefix = "[11ty]";
-	/** @type {object} */
+	/** @type {Record<string, string>} */
 	#colorFallbacks = {
 		info: "blue",
 		warn: "yellow",
