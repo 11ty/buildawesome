@@ -1,5 +1,5 @@
 import test from "ava";
-import { readFileSync, mkdtempSync } from "node:fs";
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -58,3 +58,46 @@ test("passthrough event lists passthroughs the dev server can’t emulate as cop
 	t.deepEqual(passthrough.copied, ["/img/a.txt"]);
 	t.true(Object.keys(passthrough.map).includes("/robots.txt"));
 });
+
+test("passthrough event skips files excluded by `dot` and `junk`", async (t) => {
+	let dir = mkdtempSync(path.join(tmpdir(), "ndjson-"));
+	let input = path.join(dir, "src");
+	mkdirSync(path.join(input, "og/sources"), { recursive: true });
+	writeFileSync(path.join(input, "index.md"), "");
+	writeFileSync(path.join(input, "og/sources/a.txt"), "");
+	writeFileSync(path.join(input, "og/sources/.DS_Store"), "");
+	writeFileSync(path.join(input, "og/sources/Thumbs.db"), "");
+
+	for (let [runMode, behavior] of [["build", "copy"], ["serve", "passthrough"], ["watch", "copy"]]) {
+		for (let entry of ["og/sources/", "og/sources/*", "og/sources/**"]) {
+			let eventsFile = path.join(dir, `${runMode}-${entry.replaceAll(/\W/g, "")}.ndjson`);
+			let core = new Core(input, path.join(dir, "_site"), {
+				runMode,
+				quietMode: true,
+				configPath: false,
+				config(eleventyConfig) {
+					eleventyConfig.setServerPassthroughCopyBehavior(behavior);
+					eleventyConfig.setPassthroughCopyOptions({ dot: false });
+					eleventyConfig.addPassthroughCopy({ [path.join(input, entry)]: "og/sources" });
+				},
+			});
+			core.setReporter(new NdjsonReporter(eventsFile));
+			core.disableLogger();
+			await core.init();
+			await core.write();
+
+			// Incremental rebuild from a change to a filtered file
+			core.setIncrementalFile(path.join(input, "og/sources/.DS_Store"));
+			await core.write();
+
+			let events = readEvents(eventsFile).filter((e) => e.type === "passthrough");
+			t.is(events.length, 2);
+			for (let { map, copied } of events) {
+				let urls = Object.keys(map).concat(copied);
+				t.true(urls.length > 0, `${runMode} ${entry}`);
+				t.false(urls.some((url) => /DS_Store|Thumbs\.db/.test(url)), `${runMode} ${entry}: ${urls}`);
+			}
+		}
+	}
+});
+

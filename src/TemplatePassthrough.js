@@ -360,6 +360,13 @@ class TemplatePassthrough {
 		let copyOptions = Object.assign(copyOptionsDefault, this.copyOptions);
 
 		let isEmulated = this.isEmulated;
+		if (isEmulated) {
+			// Skip files `dot` and `junk` exclude (recursive-copy does this when copying)
+			fileMap = fileMap.filter(
+				({ inputPath }) => this.isDirectory(inputPath) || copy.shouldCopy(inputPath, copyOptions),
+			);
+		}
+
 		let promises = fileMap.map((entry) => {
 			// For-free passthrough copy
 			if (isEmulated) {
