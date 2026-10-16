@@ -352,7 +352,7 @@ class TemplatePassthroughManager {
 		let entries = {};
 		for (let entry of result) {
 			for (let src in entry.map) {
-				entries[this.#getUrl(entry.map[src])] = this.#toPosixPath(src);
+				entries[this.#getUrl(entry.map[src])] = src;
 			}
 		}
 		return entries;
