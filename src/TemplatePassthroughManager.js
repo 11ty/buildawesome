@@ -1,3 +1,4 @@
+import path from "node:path";
 import { TemplatePath } from "@11ty/eleventy-utils";
 
 import BaseError from "./Errors/BaseError.js";
@@ -351,7 +352,7 @@ class TemplatePassthroughManager {
 		let entries = {};
 		for (let entry of result) {
 			for (let src in entry.map) {
-				entries[this.#getUrl(entry.map[src])] = src;
+				entries[this.#getUrl(entry.map[src])] = this.#toPosixPath(src);
 			}
 		}
 		return entries;
@@ -369,8 +370,16 @@ class TemplatePassthroughManager {
 		);
 	}
 
+	// Forward slashes regardless of OS path separator
+	#toPosixPath(filePath) {
+		return filePath.split(path.sep).join("/");
+	}
+
 	#getUrl(outputPath) {
-		return "/" + encodeURI(TemplatePath.stripLeadingSubPath(outputPath, this.outputDir));
+		return (
+			"/" +
+			encodeURI(this.#toPosixPath(TemplatePath.stripLeadingSubPath(outputPath, this.outputDir)))
+		);
 	}
 
 	async #waitForTemplatesRendered() {
