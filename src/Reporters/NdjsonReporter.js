@@ -47,6 +47,8 @@ export class NdjsonReporter {
 	#startedAt;
 	/** @type {string|undefined} */
 	#runMode;
+	/** @type {WeakSet<object>} */
+	#reportedErrors = new WeakSet();
 
 	constructor(filePath) {
 		this.#filePath = filePath;
@@ -74,6 +76,33 @@ export class NdjsonReporter {
 	#getDuration(now) {
 		// Integer ms, like `ts`
 		return this.#startedAt !== undefined ? Math.round(now - this.#startedAt) : undefined;
+	}
+
+	/** @param {Error} error */
+	error(error) {
+		// The build and the caller that ends the run may both report the same error
+		if (error && typeof error === "object") {
+			if (this.#reportedErrors.has(error)) {
+				return;
+			}
+			this.#reportedErrors.add(error);
+		}
+
+		this.#emit({
+			v: SCHEMA_VERSION,
+			type: "build.error",
+			ts: Date.now(),
+			ok: false,
+			// null for errors outside of a build (e.g. configuration errors)
+			durationMs: this.#getDuration(performance.now()) ?? null,
+			error: {
+				message: error?.message,
+				name: error?.name,
+				filePath: findFilePath(error),
+			},
+		});
+
+		this.#startedAt = undefined;
 	}
 
 	/** @param {object} eleventyConfig */
@@ -108,6 +137,7 @@ export class NdjsonReporter {
 						durationMs: this.#getDuration(performance.now()),
 						pages: (eventsArg.results || []).map(toManifestEntry),
 					});
+					this.#startedAt = undefined;
 				});
 			}
 		});
@@ -128,19 +158,7 @@ export class NdjsonReporter {
 
 		// Watch mode doesn’t exit on error
 		eleventyConfig.on("buildawesome.aftererror", (eventsArg) => {
-			let error = eventsArg.error;
-			this.#emit({
-				v: SCHEMA_VERSION,
-				type: "build.error",
-				ts: Date.now(),
-				ok: false,
-				durationMs: this.#getDuration(performance.now()),
-				error: {
-					message: error?.message,
-					name: error?.name,
-					filePath: findFilePath(error),
-				},
-			});
+			this.error(eventsArg.error);
 		});
 	}
 }

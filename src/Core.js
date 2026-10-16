@@ -348,6 +348,8 @@ export default class Core extends CoreFs {
 		} catch (e) {
 			this.watchQueue.finishBuild();
 
+			this.reportError(e);
+
 			if (e instanceof BaseError) {
 				this.errorHandler.error(e, "Eleventy watch error");
 			} else {

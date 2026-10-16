@@ -44,6 +44,7 @@ async function exec() {
 		}
 	}
 
+	let reporter;
 	try {
 		function getFallbackErrorHandler() {
 			let handler = new ErrorHandler();
@@ -97,7 +98,6 @@ async function exec() {
 			return;
 		}
 
-		let reporter;
 		if ("events-file" in argv) {
 			// Bare flag parses as "", repeated as an array, --no-events-file as false
 			if (typeof argv["events-file"] !== "string" || !argv["events-file"]) {
@@ -182,6 +182,8 @@ async function exec() {
 			}
 		}
 	} catch (error) {
+		reporter?.error(error);
+
 		if(typeof ErrorHandler !== "undefined") {
 			let handler = getFallbackErrorHandler();
 			handler.fatal(error, "Fatal Error (CLI)");

@@ -101,3 +101,70 @@ test("passthrough event skips files excluded by `dot` and `junk`", async (t) => 
 	}
 });
 
+test("watch run with a throwing config writes one `build.error`, then recovers", async (t) => {
+	// Inside the project so the config file can import Core’s dependencies
+	let dir = "test/stubs-ndjson-config-error";
+	rmSync(dir, { recursive: true, force: true });
+	mkdirSync(dir, { recursive: true });
+	t.teardown(() => rmSync(dir, { recursive: true, force: true }));
+
+	let configPath = path.join(dir, "eleventy.config.js");
+	writeFileSync(configPath, "export default function() {};");
+	writeFileSync(path.join(dir, "index.md"), "Hello");
+
+	let eventsFile = path.join(mkdtempSync(path.join(tmpdir(), "ndjson-")), ".events.ndjson");
+	let core = new Core(dir, path.join(dir, "_site"), { runMode: "watch", configPath });
+	core.setReporter(new NdjsonReporter(eventsFile));
+	core.disableLogger();
+	await core.init();
+	await core.write();
+
+	// Skip chokidar
+	core.watcher = { watchTargets() {}, close() {} };
+	core.startWatch = async () => {};
+
+	writeFileSync(configPath, `export default function() { throw new Error("sdlkfj"); };`);
+	await core.triggerWatchRunForPath(`./${configPath}`);
+
+	let readBuildEvents = () => readEvents(eventsFile).filter((e) => e.type.startsWith("build."));
+	let events = readBuildEvents();
+	t.deepEqual(events.map((e) => e.type), ["build.start", "build.end", "build.error"]);
+	let { error, ok, durationMs } = events[2];
+	t.false(ok);
+	t.is(durationMs, null);
+	t.is(error.name, "ConfigError");
+	t.true(error.message.includes("eleventy.config.js"));
+
+	writeFileSync(configPath, "export default function() {};");
+	await core.triggerWatchRunForPath(`./${configPath}`);
+
+	events = readBuildEvents();
+	t.deepEqual(events.slice(3).map((e) => e.type), ["build.start", "build.end"]);
+	t.true(events[4].ok);
+});
+
+test("an error already reported by the build isn’t reported again", async (t) => {
+	let dir = mkdtempSync(path.join(tmpdir(), "ndjson-"));
+	let eventsFile = path.join(dir, ".events.ndjson");
+	let core = new Core("test/stubs-virtual/", path.join(dir, "_site"), {
+		quietMode: true,
+		configPath: false,
+		config(eleventyConfig) {
+			eleventyConfig.addTemplate("index.11ty.js", {
+				render() {
+					throw new Error("Template failed");
+				},
+			});
+		},
+	});
+	core.setReporter(new NdjsonReporter(eventsFile));
+	core.disableLogger();
+	core.setIsVerbose(false);
+
+	let error = await t.throwsAsync(() => core.write());
+	core.reportError(error);
+
+	let errors = readEvents(eventsFile).filter((e) => e.type === "build.error");
+	t.is(errors.length, 1);
+	t.is(typeof errors[0].durationMs, "number");
+});

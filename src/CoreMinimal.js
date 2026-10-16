@@ -579,10 +579,19 @@ Verbose Output: ${this.verboseMode}`;
 	/**
 	 * Call before init().
 	 *
-	 * @param {{ config: Function }} reporter
+	 * @param {{ config: Function, error?: Function }} reporter
 	 */
 	setReporter(reporter) {
 		this.#reporter = reporter;
+	}
+
+	/**
+	 * For errors that end a run outside of the build (e.g. configuration errors).
+	 *
+	 * @param {Error} error
+	 */
+	reportError(error) {
+		this.#reporter?.error?.(error);
 	}
 
 	/** @type {ErrorHandler} */
