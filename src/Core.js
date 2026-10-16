@@ -647,7 +647,8 @@ Arguments:
        Writes templates, skips passthrough copy
 
      --events-file=.events.ndjson
-       Write build events as newline-delimited JSON to this file (off by default)
+       Write build events as newline-delimited JSON to this file (off by default).
+       Event types: build.start, passthrough, build.end, build.error
 
      --help`;
 	}

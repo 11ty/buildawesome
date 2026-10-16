@@ -2,6 +2,8 @@ import { mkdirSync, openSync, writeSync } from "node:fs";
 import path from "node:path";
 import { TemplatePath } from "@11ty/eleventy-utils";
 
+import checkPassthroughCopyBehavior from "../Util/PassthroughCopyBehaviorCheck.js";
+
 // Bump on a breaking change
 const SCHEMA_VERSION = 1;
 
@@ -43,6 +45,8 @@ export class NdjsonReporter {
 	#eleventyConfig;
 	/** @type {number|undefined} */
 	#startedAt;
+	/** @type {string|undefined} */
+	#runMode;
 
 	constructor(filePath) {
 		this.#filePath = filePath;
@@ -83,6 +87,7 @@ export class NdjsonReporter {
 
 		eleventyConfig.on("buildawesome.before", (eventsArg) => {
 			this.#startedAt = performance.now();
+			this.#runMode = eventsArg.runMode;
 			this.#emit({
 				v: SCHEMA_VERSION,
 				type: "build.start",
@@ -105,6 +110,17 @@ export class NdjsonReporter {
 					});
 				});
 			}
+		});
+
+		// Once per build; incremental builds list only what they copied, so consumers merge maps across builds
+		eleventyConfig.on("buildawesome.passthrough", ({ map }) => {
+			this.#emit({
+				v: SCHEMA_VERSION,
+				type: "passthrough",
+				ts: Date.now(),
+				emulated: checkPassthroughCopyBehavior(eleventyConfig, this.#runMode),
+				map,
+			});
 		});
 
 		// Watch mode doesn’t exit on error

@@ -9,6 +9,7 @@ function readEvents(filePath) {
 
 test.after.always("Directory cleanup", () => {
   deleteDirectory("./test/stubs/events-file-ok/_site/");
+  deleteDirectory("./test/stubs/events-file-passthrough/_site/");
   deleteDirectory("./test/stubs/events-file-broken/_site/");
   deleteDirectory("./test/stubs/events-file-broken-data/_site/");
 });
@@ -99,6 +100,47 @@ test("Test command line --events-file writes build.end on success", async (t) =>
 });
 
 // Warning: this test writes to the file system
+test("Test command line --events-file writes a passthrough event", async (t) => {
+  let eventsFile = "test/stubs/events-file-passthrough/_site/.events.ndjson";
+
+  await new Promise((resolve) => {
+    exec(
+      `node ./cmd.cjs --input=test/stubs/events-file-passthrough --output=test/stubs/events-file-passthrough/_site --formats=md --config=test/stubs/events-file-passthrough.config.js --events-file=${eventsFile}`,
+      (error, stdout, stderr) => {
+        t.falsy(error);
+        let events = readEvents(eventsFile);
+        t.deepEqual(events.map((e) => e.type), ["build.start", "passthrough", "build.end"]);
+        let passthrough = events[1];
+        t.is(passthrough.v, 1);
+        t.false(passthrough.emulated);
+        t.deepEqual(passthrough.map, {
+          "/robots.txt": "test/stubs/events-file-passthrough/robots.txt",
+          "/img/a.txt": "test/stubs/events-file-passthrough/img/a.txt",
+        });
+        resolve();
+      }
+    );
+  });
+});
+
+test("Test command line --events-file writes an empty passthrough map without passthrough copy", async (t) => {
+  let eventsFile = "test/stubs/events-file-ok/_site/no-passthrough/.events.ndjson";
+
+  await new Promise((resolve) => {
+    exec(
+      `node ./cmd.cjs --input=test/stubs/events-file-ok --formats=md --events-file=${eventsFile} --dryrun`,
+      (error, stdout, stderr) => {
+        t.falsy(error);
+        let passthrough = readEvents(eventsFile).filter((e) => e.type === "passthrough");
+        t.is(passthrough.length, 1);
+        t.deepEqual(passthrough[0].map, {});
+        resolve();
+      }
+    );
+  });
+});
+
+// Warning: this test writes to the file system
 test("Test command line --events-file works with --to=json", async (t) => {
   let eventsFile = "test/stubs/events-file-ok/_site/json/.events.ndjson";
 
@@ -144,7 +186,7 @@ test("Test command line --events-file rejects repeated flags", async (t) => {
 });
 
 // Warning: this test writes to the file system
-test("Test command line --events-file writes only build.error when an after listener throws", async (t) => {
+test("Test command line --events-file writes build.error instead of build.end when an after listener throws", async (t) => {
   let eventsFile = "test/stubs/events-file-ok/_site/after-throws/.events.ndjson";
 
   await new Promise((resolve) => {
@@ -154,7 +196,7 @@ test("Test command line --events-file writes only build.error when an after list
         t.is(error.code, 1);
         let events = readEvents(eventsFile);
         let types = events.map((e) => e.type);
-        t.deepEqual(types, ["build.start", "build.error"]);
+        t.deepEqual(types, ["build.start", "passthrough", "build.error"]);
         resolve();
       }
     );
