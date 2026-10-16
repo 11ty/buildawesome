@@ -112,14 +112,17 @@ export class NdjsonReporter {
 			}
 		});
 
-		// Once per build; incremental builds list only what they copied, so consumers merge maps across builds
-		eleventyConfig.on("buildawesome.passthrough", ({ map }) => {
+		// Once per build; incremental builds list every emulated entry but only what they copied, so consumers merge maps across builds
+		eleventyConfig.on("buildawesome.passthrough", ({ map, entries = [] }) => {
+			let emulatedUrls = new Set(entries.map(({ url }) => url));
 			this.#emit({
 				v: SCHEMA_VERSION,
 				type: "passthrough",
 				ts: Date.now(),
 				emulated: checkPassthroughCopyBehavior(eleventyConfig, this.#runMode),
 				map,
+				// URLs in `map` written to the output folder (passthroughs the dev server can’t emulate are copied)
+				copied: Object.keys(map).filter((url) => !emulatedUrls.has(url)),
 			});
 		});
 

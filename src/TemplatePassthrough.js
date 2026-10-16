@@ -319,6 +319,18 @@ class TemplatePassthrough {
 			);
 	}
 
+	// The dev server can only emulate `dot` and `junk`, so these copy files for real
+	static isEmulatable(copyOptions) {
+		return !copyOptions?.filter && !copyOptions?.rename && !copyOptions?.transform;
+	}
+
+	get isEmulated() {
+		return (
+			checkPassthroughCopyBehavior(this.config, this.runMode) &&
+			TemplatePassthrough.isEmulatable(this.copyOptions)
+		);
+	}
+
 	async write() {
 		if (this.isDryRun) {
 			return Promise.resolve({
@@ -347,9 +359,10 @@ class TemplatePassthrough {
 
 		let copyOptions = Object.assign(copyOptionsDefault, this.copyOptions);
 
+		let isEmulated = this.isEmulated;
 		let promises = fileMap.map((entry) => {
 			// For-free passthrough copy
-			if (checkPassthroughCopyBehavior(this.config, this.runMode)) {
+			if (isEmulated) {
 				let aliasMap = {};
 				aliasMap[entry.inputPath] = entry.outputPath;
 
@@ -375,6 +388,23 @@ class TemplatePassthrough {
 					count += result.count;
 					size += result.size;
 					Object.assign(map, result.map);
+				}
+
+				if (isEmulated) {
+					// Served by the dev server, which applies `dot` and `junk` per request
+					let aliases = fileMap.map(({ inputPath, outputPath }) => ({
+						inputPath,
+						outputPath,
+						dot: Boolean(copyOptions.dot),
+						junk: Boolean(copyOptions.junk),
+					}));
+
+					return {
+						count,
+						size,
+						map,
+						aliases,
+					};
 				}
 
 				return {

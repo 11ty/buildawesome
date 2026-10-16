@@ -1,11 +1,15 @@
 import test from "ava";
 import fs from "fs";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 import TemplatePassthroughManager from "../src/TemplatePassthroughManager.js";
 import TemplateConfig from "../src/TemplateConfig.js";
 import FileSystemSearch from "../src/FileSystemSearch.js";
 import ExtensionMap from "../src/ExtensionMap.js";
 import ProjectDirectories from "../src/Util/ProjectDirectories.js";
+import Core from "../src/Core.js";
 
 import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback, getEleventyFilesInstance, deleteDirectory } from "./_testHelpers.js";
 
@@ -248,4 +252,100 @@ test("Incremental passthrough, issue #3285", async (t) => {
   t.deepEqual(mgr.getAllNormalizedPaths([]), [
     { copyOptions: {}, inputPath: "./test/stubs-3285/src/scripts", outputPath: "scripts", isDynamicPattern: false },
   ]);
+});
+
+test("Emulated passthrough copy sends entries and copies passthroughs that can’t be emulated", async (t) => {
+  let payload;
+  let outputDir = path.join(mkdtempSync(path.join(tmpdir(), "passthrough-entries-")), "_site");
+  let core = new Core("test/stubs/template-passthrough", outputDir, {
+    runMode: "serve",
+    quietMode: true,
+    configPath: false,
+    config(eleventyConfig) {
+      eleventyConfig.setServerPassthroughCopyBehavior("passthrough");
+      eleventyConfig.addPassthroughCopy({ "test/stubs/template-passthrough/static": "static" }, { junk: true });
+      eleventyConfig.addPassthroughCopy({ "test/stubs/template-passthrough/img.jpg": "img.jpg" });
+      eleventyConfig.addPassthroughCopy({ "test/stubs/template-passthrough/src/views": "views" }, {
+        rename: (p) => p.replace("avatar", "renamed"),
+      });
+      eleventyConfig.on("buildawesome.passthrough", (data) => {
+        payload = data;
+      });
+    },
+  });
+  core.disableLogger();
+  await core.write();
+
+  t.deepEqual(payload.entries, [
+    { url: "/static", inputPath: "./test/stubs/template-passthrough/static/", dot: true, junk: true },
+    { url: "/img.jpg", inputPath: "./test/stubs/template-passthrough/img.jpg", dot: true, junk: false },
+  ]);
+  t.true(Object.keys(payload.map).includes("/static"));
+  t.true(fs.existsSync(path.join(outputDir, "views/renamed.png")));
+  t.false(fs.existsSync(path.join(outputDir, "static")));
+});
+
+test("Emulated incremental passthrough sends every emulated entry but only copies what changed", async (t) => {
+  let eleventyConfig = new TemplateConfig();
+  eleventyConfig.userConfig.setServerPassthroughCopyBehavior("passthrough");
+  eleventyConfig.userConfig.addPassthroughCopy({ "./test/stubs-3285/src/scripts": "scripts" });
+  eleventyConfig.userConfig.addPassthroughCopy({ "./test/stubs/template-passthrough/static": "static" }, { rename: (p) => p });
+  await eleventyConfig.init();
+
+  let mgr = new TemplatePassthroughManager(eleventyConfig);
+  mgr.setRunMode("serve");
+
+  let scripts = { copyOptions: {}, inputPath: "./test/stubs-3285/src/scripts", outputPath: "scripts", isDynamicPattern: false };
+
+  // a template changed
+  mgr.setIncrementalFiles(["./test/stubs/template-passthrough/index.njk"]);
+  t.deepEqual(mgr.getAllNormalizedPaths([]), [scripts]);
+
+  // a passthrough that can’t be emulated changed
+  mgr.setIncrementalFiles(["./test/stubs/template-passthrough/static/test.css"]);
+  let paths = mgr.getAllNormalizedPaths([]);
+  t.deepEqual(paths.map((p) => p.inputPath), ["./test/stubs/template-passthrough/static", "./test/stubs-3285/src/scripts"]);
+});
+
+test("setPassthroughCopyOptions sets defaults that per-call options override", async (t) => {
+  let eleventyConfig = new TemplateConfig();
+  eleventyConfig.userConfig.setPassthroughCopyOptions({ junk: true, dot: false });
+  eleventyConfig.userConfig.addPassthroughCopy("img");
+  eleventyConfig.userConfig.addPassthroughCopy("static", { dot: true });
+  await eleventyConfig.init();
+
+  let mgr = new TemplatePassthroughManager(eleventyConfig);
+  t.deepEqual(mgr.getConfigPaths().map((p) => p.copyOptions), [
+    { junk: true, dot: false },
+    { junk: true, dot: true },
+  ]);
+});
+
+test("setPassthroughCopyOptions applies to copied files", async (t) => {
+  let outputDir = path.join(mkdtempSync(path.join(tmpdir(), "passthrough-defaults-")), "_site");
+  let core = new Core("test/stubs/template-passthrough", outputDir, {
+    quietMode: true,
+    configPath: false,
+    config(eleventyConfig) {
+      eleventyConfig.setPassthroughCopyOptions({ dot: false });
+      eleventyConfig.addPassthroughCopy({ "test/stubs/template-passthrough": "copy" });
+    },
+  });
+  core.disableLogger();
+  await core.write();
+
+  t.true(fs.existsSync(path.join(outputDir, "copy/img.jpg")));
+  t.false(fs.existsSync(path.join(outputDir, "copy/.htaccess")));
+});
+
+test("setPassthroughCopyOptions with `rename` disables dev server emulation", async (t) => {
+  let eleventyConfig = new TemplateConfig();
+  eleventyConfig.userConfig.setServerPassthroughCopyBehavior("passthrough");
+  eleventyConfig.userConfig.setPassthroughCopyOptions({ rename: (p) => p });
+  eleventyConfig.userConfig.addPassthroughCopy("img");
+  await eleventyConfig.init();
+
+  let mgr = new TemplatePassthroughManager(eleventyConfig);
+  t.deepEqual(mgr.getConfigPathGlobs(true), []);
+  t.deepEqual(mgr.getConfigPathGlobs(false), ["./img"]);
 });

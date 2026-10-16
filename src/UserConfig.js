@@ -147,6 +147,7 @@ export default class UserConfig {
 		/** @type {object} */
 		this.passthroughCopies = {};
 		this.passthroughCopiesHtmlRelative = new Set();
+		this.passthroughCopyOptions = {};
 
 		/** @type {object} */
 		this.layoutAliases = {};
@@ -791,6 +792,21 @@ export default class UserConfig {
 		return this;
 	}
 
+	// Default options for every `addPassthroughCopy()` call (per-call options win)
+	setPassthroughCopyOptions(copyOptions = {}) {
+		if (!isPlainObject(copyOptions)) {
+			throw new Error("`setPassthroughCopyOptions` expects an object of options.");
+		}
+		if (copyOptions.mode) {
+			throw new Error(
+				"`mode` is not supported in `setPassthroughCopyOptions`, use `addPassthroughCopy` instead.",
+			);
+		}
+
+		this.passthroughCopyOptions = copyOptions;
+		return this;
+	}
+
 	/*
 	 * Template Formats
 	 */
@@ -1220,6 +1236,7 @@ export default class UserConfig {
 			layoutResolution: this.layoutResolution,
 			passthroughCopiesHtmlRelative: this.passthroughCopiesHtmlRelative,
 			passthroughCopies: this.passthroughCopies,
+			passthroughCopyOptions: this.passthroughCopyOptions,
 
 			// Liquid
 			liquidOptions: this.liquid.options,

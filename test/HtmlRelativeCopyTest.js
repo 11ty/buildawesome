@@ -32,6 +32,7 @@ test("Basic usage", async (t) => {
 
 			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, {
+					entries: [],
 					map: {
 						"/test/possum.png": TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.png")
 					}
@@ -81,6 +82,7 @@ test("More complex image path (parent dir)", async (t) => {
 
 			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, {
+					entries: [],
 					map: {
 						"/stubs-img-transform/possum.png": TemplatePath.normalizeOperatingSystemFilePath("test/stubs-img-transform/possum.png")
 					}
@@ -130,7 +132,7 @@ test("No matches", async (t) => {
 			})
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { map: {} })
+				t.deepEqual(copyMap, { entries: [], map: {} })
 			});
 
 			$config.addTemplate("test.njk", `<img src="lol.lol">`)
@@ -157,7 +159,7 @@ test("Match but does not exist (throws error)", async (t) => {
 			});
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { map: {} })
+				t.deepEqual(copyMap, { entries: [], map: {} })
 			});
 
 			$config.addTemplate("test.njk", `<img src="missing.png">`)
@@ -188,7 +190,7 @@ test("Match but does not exist (no error, using `failOnError: false`)", async (t
 			})
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { map: {} })
+				t.deepEqual(copyMap, { entries: [], map: {} })
 			});
 
 			$config.addTemplate("test.njk", `<img src="missing.png">`)
@@ -222,7 +224,7 @@ test("Copying dotfiles are not allowed", async (t) => {
 			});
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { map: {} })
+				t.deepEqual(copyMap, { entries: [], map: {} })
 			});
 
 			$config.addTemplate("test.njk", `<img src=".gitkeep">`)
@@ -257,7 +259,7 @@ test("Using with InputPathToUrl plugin", async (t) => {
 			$config.addPlugin(InputPathToUrlTransformPlugin);
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { map: {} })
+				t.deepEqual(copyMap, { entries: [], map: {} })
 			});
 
 			$config.addTemplate("test1.njk", `Test 1`)
@@ -293,7 +295,7 @@ test("Using with InputPathToUrl plugin (reverse addPlugin order)", async (t) => 
 			});
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { map: {} })
+				t.deepEqual(copyMap, { entries: [], map: {} })
 			});
 
 			$config.addTemplate("test1.njk", `Test 1`)
@@ -328,6 +330,7 @@ test("Use with HtmlBasePlugin usage", async (t) => {
 
 			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, {
+					entries: [],
 					map: {
 						"/test/possum.png": TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.png")
 					}
@@ -381,7 +384,7 @@ test("Using with InputPathToUrl plugin and HtmlBasePlugin", async (t) => {
 			$config.addPlugin(HtmlBasePlugin);
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { map: {} })
+				t.deepEqual(copyMap, { entries: [], map: {} })
 			});
 
 			$config.addTemplate("test1.njk", `Test 1`)
@@ -418,6 +421,7 @@ test("Multiple addPlugin calls (use both globs)", async (t) => {
 
 			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, {
+					entries: [],
 					map: {
 						"/test/possum.jpg": TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.jpg"),
 						"/test/possum.png": TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.png"),
@@ -475,6 +479,7 @@ test("Array of globs", async (t) => {
 
 			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, {
+					entries: [],
 					map: {
 						"/test/possum.jpg": TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.jpg"),
 						"/test/possum.png": TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.png"),
@@ -538,6 +543,7 @@ test("overwrite: false", async (t) => {
 
 			$config.on("buildawesome.passthrough", copyMap => {
 				t.deepEqual(copyMap, {
+					entries: [],
 					map: {}
 				})
 			});
@@ -583,7 +589,7 @@ test("Input -> output remapping not yet supported (throws error)", async (t) => 
 			});
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { map: {} })
+				t.deepEqual(copyMap, { entries: [], map: {} })
 			});
 
 			$config.addTemplate("test.njk", `<img src="missing.png">`)

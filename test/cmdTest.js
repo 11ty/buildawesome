@@ -117,6 +117,7 @@ test("Test command line --events-file writes a passthrough event", async (t) => 
           "/robots.txt": "test/stubs/events-file-passthrough/robots.txt",
           "/img/a.txt": "test/stubs/events-file-passthrough/img/a.txt",
         });
+        t.deepEqual(passthrough.copied, ["/robots.txt", "/img/a.txt"]);
         resolve();
       }
     );

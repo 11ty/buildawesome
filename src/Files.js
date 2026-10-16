@@ -87,14 +87,21 @@ export class Files {
 	}
 
 	get passthroughGlobs() {
+		return this.#getPassthroughGlobs();
+	}
+
+	// `isEmulatable` filters `addPassthroughCopy()` entries by whether the dev server can emulate them
+	#getPassthroughGlobs(isEmulatable) {
 		let paths = new Set();
 		// stuff added in addPassthroughCopy()
-		for (let path of this.passthroughManager.getConfigPathGlobs()) {
+		for (let path of this.passthroughManager.getConfigPathGlobs(isEmulatable)) {
 			paths.add(path);
 		}
 		// non-template language extensions
-		for (let path of this.extensionMap.getPassthroughCopyGlobs(this.inputDir)) {
-			paths.add(path);
+		if (isEmulatable !== false) {
+			for (let path of this.extensionMap.getPassthroughCopyGlobs(this.inputDir)) {
+				paths.add(path);
+			}
 		}
 		return Array.from(paths);
 	}
@@ -388,8 +395,9 @@ export class Files {
 
 		let globs = this.#getWatcherGlobs();
 
+		// Emulated passthrough copy files are watched by the dev server, others are copied on rebuild
 		if (checkPassthroughCopyBehavior(this.config, this.runMode)) {
-			return globs.concat(directoryGlobs);
+			return globs.concat(this.#getPassthroughGlobs(false)).concat(directoryGlobs);
 		}
 
 		// Revert to old passthroughcopy copy files behavior
@@ -398,7 +406,7 @@ export class Files {
 
 	/* For `eleventy --watch` */
 	getGlobWatcherFilesForPassthroughCopy() {
-		return this.passthroughGlobs;
+		return this.#getPassthroughGlobs(true);
 	}
 
 	/* For `eleventy --watch` */

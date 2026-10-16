@@ -270,3 +270,12 @@ test("addJavaScriptFunction feeds into `getFilter` #3365", (t) => {
 
   t.is(typeof userCfg.getFilter("increment"), "function");
 });
+
+test("setPassthroughCopyOptions replaces earlier calls", (t) => {
+  let userCfg = new UserConfig();
+  userCfg.setPassthroughCopyOptions({ junk: true });
+  userCfg.setPassthroughCopyOptions({ dot: false });
+
+  t.deepEqual(userCfg.passthroughCopyOptions, { dot: false });
+  t.throws(() => userCfg.setPassthroughCopyOptions({ mode: "html-relative" }));
+});

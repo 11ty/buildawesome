@@ -37,7 +37,7 @@ export default class Serve {
 	#options;
 	#eleventyConfig;
 	#savedConfigOptions;
-	#aliases;
+	#passthroughEntries;
 	#initOptionsFetched = false;
 	#chokidar;
 	// these are *not* normalized
@@ -56,11 +56,21 @@ export default class Serve {
 		throw new Error("It’s not allowed to set config on Serve. Set eleventyConfig instead.");
 	}
 
-	setAliases(aliases) {
-		this.#aliases = aliases;
+	// Emulated passthrough copy: `[{ url, inputPath, dot, junk }]`
+	setPassthroughCopies(entries) {
+		this.#passthroughEntries = entries;
 
-		if (this._server && "setAliases" in this._server) {
-			this._server.setAliases(aliases);
+		if (!this._server || !entries) {
+			return;
+		}
+
+		if ("setPassthroughCopies" in this._server) {
+			this._server.setPassthroughCopies(entries);
+		} else if ("setAliases" in this._server) {
+			// Older versions of the dev server
+			this._server.setAliases(
+				Object.fromEntries(entries.map(({ url, inputPath }) => [url, inputPath])),
+			);
 		}
 	}
 
@@ -76,9 +86,9 @@ export default class Serve {
 		this.#eleventyConfig = config;
 
 		if (checkPassthroughCopyBehavior(this.#eleventyConfig.userConfig, "serve")) {
-			this.#eleventyConfig.userConfig.events.on("buildawesome.passthrough", ({ map }) => {
+			this.#eleventyConfig.userConfig.events.on("buildawesome.passthrough", ({ entries }) => {
 				// for-free passthrough copy
-				this.setAliases(map);
+				this.setPassthroughCopies(entries);
 			});
 		}
 	}
@@ -244,7 +254,7 @@ export default class Serve {
 		// Static method `getServer` was already checked in `getServerModule`
 		this._server = serverModule.getServer("eleventy-server", this.outputDir, this.options);
 
-		this.setAliases(this.#aliases);
+		this.setPassthroughCopies(this.#passthroughEntries);
 	}
 
 	getSetupCallback() {

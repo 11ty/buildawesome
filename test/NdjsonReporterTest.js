@@ -33,4 +33,28 @@ test("passthrough event is emulated in serve mode with serverPassthroughCopyBeha
 		"/robots.txt": "./test/stubs/events-file-passthrough/robots.txt",
 		"/img": "./test/stubs/events-file-passthrough/img/",
 	});
+	t.deepEqual(passthrough.copied, []);
+});
+
+test("passthrough event lists passthroughs the dev server can’t emulate as copied", async (t) => {
+	let dir = mkdtempSync(path.join(tmpdir(), "ndjson-"));
+	let eventsFile = path.join(dir, ".events.ndjson");
+	let core = new Core("test/stubs/events-file-passthrough", path.join(dir, "_site"), {
+		runMode: "serve",
+		quietMode: true,
+		configPath: false,
+		config(eleventyConfig) {
+			eleventyConfig.setServerPassthroughCopyBehavior("passthrough");
+			eleventyConfig.addPassthroughCopy("test/stubs/events-file-passthrough/robots.txt");
+			eleventyConfig.addPassthroughCopy({ "test/stubs/events-file-passthrough/img": "img" }, { rename: (p) => p });
+		},
+	});
+	core.setReporter(new NdjsonReporter(eventsFile));
+	core.disableLogger();
+	await core.write();
+
+	let passthrough = readEvents(eventsFile).find((e) => e.type === "passthrough");
+	t.true(passthrough.emulated);
+	t.deepEqual(passthrough.copied, ["/img/a.txt"]);
+	t.true(Object.keys(passthrough.map).includes("/robots.txt"));
 });

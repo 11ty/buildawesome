@@ -440,6 +440,35 @@ test("Glob Watcher Files with Config Passthroughs (one template format) with Dev
   t.deepEqual(evf.getGlobWatcherFilesForPassthroughCopy(), ["./test/stubs/img/**"]);
 });
 
+test("Glob Watcher Files with Dev Server rebuild for passthroughs that can’t be emulated", async (t) => {
+  let $config = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs"
+  }, function(cfg) {
+		cfg.setServerPassthroughCopyBehavior("passthrough");
+
+		cfg.passthroughCopies = {
+			"test/stubs/img/": { outputPath: true },
+			"test/stubs/template-passthrough/static/": { outputPath: true, copyOptions: { rename: (p) => p } },
+		};
+	});
+
+  let { eleventyFiles: evf } = getEleventyFilesInstance(["njk"], $config);
+  evf.setRunMode("serve");
+  evf.init(); // duplicate init
+
+  let mgr = new TemplatePassthroughManager($config);
+  evf.setPassthroughManager(mgr);
+
+  t.deepEqual(evf.getGlobWatcherFiles(), [
+    "./test/stubs/**/*.njk",
+    "./test/stubs/template-passthrough/static/**",
+    "./test/stubs/_includes/**",
+    "./test/stubs/_data/**",
+  ]);
+
+  t.deepEqual(evf.getGlobWatcherFilesForPassthroughCopy(), ["./test/stubs/img/**"]);
+});
+
 test("Glob Watcher Files with Config Passthroughs (no template formats)", async (t) => {
   let templateConfig = new TemplateConfig();
   let projectDirs = new ProjectDirectories();

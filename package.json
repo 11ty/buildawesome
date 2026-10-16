@@ -1,6 +1,6 @@
 {
 	"name": "@11ty/eleventy",
-	"version": "4.0.0-alpha.10",
+	"version": "4.0.0-alpha.11",
 	"description": "A simpler way to build awesome web sites.",
 	"publishConfig": {
 		"access": "public",
@@ -134,9 +134,9 @@
 		"zod-validation-error": "^5.0.0"
 	},
 	"dependencies": {
-		"@11ty/chokidar-with-glob-support": "^2.0.0",
+		"@11ty/chokidar-with-glob-support": "^2.1.0",
 		"@11ty/dependency-tree": "^5.0.0-alpha.3",
-		"@11ty/eleventy-dev-server": "^3.0.0-alpha.14",
+		"@11ty/eleventy-dev-server": "^3.0.0-alpha.15",
 		"@11ty/eleventy-plugin-bundle": "^4.0.3",
 		"@11ty/eleventy-utils": "^3.0.1",
 		"@11ty/gray-matter": "^3.0.0",
