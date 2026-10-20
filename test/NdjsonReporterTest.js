@@ -64,7 +64,8 @@ test("passthrough event skips files excluded by `dot` and `junk`", async (t) => 
 	let dir = "test/stubs-ndjson-dot-junk";
 	rmSync(dir, { recursive: true, force: true });
 	t.teardown(() => rmSync(dir, { recursive: true, force: true }));
-	let input = path.join(dir, "src");
+	// Globs need forward slashes
+	let input = path.posix.join(dir, "src");
 	mkdirSync(path.join(input, "og/sources"), { recursive: true });
 	writeFileSync(path.join(input, "index.md"), "");
 	writeFileSync(path.join(input, "og/sources/a.txt"), "");
@@ -81,7 +82,7 @@ test("passthrough event skips files excluded by `dot` and `junk`", async (t) => 
 				config(eleventyConfig) {
 					eleventyConfig.setServerPassthroughCopyBehavior(behavior);
 					eleventyConfig.setPassthroughCopyOptions({ dot: false });
-					eleventyConfig.addPassthroughCopy({ [path.join(input, entry)]: "og/sources" });
+					eleventyConfig.addPassthroughCopy({ [path.posix.join(input, entry)]: "og/sources" });
 				},
 			});
 			core.setReporter(new NdjsonReporter(eventsFile));
