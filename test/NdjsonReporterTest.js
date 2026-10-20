@@ -60,7 +60,10 @@ test("passthrough event lists passthroughs the dev server can’t emulate as cop
 });
 
 test("passthrough event skips files excluded by `dot` and `junk`", async (t) => {
-	let dir = mkdtempSync(path.join(tmpdir(), "ndjson-"));
+	// Inside the project, absolute input paths on another drive fail on Windows
+	let dir = "test/stubs-ndjson-dot-junk";
+	rmSync(dir, { recursive: true, force: true });
+	t.teardown(() => rmSync(dir, { recursive: true, force: true }));
 	let input = path.join(dir, "src");
 	mkdirSync(path.join(input, "og/sources"), { recursive: true });
 	writeFileSync(path.join(input, "index.md"), "");

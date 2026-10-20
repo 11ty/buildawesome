@@ -117,8 +117,13 @@ export default class Core extends CoreFs {
 			Array.from(this.eleventyConfig.userConfig.watchTargetsConfigReset),
 		);
 
+		// Changed files are normalized by WatchQueue
+		let normalizedConfigFilePaths = new Set(
+			Array.from(configFilePaths, (configFilePath) => WatchQueue.normalizePath(configFilePath)),
+		);
+
 		for (let filePath of changedFiles) {
-			if (configFilePaths.has(filePath)) {
+			if (normalizedConfigFilePaths.has(filePath)) {
 				return true;
 			}
 			if (isGlobMatch(filePath, resetConfigGlobs)) {
