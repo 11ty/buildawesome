@@ -99,7 +99,7 @@ class FileSystemSearch {
 		for (let key in this.inputs) {
 			let { input, options } = this.inputs[key];
 			if (
-				isGlobMatch(path, input, {
+				isGlobMatch(normalized, input, {
 					ignore: options.ignore,
 				})
 			) {
