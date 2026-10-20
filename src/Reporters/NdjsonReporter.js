@@ -16,6 +16,13 @@ function toManifestEntry(result) {
 	};
 }
 
+/** @param {object} map */
+function toPosixMap(map) {
+	return Object.fromEntries(
+		Object.entries(map).map(([url, inputPath]) => [url, inputPath.split(path.sep).join("/")]),
+	);
+}
+
 /** @param {string} filePath */
 function toIgnoreGlob(filePath) {
 	let relative = TemplatePath.addLeadingDotSlash(
@@ -150,7 +157,7 @@ export class NdjsonReporter {
 				type: "passthrough",
 				ts: Date.now(),
 				emulated: checkPassthroughCopyBehavior(eleventyConfig, this.#runMode),
-				map,
+				map: toPosixMap(map),
 				// URLs in `map` written to the output folder (passthroughs the dev server can’t emulate are copied)
 				copied: Object.keys(map).filter((url) => !emulatedUrls.has(url)),
 			});
