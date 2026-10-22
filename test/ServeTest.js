@@ -1,6 +1,10 @@
 import test from "ava";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 import Serve from "../src/Serve.js";
+import Core from "../src/Core.js";
 import TemplateConfig from "../src/TemplateConfig.js";
 import ConsoleLogger from "../src/Util/ConsoleLogger.js";
 
@@ -80,4 +84,34 @@ test("Custom output dir is set correctly", async (t) => {
   t.is(es.outputDir, "x");
 
   t.is(es.server.dir, "x");
+});
+
+test("Incremental passthrough builds merge into existing dev server entries", async (t) => {
+  let outputDir = path.join(mkdtempSync(path.join(tmpdir(), "serve-incremental-")), "_site");
+  let core = new Core("test/stubs/template-passthrough", outputDir, {
+    runMode: "serve",
+    quietMode: true,
+    configPath: false,
+    config(eleventyConfig) {
+      eleventyConfig.setServerPassthroughCopyBehavior("passthrough");
+      eleventyConfig.addPassthroughCopy({ "test/stubs/template-passthrough/static": "static" });
+      eleventyConfig.addPassthroughCopy({ "test/stubs/template-passthrough/img.jpg": "img.jpg" });
+    },
+  });
+  core.disableLogger();
+  await core.init();
+
+  let entries;
+  core.eleventyServe._server = {
+    setPassthroughCopies(e) {
+      entries = e;
+    },
+  };
+
+  await core.write();
+  t.deepEqual(entries.map(({ url }) => url).sort(), ["/img.jpg", "/static"]);
+
+  core.setIncrementalFile("./test/stubs/template-passthrough/img.jpg");
+  await core.write();
+  t.deepEqual(entries.map(({ url }) => url).sort(), ["/img.jpg", "/static"]);
 });

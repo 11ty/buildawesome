@@ -3,7 +3,6 @@ import { TemplatePath } from "@11ty/eleventy-utils";
 
 import BaseError from "./Errors/BaseError.js";
 import TemplatePassthrough from "./TemplatePassthrough.js";
-import checkPassthroughCopyBehavior from "./Util/PassthroughCopyBehaviorCheck.js";
 import { isGlobMatch, isDynamicPattern } from "./Util/GlobMatcher.js";
 import { createDebug } from "./Util/DebugLogUtil.js";
 
@@ -87,6 +86,10 @@ class TemplatePassthroughManager {
 
 	resetIncremental() {
 		this.incrementalFiles = undefined;
+	}
+
+	get isIncremental() {
+		return Array.isArray(this.incrementalFiles) && this.incrementalFiles.length > 0;
 	}
 
 	// Defaults from `setPassthroughCopyOptions()`
@@ -292,7 +295,7 @@ class TemplatePassthroughManager {
 	}
 
 	getAllNormalizedPaths(paths = []) {
-		if (Array.isArray(this.incrementalFiles) && this.incrementalFiles.length > 0) {
+		if (this.isIncremental) {
 			let passthroughIncrementalFiles = this.filterToPassthroughCopyFilesOnly(
 				paths,
 				this.incrementalFiles,
@@ -303,17 +306,6 @@ class TemplatePassthroughManager {
 
 				return this.#normalizePath(file);
 			});
-
-			// The dev server replaces its entries on every build: send all emulated entries (no copying) but only copy what changed
-			if (checkPassthroughCopyBehavior(this.config, this.runMode)) {
-				return passthroughIncrementalFiles
-					.filter((path) => !TemplatePassthrough.isEmulatable(path.copyOptions))
-					.concat(
-						this.#getAllNormalizedPaths(paths).filter((path) =>
-							TemplatePassthrough.isEmulatable(path.copyOptions),
-						),
-					);
-			}
 
 			// Fixes https://github.com/11ty/eleventy/issues/2491
 			return passthroughIncrementalFiles;
@@ -431,6 +423,7 @@ class TemplatePassthroughManager {
 			await this.config.events.emit("buildawesome.passthrough", {
 				map: this.getAliasesFromPassthroughResults(results),
 				entries: this.getEmulatedEntriesFromPassthroughResults(outcomes),
+				incremental: this.isIncremental,
 			});
 
 			debug(`TemplatePassthrough copy finished. Current count: ${this.count} (size: ${this.size})`);

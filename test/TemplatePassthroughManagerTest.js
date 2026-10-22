@@ -285,7 +285,7 @@ test("Emulated passthrough copy sends entries and copies passthroughs that canâ€
   t.false(fs.existsSync(path.join(outputDir, "static")));
 });
 
-test("Emulated incremental passthrough sends every emulated entry but only copies what changed", async (t) => {
+test("Emulated incremental passthrough only includes what changed", async (t) => {
   let eleventyConfig = new TemplateConfig();
   eleventyConfig.userConfig.setServerPassthroughCopyBehavior("passthrough");
   eleventyConfig.userConfig.addPassthroughCopy({ "./test/stubs-3285/src/scripts": "scripts" });
@@ -295,16 +295,13 @@ test("Emulated incremental passthrough sends every emulated entry but only copie
   let mgr = new TemplatePassthroughManager(eleventyConfig);
   mgr.setRunMode("serve");
 
-  let scripts = { copyOptions: {}, inputPath: "./test/stubs-3285/src/scripts", outputPath: "scripts", isDynamicPattern: false };
-
   // a template changed
   mgr.setIncrementalFiles(["./test/stubs/template-passthrough/index.njk"]);
-  t.deepEqual(mgr.getAllNormalizedPaths([]), [scripts]);
+  t.deepEqual(mgr.getAllNormalizedPaths([]), []);
 
   // a passthrough that canâ€™t be emulated changed
   mgr.setIncrementalFiles(["./test/stubs/template-passthrough/static/test.css"]);
-  let paths = mgr.getAllNormalizedPaths([]);
-  t.deepEqual(paths.map((p) => p.inputPath), ["./test/stubs/template-passthrough/static", "./test/stubs-3285/src/scripts"]);
+  t.deepEqual(mgr.getAllNormalizedPaths([]).map((p) => p.inputPath), ["./test/stubs/template-passthrough/static"]);
 });
 
 test("setPassthroughCopyOptions sets defaults that per-call options override", async (t) => {

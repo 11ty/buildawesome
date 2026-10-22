@@ -86,10 +86,22 @@ export default class Serve {
 		this.#eleventyConfig = config;
 
 		if (checkPassthroughCopyBehavior(this.#eleventyConfig.userConfig, "serve")) {
-			this.#eleventyConfig.userConfig.events.on("buildawesome.passthrough", ({ entries }) => {
-				// for-free passthrough copy
-				this.setPassthroughCopies(entries);
-			});
+			this.#eleventyConfig.userConfig.events.on(
+				"buildawesome.passthrough",
+				({ entries, incremental }) => {
+					// Incremental builds only include changed passthroughs, so merge into existing entries
+					if (incremental && this.#passthroughEntries) {
+						let merged = new Map(this.#passthroughEntries.map((entry) => [entry.url, entry]));
+						for (let entry of entries) {
+							merged.set(entry.url, entry);
+						}
+						entries = Array.from(merged.values());
+					}
+
+					// for-free passthrough copy
+					this.setPassthroughCopies(entries);
+				},
+			);
 		}
 	}
 
