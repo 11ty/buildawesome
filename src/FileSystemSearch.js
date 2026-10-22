@@ -12,6 +12,7 @@ class FileSystemSearch {
 		this.inputs = {};
 		this.outputs = {};
 		this.promises = {};
+		this.pendingModifications = {};
 		this.count = 0;
 	}
 
@@ -83,6 +84,12 @@ class FileSystemSearch {
 					}),
 				);
 
+				// Apply add/delete calls that arrived while the glob was running
+				for (let [setOperation, path] of this.pendingModifications[cacheKey] || []) {
+					this.outputs[cacheKey][setOperation](path);
+				}
+				delete this.pendingModifications[cacheKey];
+
 				return Array.from(this.outputs[cacheKey]);
 			});
 		}
@@ -92,18 +99,25 @@ class FileSystemSearch {
 	}
 
 	_modify(path, setOperation) {
-		path = TemplatePath.stripLeadingDotSlash(path);
-
+		// Normalize platform separators (Windows watchers report backslashes) before matching
 		let normalized = TemplatePath.standardizeFilePath(path);
 
 		for (let key in this.inputs) {
 			let { input, options } = this.inputs[key];
 			if (
-				isGlobMatch(path, input, {
+				!isGlobMatch(normalized, input, {
 					ignore: options.ignore,
 				})
 			) {
+				continue;
+			}
+
+			if (this.outputs[key]) {
 				this.outputs[key][setOperation](normalized);
+			} else {
+				// Search is still in flight
+				this.pendingModifications[key] ??= [];
+				this.pendingModifications[key].push([setOperation, normalized]);
 			}
 		}
 	}
