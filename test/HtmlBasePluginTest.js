@@ -655,3 +655,24 @@ permalink: /deep/
 </html>`
   );
 });
+
+test("HTML base plugin skips attributes with no value", async (t) => {
+  let elev = new Eleventy({
+    input: "./test/stubs-virtual/",
+    pathPrefix: "/prefixed/",
+    configPath: false,
+    config: function ($config) {
+      $config.setUseTemplateCache(false);
+      $config.addTemplate("index.html", `<a href>Test</a><img src><a href="/test/">Test</a>`);
+      $config.addPlugin(HtmlBasePlugin);
+    },
+  });
+
+  await elev.initializeConfig();
+
+  elev.setIsVerbose(false);
+  elev.disableLogger();
+
+  let results = await elev.toJSON();
+  t.is(results[0].content, `<a href>Test</a><img src><a href="/prefixed/test/">Test</a>`);
+});

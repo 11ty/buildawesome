@@ -61,6 +61,11 @@ export class HtmlTransformer {
 			inst.use(
 				urls({
 					eachURL: (url, attrName, tagName) => {
+						// Attributes with no value (e.g. `<a href>`) are `true` via `recognizeNoValueAttribute`
+						if (typeof url !== "string") {
+							return url;
+						}
+
 						for (let { fn: callback } of callbacks) {
 							// already sorted by priority when added
 							url = callback.call(context, url, { attribute: attrName, tag: tagName });
