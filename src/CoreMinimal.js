@@ -476,6 +476,7 @@ export class CoreMinimal {
 
 		this.writer = new TemplateWriter(formats, this.templateData, this.eleventyConfig);
 		this.writer.logger = this.logger;
+		this.writer.errorHandler = this.errorHandler;
 
 		if (!viaConfigReset) {
 			// set or restore cache

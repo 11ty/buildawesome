@@ -73,6 +73,10 @@ class TemplateWriter {
 		return this.#errorHandler;
 	}
 
+	set errorHandler(errorHandler) {
+		this.#errorHandler = errorHandler;
+	}
+
 	get logger() {
 		if (!this.#logger) {
 			throw new Error("Internal error: missing ConsoleLogger instance.");
