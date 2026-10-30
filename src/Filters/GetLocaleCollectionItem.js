@@ -36,11 +36,8 @@ function getLocaleCollectionItem(config, collection, pageOverride, langCode, ind
 	}
 
 	// find the modified locale `page` again in `collections.all`
-	let all =
-		this.collections?.all ||
-		this.ctx?.collections?.all ||
-		this.context?.environments?.collections?.all ||
-		[];
+	let all = this.collections?.all || this.data?.collections?.all || [];
+
 	return getCollectionItem(all, modifiedLocalePage, 0);
 }
 
