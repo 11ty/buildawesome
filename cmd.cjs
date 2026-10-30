@@ -157,7 +157,7 @@ async function exec() {
 
 			if (argv.serve) {
 				// Start the server before the initial build so it’s available sooner
-				core.serve(argv.port);
+				await core.serve(argv.port);
 			}
 
 			await core.watch();

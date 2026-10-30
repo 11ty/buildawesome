@@ -149,3 +149,76 @@ test("Emulated passthrough entries reach the dev server before templates finish 
   await core.write();
   t.deepEqual(entriesDuringRender?.map(({ url }) => url), ["/static"]);
 });
+
+test("sendBuildStart is a no-op without a server or when the server doesn’t implement it", async (t) => {
+  let es = new Serve();
+  await t.notThrowsAsync(() => es.sendBuildStart());
+
+  es._server = {};
+  await t.notThrowsAsync(() => es.sendBuildStart());
+
+  let calls = 0;
+  es._server = {
+    sendBuildStart() {
+      calls++;
+    },
+  };
+  await es.sendBuildStart();
+  t.is(calls, 1);
+});
+
+async function getWatchCore(configCallback) {
+  let core = new Core(mkdtempSync(path.join(tmpdir(), "eleventy-input-")), mkdtempSync(path.join(tmpdir(), "eleventy-output-")), {
+    runMode: "serve",
+    quietMode: true,
+    configPath: false,
+    config: configCallback,
+  });
+  core.disableLogger();
+  await core.init();
+
+  let calls = [];
+  core.eleventyServe._server = {
+    sendBuildStart() {
+      calls.push("sendBuildStart");
+    },
+    reload() {
+      calls.push("reload");
+    },
+    sendError() {
+      calls.push("sendError");
+    },
+  };
+  // Skip chokidar and the options-changed restart (`serve()` was never called)
+  core.startWatch = async () => {};
+  core.eleventyServe.hasOptionsChanged = () => false;
+
+  return { core, calls };
+}
+
+test("Initial watch build signals build start, then reloads", async (t) => {
+  let { core, calls } = await getWatchCore((eleventyConfig) => {
+    eleventyConfig.addTemplate("index.html", "Hello");
+  });
+
+  await core.watch();
+  t.deepEqual(calls, ["sendBuildStart", "reload"]);
+});
+
+test("Failed initial watch build sends an error and still starts the watcher", async (t) => {
+  let { core, calls } = await getWatchCore((eleventyConfig) => {
+    eleventyConfig.addTemplate("index.html", "Hello");
+    eleventyConfig.addTransform("fail", () => {
+      throw new Error("Broken");
+    });
+  });
+  core.startWatch = async () => {
+    calls.push("startWatch");
+  };
+
+  let exitCode = process.exitCode;
+  await core.watch();
+  process.exitCode = exitCode;
+
+  t.deepEqual(calls, ["sendBuildStart", "sendError", "startWatch"]);
+});

@@ -182,6 +182,10 @@ export default class Core extends CoreFs {
 
 		this.watchQueue.startBuild();
 
+		if (this.runMode === "serve") {
+			this.eleventyServe.sendBuildStart();
+		}
+
 		let queue = this.watchQueue.getActiveQueue();
 		let isResetConfig = this.#shouldResetConfig(queue);
 
@@ -353,6 +357,9 @@ export default class Core extends CoreFs {
 			await this.#rewatch();
 		} catch (e) {
 			this.watchQueue.finishBuild();
+
+			// Errors thrown before `write()` (e.g. in `init()`) skip the `sendError` in `#rewatch`.
+			this.eleventyServe.sendError({ error: e });
 
 			this.reportError(e);
 
@@ -548,10 +555,18 @@ export default class Core extends CoreFs {
 
 		// Note that watching indirectly depends on this for fetching dependencies from JS files
 		// See: TemplateWriter:pathCache and WatchTargets
-		await this.write();
+		// No-op without a server
+		this.eleventyServe.sendBuildStart();
 
-		// Refresh pages opened while the initial build was running (no-op without a server)
-		await this.eleventyServe.reload();
+		try {
+			await this.write();
+
+			// Refresh pages opened while the initial build was running (no-op without a server)
+			await this.eleventyServe.reload();
+		} catch (error) {
+			// Already logged by `write()`; keep the server and watcher running so a fix triggers a rebuild, like `#rewatch`.
+			this.eleventyServe.sendError({ error });
+		}
 
 		let initWatchBench = this.watcherBench.get("Start up --watch");
 		initWatchBench.before();

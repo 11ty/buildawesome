@@ -305,11 +305,13 @@ export default class Serve {
 
 		this.server.serve(port || this.options.port);
 
+		// Dev Server 2.0.7+: wait for the server URL to log before the initial build output
+		if (typeof this.server.ready === "function") {
+			await this.server.ready();
+		}
+
 		if (typeof this.config.serverOptions?.ready === "function") {
 			if (typeof this.server.ready === "function") {
-				// Dev Server 2.0.7+
-				// wait for ready promise to resolve before triggering ready callback
-				await this.server.ready();
 				await this.config.serverOptions?.ready(this.server);
 			} else {
 				throw new Error(
@@ -332,6 +334,13 @@ export default class Serve {
 			await this.server.sendError({
 				error,
 			});
+		}
+	}
+
+	// Older dev server versions and custom `serverOptions.module` servers may not implement this.
+	async sendBuildStart() {
+		if (this._server && typeof this.server.sendBuildStart === "function") {
+			await this.server.sendBuildStart();
 		}
 	}
 
