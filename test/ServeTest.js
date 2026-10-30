@@ -115,3 +115,37 @@ test("Incremental passthrough builds merge into existing dev server entries", as
   await core.write();
   t.deepEqual(entries.map(({ url }) => url).sort(), ["/img.jpg", "/static"]);
 });
+
+test("Emulated passthrough entries reach the dev server before templates finish rendering", async (t) => {
+  let outputDir = path.join(mkdtempSync(path.join(tmpdir(), "serve-early-")), "_site");
+  let entries;
+  let entriesDuringRender;
+  let core = new Core("test/stubs/template-passthrough", outputDir, {
+    runMode: "serve",
+    quietMode: true,
+    configPath: false,
+    config(eleventyConfig) {
+      eleventyConfig.setServerPassthroughCopyBehavior("passthrough");
+      eleventyConfig.addPassthroughCopy({ "test/stubs/template-passthrough/static": "static" });
+      eleventyConfig.addTemplate("index.html", "Hello");
+      eleventyConfig.addTransform("wait-for-entries", async (content) => {
+        for (let j = 0; j < 50 && !entries; j++) {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        entriesDuringRender ??= entries;
+        return content;
+      });
+    },
+  });
+  core.disableLogger();
+  await core.init();
+
+  core.eleventyServe._server = {
+    setPassthroughCopies(e) {
+      entries = e;
+    },
+  };
+
+  await core.write();
+  t.deepEqual(entriesDuringRender?.map(({ url }) => url), ["/static"]);
+});

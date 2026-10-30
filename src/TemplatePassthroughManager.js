@@ -412,6 +412,15 @@ class TemplatePassthroughManager {
 
 		let promises = passthroughs.map((pass) => this.#copy(pass));
 
+		// The dev server may already be running, so serve config passthrough copy before templates finish rendering
+		let configEntries = this.getEmulatedEntriesFromPassthroughResults(await Promise.all(promises));
+		if (configEntries.length > 0) {
+			await this.config.events.emit("buildawesome.passthroughentries", {
+				entries: configEntries,
+				incremental: true,
+			});
+		}
+
 		await this.#waitForTemplatesRendered();
 
 		for (let [key, afterBuildCopyPromises] of this.#queue) {
@@ -420,9 +429,14 @@ class TemplatePassthroughManager {
 
 		return Promise.all(promises).then(async (outcomes) => {
 			let results = outcomes.map(({ count, map }) => ({ count, map }));
+			let entries = this.getEmulatedEntriesFromPassthroughResults(outcomes);
+			await this.config.events.emit("buildawesome.passthroughentries", {
+				entries,
+				incremental: this.isIncremental,
+			});
 			await this.config.events.emit("buildawesome.passthrough", {
 				map: this.getAliasesFromPassthroughResults(results),
-				entries: this.getEmulatedEntriesFromPassthroughResults(outcomes),
+				entries,
 				incremental: this.isIncremental,
 			});
 

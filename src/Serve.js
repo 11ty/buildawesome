@@ -87,7 +87,7 @@ export default class Serve {
 
 		if (checkPassthroughCopyBehavior(this.#eleventyConfig.userConfig, "serve")) {
 			this.#eleventyConfig.userConfig.events.on(
-				"buildawesome.passthrough",
+				"buildawesome.passthroughentries",
 				({ entries, incremental }) => {
 					// Incremental builds only include changed passthroughs, so merge into existing entries
 					if (incremental && this.#passthroughEntries) {
