@@ -549,6 +549,9 @@ export default class Core extends CoreFs {
 		// See: TemplateWriter:pathCache and WatchTargets
 		await this.write();
 
+		// Refresh pages opened while the initial build was running (no-op without a server)
+		await this.eleventyServe.reload();
+
 		let initWatchBench = this.watcherBench.get("Start up --watch");
 		initWatchBench.before();
 

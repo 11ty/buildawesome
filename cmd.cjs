@@ -155,12 +155,13 @@ async function exec() {
 				throw new SimpleError("--to=json is not compatible with --serve or --watch.");
 			}
 
-			await core.watch();
-
 			if (argv.serve) {
-				// TODO await here?
+				// Start the server before the initial build so it’s available sooner
+				await core.init();
 				core.serve(argv.port);
 			}
+
+			await core.watch();
 
 			process.on("SIGINT", async () => {
 				core.interrupt();
