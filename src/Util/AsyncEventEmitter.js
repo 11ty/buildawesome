@@ -45,7 +45,6 @@ class AsyncEventEmitter extends EventEmitter {
 		"buildawesome#copy": ["eleventy#copy", "buildawesome#copy"],
 
 		// Internal but not aliased
-		// "buildawesome#previousqueue"
 		// "buildawesome#beforerender",
 		// "buildawesome#render"
 	};

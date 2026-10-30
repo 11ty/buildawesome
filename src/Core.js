@@ -265,10 +265,11 @@ export default class Core extends CoreFs {
 				}
 			}
 
-			// `addWatchTarget` files can change output Eleventy doesn’t track (e.g. a bundler in `eleventy.before`)
+			// `addWatchTarget` files can change output Eleventy doesn’t track (e.g. a bundler in `eleventy.before`), unless a template declared them via `addDependencies`
+			let uses = this.eleventyConfig.usesGraph;
 			let isOutputsTracked =
 				this.eleventyConfig.isWatchOrServe() &&
-				!queue.some((path) => this.#isAdditionalWatchTarget(path));
+				!queue.some((path) => this.#isAdditionalWatchTarget(path) && !uses.hasDependants(path));
 
 			let normalizedPathPrefix = PathPrefixer.normalizePathPrefix(this.config.pathPrefix);
 			let matchingTemplates = templateResults

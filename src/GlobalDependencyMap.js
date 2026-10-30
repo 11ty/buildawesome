@@ -48,6 +48,11 @@ class GlobalDependencyMap {
 		return this.#changedFiles.some((file) => this.hasDependency(node, file, false));
 	}
 
+	// Includes the changed file itself, e.g. for compile cache invalidation
+	isChangedFileRelevantTo(node) {
+		return this.#changedFiles.some((file) => this.isFileRelevantTo(node, file, false));
+	}
+
 	// True once every template has rendered (and recorded its includes) without an error
 	get hasAllTemplateDependencies() {
 		return this.#hasAllTemplateDependencies;

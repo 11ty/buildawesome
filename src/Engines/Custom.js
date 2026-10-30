@@ -9,11 +9,6 @@ export default class CustomEngine extends TemplateEngine {
 		this.needsInit = "init" in this.entry && typeof this.entry.init === "function";
 
 		this.setDefaultEngine(undefined);
-
-		this.previousQueue = [];
-		this.config.events.on("buildawesome#previousqueue", (filePaths) => {
-			this.previousQueue = filePaths;
-		});
 	}
 
 	getExtensionMapEntry() {
@@ -287,16 +282,10 @@ export default class CustomEngine extends TemplateEngine {
 		return true;
 	}
 
-	wasFileRelevantToPreviousBuild(inputPath) {
-		return this.previousQueue.find((comparisonFile) =>
-			this.config.uses.isFileRelevantTo(inputPath, comparisonFile, false),
-		);
-	}
-
 	getCompileCacheKey(str, inputPath) {
 		// Return this separately so we know whether or not to use the cached version
 		// but still return a key to cache this new render for next time
-		let useCache = !this.wasFileRelevantToPreviousBuild(inputPath);
+		let useCache = !this.config.uses.isChangedFileRelevantTo(inputPath);
 
 		if (this.entry.compileOptions && "getCacheKey" in this.entry.compileOptions) {
 			if (typeof this.entry.compileOptions.getCacheKey !== "function") {

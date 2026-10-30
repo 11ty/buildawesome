@@ -926,7 +926,6 @@ Verbose Output: ${this.verboseMode}`;
 			// always reset after first build
 			this.setIgnoreInitial(false);
 			this.writer.resetIncremental();
-			this.config.events.emit("buildawesome#previousqueue", incrementalFiles);
 
 			eventsArg.uses = this.eleventyConfig.usesGraph.map;
 			await this.config.events.emit("buildawesome.after", eventsArg);

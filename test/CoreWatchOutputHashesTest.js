@@ -191,6 +191,35 @@ test("Watch target changes don’t filter by changed output", async (t) => {
   t.deepEqual(getUrls(events[0]), ["/static/", "/uses-data/"]);
 });
 
+test("Watch target changes declared via addDependencies filter by changed output", async (t) => {
+  let dir = createProject("watch-target-dependency");
+  let componentPath = `${dir}/components/card.part`;
+  fs.mkdirSync(path.join(dir, "components"));
+  fs.writeFileSync(componentPath, "First");
+  fs.writeFileSync(path.join(dir, "uses-component.comp"), "");
+
+  let { elev, events } = await getWatchInstance(dir, {
+    config($config) {
+      $config.addWatchTarget(`${dir}/components/`);
+      $config.addTemplateFormats("comp");
+      $config.addExtension("comp", {
+        compile(str, inputPath) {
+          this.addDependencies(inputPath, [componentPath]);
+          let component = fs.readFileSync(componentPath, "utf8");
+          return () => component;
+        },
+      });
+    },
+  });
+
+  fs.writeFileSync(componentPath, "Second");
+  await elev.triggerWatchRunForPath(`./${componentPath}`);
+
+  t.true(events[0].build.outputs);
+  t.deepEqual(getUrls(events[0]), ["/uses-component/"]);
+  t.is(events[0].build.templates[0].content, "Second");
+});
+
 test("Build mode doesn’t track output hashes", async (t) => {
   let dir = createProject("build-no-hashes");
   let elev = new Eleventy(dir, `${dir}/_site`, { configPath: `${dir}/eleventy.config.js` });
