@@ -39,7 +39,7 @@
   "homepage": "https://www.11ty.dev/",
   "devDependencies": {
     "@11ty/package-bundler": "^0.5.6",
-    "@vitest/browser": "^5.0.3",
+    "@vitest/browser": "^5.0.5",
     "@vitest/browser-playwright": "^5.0.3",
     "playwright": "^1.64.0",
     "vitest": "^5.0.3"
