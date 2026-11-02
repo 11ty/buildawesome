@@ -163,8 +163,5 @@
 		"posthtml-match-helper": "^2.0.3",
 		"semver": "^7.8.6",
 		"tinyglobby": "^0.2.17"
-	},
-  "overrides": {
-    "minimatch": "$minimatch"
-  }
+	}
 }
