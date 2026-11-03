@@ -238,7 +238,7 @@ function RenderPlugin($config, options = {}) {
 
 				let argArray = [];
 				if (this.legacyArgs) {
-					let rawArgs = Liquid.parseArguments(null, this.legacyArgs);
+					let rawArgs = Liquid.parseArguments(this.legacyArgs);
 					for (let arg of rawArgs) {
 						let b = yield liquidEngine.evalValue(arg, ctx);
 						argArray.push(b);
