@@ -3,7 +3,6 @@ import test from "ava";
 import TemplateMap from "../src/TemplateMap.js";
 import TemplateCollection from "../src/TemplateCollection.js";
 import UsingCircularTemplateContentReferenceError from "../src/Errors/UsingCircularTemplateContentReferenceError.js";
-import TemplateContentUnrenderedTemplateError from "../src/Errors/TemplateContentUnrenderedTemplateError.js";
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 
 import getNewTemplateForTests from "./_getNewTemplateForTests.js";
@@ -1416,52 +1415,6 @@ test("TemplateMap circular references (map.templateContent) using eleventyExclud
 
   let collections = await tm._testGetCollectionsData();
   t.is(collections.all.length, 1);
-});
-
-test("permalink object with build", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance();
-
-  let tm = new TemplateMap(eleventyConfig);
-  let tmplLayout = await getNewTemplate(
-    "./test/stubs/permalink-build/permalink-build.md",
-    "./test/stubs/",
-    "./test/stubs/_site",
-    eleventyConfig,
-  );
-
-  await tm.add(tmplLayout);
-
-  let map = tm.getMap();
-  await tm.cache();
-
-  t.is(map[0]._pages.length, 1);
-});
-
-test("permalink object without build (defaults to `read` mode)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance();
-
-  let tm = new TemplateMap(eleventyConfig);
-  let tmpl = await getNewTemplate(
-    "./test/stubs/permalink-nobuild/permalink-nobuild.md",
-    "./test/stubs/",
-    "./test/stubs/_site",
-    eleventyConfig,
-  );
-
-  await tm.add(tmpl);
-
-  let map = tm.getMap();
-  await tm.cache();
-
-  t.is(map[0]._pages.length, 1);
-  t.throws(
-    () => {
-      map[0]._pages[0].templateContent;
-    },
-    {
-      instanceOf: TemplateContentUnrenderedTemplateError,
-    },
-  );
 });
 
 test("eleventy.layouts Event", async (t) => {

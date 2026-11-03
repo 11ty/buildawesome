@@ -153,7 +153,6 @@ class Template extends TemplateContent {
 		this.outputFormat = "fs";
 
 		this.behavior = new TemplateBehavior(this.config);
-		this.behavior.setOutputFormat(this.outputFormat);
 	}
 
 	#initFileSlug() {
@@ -233,7 +232,6 @@ class Template extends TemplateContent {
 
 	setOutputFormat(to) {
 		this.outputFormat = to;
-		this.behavior.setOutputFormat(to);
 	}
 
 	setDryRunViaIncremental(isIncremental) {
@@ -293,9 +291,10 @@ class Template extends TemplateContent {
 		}
 
 		let computedData = ResolveConfigurationData.getValue(data, this.config.keys.computed);
-		let permalink =
+		let permalink = TemplatePermalink.resolveBuildAlias(
 			ResolveConfigurationData.getValue(data, this.config.keys.permalink) ??
-			ResolveConfigurationData.getValue(computedData, this.config.keys.permalink);
+				ResolveConfigurationData.getValue(computedData, this.config.keys.permalink),
+		);
 		let permalinkValue;
 		let isDynamicPermalinkEnabled =
 			this.config.dynamicPermalinks && data.dynamicPermalink !== false;
@@ -304,42 +303,16 @@ class Template extends TemplateContent {
 		// `permalink: true` throws an error
 		if (typeof permalink === "boolean") {
 			permalinkValue = permalink;
+		} else if (isPlainObject(permalink)) {
+			// Empty permalink {} object should act as if no permalink was set at all
+			if (Object.keys(permalink).length > 0) {
+				throw new Error(
+					`Permalink objects are not supported (other than \`permalink.build\`). Use a string or \`false\` instead in ${this.inputPath}.`,
+				);
+			}
 		} else if (permalink && !isDynamicPermalinkEnabled) {
 			// Issue #838
 			permalinkValue = permalink;
-		} else if (isPlainObject(permalink)) {
-			// Empty permalink {} object should act as if no permalink was set at all
-			// and inherit the default behavior
-			let isEmptyObject = Object.keys(permalink).length === 0;
-			if (!isEmptyObject) {
-				let promises = [];
-				let keys = [];
-				for (let key in permalink) {
-					keys.push(key);
-					if (key !== "build" && Array.isArray(permalink[key])) {
-						promises.push(
-							Promise.all([...permalink[key]].map((entry) => super.renderPermalink(entry, data))),
-						);
-					} else {
-						promises.push(super.renderPermalink(permalink[key], data));
-					}
-				}
-
-				let results = await Promise.all(promises);
-
-				permalinkValue = {};
-				for (let j = 0, k = keys.length; j < k; j++) {
-					let key = keys[j];
-					permalinkValue[key] = results[j];
-					debug(
-						"Rendering permalink.%o for %o: %s becomes %o",
-						key,
-						this.inputPath,
-						permalink[key],
-						results[j],
-					);
-				}
-			}
 		} else if (permalink) {
 			// render variables inside permalink front matter, bypass markdown
 			permalinkValue = await super.renderPermalink(permalink, data);
@@ -973,7 +946,6 @@ class Template extends TemplateContent {
 		for (let page of mapEntry._pages) {
 			let content;
 
-			// Note that behavior.render is overridden when using json output
 			if (page.template.isRenderable()) {
 				// this reuses page.templateContent, it doesn’t render it
 				content = await page.template.renderPageEntry(page);
@@ -1004,7 +976,7 @@ class Template extends TemplateContent {
 
 			if (!page.template.behavior.isWriteable()) {
 				debug(
-					"Template not written %o from %o (via permalink: false, permalink.build: false, or a permalink object without a build property).",
+					"Template not written %o from %o (via permalink: false).",
 					page.outputPath,
 					page.template.inputPath,
 				);
@@ -1187,8 +1159,6 @@ class Template extends TemplateContent {
 
 	// Important reminder: Template data is first generated in TemplateMap
 	async getTemplateMapEntry(data) {
-		this.behavior.setRenderViaDataCascade(data);
-
 		// does not return outputPath or url, we don’t want to render permalinks yet
 		return {
 			template: this,

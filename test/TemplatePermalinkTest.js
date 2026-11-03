@@ -126,32 +126,15 @@ test("Permalink matching folder and filename", (t) => {
   t.is(generate("component/", "component").toHref(), "/component/");
 });
 
-test("Permalink Object, just build", (t) => {
-  t.is(
-    new TemplatePermalink({
-      build: "permalinksubfolder/test.html",
-    }).toOutputPath(),
-    "permalinksubfolder/test.html"
-  );
-
-  t.is(
-    new TemplatePermalink({
-      build: false,
-    }).toOutputPath(),
-    false
-  );
-
-  t.throws(() => {
-    new TemplatePermalink({
-      build: true,
-    }).toOutputPath();
-  });
+test("Permalink Object, build alias", (t) => {
+  t.is(new TemplatePermalink({ build: "permalinksubfolder/test.html" }).toOutputPath(), "permalinksubfolder/test.html");
+  t.is(new TemplatePermalink({ build: false }).toOutputPath(), false);
+  t.throws(() => new TemplatePermalink({ build: true }));
 });
 
-test("Permalink Object, empty object", (t) => {
-  t.is(new TemplatePermalink({}).toOutputPath(), false);
-
-  t.is(new TemplatePermalink({}).toHref(), false);
+test("Permalink Object without build throws", (t) => {
+  t.throws(() => new TemplatePermalink({}));
+  t.throws(() => new TemplatePermalink({ someotherkey: "/" }));
 });
 
 test("Permalink generate apache content negotiation #761", (t) => {

@@ -1954,40 +1954,21 @@ test("permalink object with build", async (t) => {
   let data = await tmpl.getData();
   t.is(await tmpl.getRawOutputPath(data), "/url/index.html");
   t.is(await tmpl.getOutputHref(data), "/url/");
-});
 
-test("permalink object _getLink", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/stubs/permalink-nobuild/permalink-nobuild.md",
-    "./test/stubs/",
-    "./test/stubs/_site"
-  );
-
-  let link2 = await tmpl._getLink({
-    permalink: {
-      build: "/build/",
-    },
-  });
-  t.is(await link2.toOutputPath(), "/build/index.html");
-  t.is(await link2.toHref(), "/build/");
-});
-
-test("permalink object _getLink (array of invalid, previously serverless URLs)", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/stubs/permalink-nobuild/permalink-nobuild.md",
-    "./test/stubs/",
-    "./test/stubs/_site"
-  );
-
-  // Array of URLs is supported
-  let link = await tmpl._getLink({
-    test: "a",
-    permalink: {
-      someotherkey: [],
-    },
-  });
+  let link = await tmpl._getLink({ permalink: { build: false } });
   t.is(await link.toOutputPath(), false);
-  t.is(await link.toHref(), false);
+});
+
+test("Permalink object without build throws", async (t) => {
+  let tmpl = await getNewTemplate(
+    "./test/stubs/permalink-empty-object/empty-object.md",
+    "./test/stubs/",
+    "./test/stubs/_site"
+  );
+
+  await t.throwsAsync(() => tmpl._getLink({ permalink: { someotherkey: "/build/" } }), {
+    message: /Permalink objects/,
+  });
 });
 
 test("Permalink is an object but an empty object (inherit default behavior)", async (t) => {
@@ -2013,47 +1994,25 @@ test("Permalink is an object but an empty object (inherit default behavior)", as
   t.is(path, "./test/stubs/_site/permalink-empty-object/empty-object/index.html");
 });
 
-test("eleventyComputed returns permalink object Issue #1898", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/stubs/stubs-computed-permalink/eleventycomputed-object.11ty.cjs",
-    "./test/stubs/stubs-computed-permalink/",
-    "./test/stubs/stubs-computed-permalink/_site"
-  );
+for (let [name, file] of [
+  ["eleventyComputed returns permalink object Issue #1898", "eleventycomputed-object"],
+  ["eleventyComputed returns nested permalink object Issue #1898", "eleventycomputed-nested-object"],
+  ["eleventyComputed returns permalink object using permalink string (with replace) Issue #1898", "eleventycomputed-object-replace"],
+]) {
+  test(name, async (t) => {
+    let tmpl = await getNewTemplate(
+      `./test/stubs/stubs-computed-permalink/${file}.11ty.cjs`,
+      "./test/stubs/stubs-computed-permalink/",
+      "./test/stubs/stubs-computed-permalink/_site"
+    );
 
-  let data = await tmpl.getData();
-  let [page] = await tmpl.getTemplates(data);
+    let data = await tmpl.getData();
+    let [page] = await tmpl.getTemplates(data);
 
-  t.is(page.url, "/i18n/en/");
-  t.is(page.outputPath, "./test/stubs/stubs-computed-permalink/_site/i18n/en/index.html");
-});
-
-test("eleventyComputed returns nested permalink object Issue #1898", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/stubs/stubs-computed-permalink/eleventycomputed-nested-object.11ty.cjs",
-    "./test/stubs/stubs-computed-permalink/",
-    "./test/stubs/stubs-computed-permalink/_site"
-  );
-
-  let data = await tmpl.getData();
-  let [page] = await tmpl.getTemplates(data);
-
-  t.is(page.url, "/i18n/en/");
-  t.is(page.outputPath, "./test/stubs/stubs-computed-permalink/_site/i18n/en/index.html");
-});
-
-test("eleventyComputed returns permalink object using permalink string (with replace) Issue #1898", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/stubs/stubs-computed-permalink/eleventycomputed-object-replace.11ty.cjs",
-    "./test/stubs/stubs-computed-permalink/",
-    "./test/stubs/stubs-computed-permalink/_site"
-  );
-
-  let data = await tmpl.getData();
-  let [page] = await tmpl.getTemplates(data);
-
-  t.is(page.url, "/i18n/en/");
-  t.is(page.outputPath, "./test/stubs/stubs-computed-permalink/_site/i18n/en/index.html");
-});
+    t.is(page.url, "/i18n/en/");
+    t.is(page.outputPath, "./test/stubs/stubs-computed-permalink/_site/i18n/en/index.html");
+  });
+}
 
 test("page.templateSyntax works with templateEngineOverride", async (t) => {
   let tmpl = await getNewTemplate(
