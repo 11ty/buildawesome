@@ -536,3 +536,23 @@ for (let value of [undefined, null, false]) {
     t.deepEqual(results.map((entry) => entry.url), ["/"]);
   });
 }
+
+test("Computed data renders the permalink once for `page.url` and `page.outputPath`", async (t) => {
+  let renders = 0;
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("index.11ty.js", "", {
+        permalink: () => {
+          renders++;
+          return "/custom/";
+        },
+        eleventyComputed: { other: () => true },
+      });
+    }
+  });
+
+  let [result] = await elev.toJSON();
+  t.is(result.url, "/custom/");
+  t.is(result.outputPath, "./_site/custom/index.html");
+  t.is(renders, 1);
+});

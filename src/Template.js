@@ -664,26 +664,27 @@ class Template extends TemplateContent {
 		let cd = new ComputedData(this.config);
 
 		// `permalink` is consumed (not added to data) so computed entries can use page.url/page.outputPath
-		// Template strings so placeholder rendering detects a computed `permalink` dependency
-		// TODO Room for optimization here—we don’t need to recalculate `getOutputHref` and `getOutputPath`
-		let declaredDependencies = ["permalink", "dynamicPermalink", this.config.keys.permalinkRoot];
-		cd.addTemplateString(
-			"page.url",
-			async function (data) {
-				return this.tmpl.getOutputHref(data);
-			},
-			declaredDependencies,
-			undefined,
-			this,
-		);
+		// One permalink render per data object, shared by `page.url` and `page.outputPath`
+		let outputLocations = new WeakMap();
+		let getOutputLocations = (data) => {
+			if (!outputLocations.has(data)) {
+				outputLocations.set(data, this.getOutputLocations(data));
+			}
+			return outputLocations.get(data);
+		};
+
+		// Template string so placeholder rendering detects a computed `permalink` dependency
+		cd.addTemplateString("page.url", async (data) => (await getOutputLocations(data)).href, [
+			"permalink",
+			"dynamicPermalink",
+			this.config.keys.permalinkRoot,
+		]);
+		// Same dependencies as `page.url` (no symbols to parse), so it resolves right after with the same render
 		cd.addTemplateString(
 			"page.outputPath",
-			async function (data) {
-				return this.tmpl.getOutputPath(data);
-			},
-			declaredDependencies,
-			undefined,
-			this,
+			async (data) => (await getOutputLocations(data)).path,
+			["page.url"],
+			() => [],
 		);
 
 		// Computed `date` maps to `page.date`, Issue #4415
