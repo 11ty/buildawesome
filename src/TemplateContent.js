@@ -649,7 +649,7 @@ class TemplateContent {
 
 	_getPaginationLogSuffix(data) {
 		let suffix = [];
-		if ("pagination" in data) {
+		if (data.pagination) {
 			suffix.push(" (");
 			if (data.pagination.pages) {
 				suffix.push(

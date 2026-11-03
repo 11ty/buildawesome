@@ -661,13 +661,6 @@ class Template extends TemplateContent {
 			return;
 		}
 
-		// Pagination splits pages before computed data resolves for each page, Issue #4415
-		if ("pagination" in computedData) {
-			throw new PaginationError(
-				`\`pagination\` can’t be set in computed data (${this.inputPath}). Set it in front matter or a data file instead, computed data can supply the data that \`pagination.data\` points to.`,
-			);
-		}
-
 		let cd = new ComputedData(this.config);
 
 		// `permalink` is consumed (not added to data) so computed entries can use page.url/page.outputPath
@@ -718,16 +711,42 @@ class Template extends TemplateContent {
 			return;
 		}
 
+		await this.#setupComputedPagination(data);
+
 		let unavailable = ["page.rawInput", "collections"];
 		if (Pagination.hasPagination(data)) {
 			unavailable.push("pagination", "page.url", "page.outputPath");
-			if (data.pagination.alias) {
+			if (data.pagination?.alias) {
 				unavailable.push(data.pagination.alias);
 			}
 		}
 
 		debug("First round of computed data for %o", this.inputPath);
 		await this.computedData.setupData(data, { unavailable });
+	}
+
+	// Computed `pagination` resolves first, it decides which data is per page, Issue #4415
+	async #setupComputedPagination(data) {
+		let keys = Array.from(this.computedData.computedKeys).filter(
+			(key) => key === "pagination" || key.startsWith("pagination."),
+		);
+		if (keys.length === 0) {
+			return;
+		}
+
+		await this.computedData.setupData(data, {
+			unavailable: ["page.rawInput", "collections", "page.url", "page.outputPath"],
+			keys,
+		});
+
+		for (let key of keys) {
+			let deferred = this.computedData.getDeferred(key, data);
+			if (deferred) {
+				throw new PaginationError(
+					`Computed \`${key}\` (${this.inputPath}) reads \`${deferred.reason}\`, which isn’t available until after pagination.`,
+				);
+			}
+		}
 	}
 
 	// Pagination data from computed data must resolve before pagination (stage 1), Issue #4415

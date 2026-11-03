@@ -34,8 +34,9 @@ class Pagination {
 		return "";
 	}
 
+	// Falsy values (e.g. from computed data) mean no pagination
 	static hasPagination(data) {
-		return "pagination" in data;
+		return Boolean(data.pagination);
 	}
 
 	hasPagination() {
@@ -68,11 +69,7 @@ class Pagination {
 			return;
 		}
 
-		if (!data.pagination) {
-			throw new Error(
-				`Misconfigured pagination data in template front matter${this.inputPathForErrorMessages} (YAML front matter precaution: did you use tabs and not spaces for indentation?).`,
-			);
-		} else if (!("size" in data.pagination)) {
+		if (!("size" in data.pagination)) {
 			throw new Error(
 				`Missing pagination size in front matter data${this.inputPathForErrorMessages}`,
 			);

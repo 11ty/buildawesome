@@ -367,19 +367,99 @@ test("Computed `permalinkBypassOutputDir` with pagination, Issue #4415", async (
   t.deepEqual(results.map((entry) => entry.outputPath).sort(), ["./a.html", "./b.html"]);
 });
 
-test("Computed `pagination` throws, Issue #4415", async (t) => {
+test("Computed `pagination`, Issue #4415", async (t) => {
   let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
     config: configApi => {
+      configApi.addTemplate("index.njk", "{{ item }}:{{ label }}", {
+        items: ["a", "b", "c", "d"],
+        perPage: 2,
+        permalink: "/page-{{ pagination.pageNumber }}/",
+        eleventyComputed: {
+          pagination: (data) => ({ data: "items", size: data.perPage, alias: "item" }),
+          label: (data) => data.item.join("+"),
+        },
+      });
+    }
+  });
+
+  let results = await elev.toJSON();
+  t.deepEqual(results.map((entry) => [entry.url, entry.content]).sort(), [
+    ["/page-0/", "a,b:a+b"],
+    ["/page-1/", "c,d:c+d"],
+  ]);
+});
+
+test("Computed `pagination` (object form) overrides front matter pagination, Issue #4415", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("index.njk", "{{ pagination.items }}", {
+        items: ["a", "b", "c", "d"],
+        perPage: 1,
+        pagination: { data: "items", size: 4 },
+        eleventyComputed: {
+          pagination: { size: (data) => data.perPage * 2 },
+        },
+      });
+    }
+  });
+
+  let results = await elev.toJSON();
+  t.deepEqual(results.map((entry) => entry.content).sort(), ["a,b", "c,d"]);
+});
+
+test("Computed `pagination` over a collection, Issue #4415", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("post1.njk", "", { tags: ["posts"] });
+      configApi.addTemplate("post2.njk", "", { tags: ["posts"] });
+      configApi.addTemplate("index.njk", "{{ post.inputPath }}", {
+        permalink: "/list-{{ pagination.pageNumber }}/",
+        eleventyComputed: {
+          pagination: () => ({ data: "collections.posts", size: 1, alias: "post" }),
+        },
+      });
+    }
+  });
+
+  let results = await elev.toJSON();
+  t.deepEqual(results.filter((entry) => entry.url.startsWith("/list-")).map((entry) => entry.content).sort(), [
+    "./test/stubs-virtual/post1.njk",
+    "./test/stubs-virtual/post2.njk",
+  ]);
+});
+
+test("Computed `pagination` that reads collections throws, Issue #4415", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("post.njk", "", { tags: ["posts"] });
       configApi.addTemplate("index.njk", "", {
-        items: ["a", "b"],
-        eleventyComputed: { pagination: () => ({ data: "items", size: 1 }) },
+        eleventyComputed: {
+          pagination: (data) => ({ data: "collections.posts", size: data.collections.posts.length }),
+        },
       });
     }
   });
   elev.disableLogger();
 
   let e = getPaginationError(await t.throwsAsync(() => elev.toJSON()));
-  t.true(e.message.startsWith("`pagination` can’t be set in computed data"));
+  t.is(e.message, "Computed `pagination` (./test/stubs-virtual/index.njk) reads `collections`, which isn’t available until after pagination.");
+});
+
+test("Computed `pagination` that reads per-page data throws, Issue #4415", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("index.njk", "", {
+        items: ["a"],
+        eleventyComputed: {
+          pagination: { data: "items", size: (data) => (data.page.url ? 1 : 2) },
+        },
+      });
+    }
+  });
+  elev.disableLogger();
+
+  let e = getPaginationError(await t.throwsAsync(() => elev.toJSON()));
+  t.is(e.message, "Computed `pagination.size` (./test/stubs-virtual/index.njk) reads `page.url`, which isn’t available until after pagination.");
 });
 
 test("Paginating over computed data that needs collections throws, Issue #4415", async (t) => {
@@ -417,3 +497,42 @@ test("Paginating over computed data that depends on per-page data throws, Issue 
   let e = getPaginationError(await t.throwsAsync(() => elev.toJSON()));
   t.is(e.message, "Pagination data `list` can’t use computed data `list` (./test/stubs-virtual/index.njk) because it reads `page.url`, which isn’t available until after pagination.");
 });
+
+test("Conditional computed `pagination` (falsy means no pagination), Issue #4415", async (t) => {
+  let pagination = (data) => (data.paginate ? { data: "items", size: 1, alias: "item" } : undefined);
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("paged.njk", "{{ item }}", {
+        paginate: true,
+        items: ["a", "b"],
+        permalink: "/paged-{{ item }}/",
+        eleventyComputed: { pagination },
+      });
+      configApi.addTemplate("single.njk", "single", {
+        paginate: false,
+        items: ["a", "b"],
+        eleventyComputed: { pagination },
+      });
+    }
+  });
+
+  let results = await elev.toJSON();
+  t.deepEqual(results.map((entry) => [entry.url, entry.content]).sort(), [
+    ["/paged-a/", "a"],
+    ["/paged-b/", "b"],
+    ["/single/", "single"],
+  ]);
+});
+
+for (let value of [undefined, null, false]) {
+  test(`\`pagination: ${value}\` in front matter means no pagination`, async (t) => {
+    let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+      config: configApi => {
+        configApi.addTemplate("index.njk", "hi", { pagination: value });
+      }
+    });
+
+    let results = await elev.toJSON();
+    t.deepEqual(results.map((entry) => entry.url), ["/"]);
+  });
+}

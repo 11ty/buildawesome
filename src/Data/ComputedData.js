@@ -65,13 +65,13 @@ export default class ComputedData {
 		return signals;
 	}
 
-	// Resolves what it can, deferring anything that reads an `unavailable` path (retried on the next call).
-	async setupData(data, { unavailable = [] } = {}) {
+	// Resolves what it can (of `keys`, default all), deferring anything that reads an `unavailable` path (retried on the next call).
+	async setupData(data, { unavailable = [], keys = this.#entries.keys() } = {}) {
 		let signals = this.#getSignals(data);
 		signals.resetDeferred();
 		signals.unavailable = unavailable;
 
-		for (let key of this.#entries.keys()) {
+		for (let key of keys) {
 			await this.#pull(key, data, signals, []);
 		}
 	}
