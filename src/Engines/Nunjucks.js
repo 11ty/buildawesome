@@ -56,6 +56,11 @@ export default class Nunjucks extends TemplateEngine {
 
 	#setEnv(override) {
 		if (override) {
+			if (!(override instanceof Environment)) {
+				debug(
+					"WARNING: the Nunjucks environment passed to `setLibrary` was not created by `@11ty/nunjucks`. Import from `@11ty/nunjucks` instead of `nunjucks` to avoid mixing library versions.",
+				);
+			}
 			this.njkEnv = override;
 		} else if (this._usingPrecompiled) {
 			// Precompiled templates to avoid eval!
