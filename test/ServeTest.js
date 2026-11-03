@@ -36,7 +36,6 @@ test("Get Options", async (t) => {
   es.setOutputDir("_site");
 
   t.deepEqual(es.options, {
-    onClientMessage: async() => {},
     pathPrefix: "/",
     port: 8080,
   });
@@ -50,7 +49,6 @@ test("Get Options (with a pathPrefix)", async (t) => {
   es.setOutputDir("_site");
 
   t.deepEqual(es.options, {
-    onClientMessage: async() => {},
     pathPrefix: "/web/",
     port: 8080,
   });
@@ -61,7 +59,6 @@ test("Get Options (override in config)", async (t) => {
   es.setOutputDir("_site");
 
   t.deepEqual(es.options, {
-    onClientMessage: async() => {},
     pathPrefix: "/",
     port: 8080,
   });

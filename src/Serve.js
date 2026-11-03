@@ -215,9 +215,6 @@ export default class Serve {
 			{
 				pathPrefix: PathPrefixer.normalizePathPrefix(this.config.pathPrefix),
 				logger: this.getForcedOutputLogger(),
-				onClientMessage: async ({ id, type, data, timestamp }) => {
-					// do nothing
-				},
 			},
 			DEFAULT_SERVER_OPTIONS,
 			this.config.serverOptions,
