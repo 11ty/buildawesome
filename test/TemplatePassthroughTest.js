@@ -266,19 +266,18 @@ test("Output paths match with different templatePassthrough methods", async (t) 
   t.is(await pass1.getOutputPathForGlobFile("avatar.png"), await pass2.getOutputPath());
 });
 
-// ToDo: Currently can't do :(
-// test("File renamed", async t => {
-//   let pass = await getTemplatePassthrough(
-//     {
-//       inputPath: "./test/stubs/template-passthrough/static/test.js",
-//       outputPath: "./rename.js"
-//     },
-//     "_site",
-//     "test/stubs"
-//   );
-//   t.truthy(pass);
-//   t.is(await pass.getOutputPath(), "_site/rename.js");
-// });
+test("File renamed", async t => {
+  let pass = await getTemplatePassthrough(
+    {
+      inputPath: "./test/stubs/template-passthrough/static/test.js",
+      outputPath: "./rename.js"
+    },
+    "_site",
+    "test/stubs"
+  );
+  t.truthy(pass);
+  t.is(await pass.getOutputPath(), "_site/rename.js");
+});
 
 test("Bug with incremental file copying to a directory output, issue #2278 #1038", async (t) => {
   let pass1 = await getTemplatePassthrough(

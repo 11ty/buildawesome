@@ -26,8 +26,7 @@ test("Lodash set on proxy object with data", t => {
 	t.deepEqual(obj, {metadata: {title: "test"}});
 });
 
-// TODO re-add support for frozen fallbacks
-test.skip("Fallback is *not* mutated (is frozen) (does not exist in fallback)", t => {
+test("Fallback is *not* mutated (is frozen) (does not exist in fallback)", t => {
 	let fallback = {};
 
 	// oh my god freeze is shallow

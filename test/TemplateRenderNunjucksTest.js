@@ -1016,8 +1016,7 @@ test("Nunjucks Shortcode in a loop (everything is sync)", async (t) => {
   );
 });
 
-// TODO!
-test.skip("Weird issue with number arguments in a loop (not parsing literals properly?)", async (t) => {
+test("Weird issue with number arguments in a loop (not parsing literals properly?)", async (t) => {
   let templateConfig = await getTemplateConfigInstanceCustomCallback(
     {
       input: "test/stubs-njk-async/"

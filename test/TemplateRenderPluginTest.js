@@ -114,9 +114,7 @@ test.skip("Breaking Change (3.0): Use txt file in njk (override to 11ty.js)", as
   t.is(html, `TESTING`);
 });
 
-// Skip this for now, toJSON calls actually change the exitCode of the process when they error,
-// which is not ideal.
-test.skip("Use nunjucks file in liquid but it doesn’t exist", async (t) => {
+test("Use nunjucks file in liquid but it doesn’t exist", async (t) => {
   await t.throwsAsync(async () => {
     await getTestOutputForFile("./test/stubs-render-plugin/njk-file-not-exist.liquid");
   });
