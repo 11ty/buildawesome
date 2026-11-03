@@ -694,9 +694,7 @@ class Template extends TemplateContent {
 
 			// First round skips entries that depend on collections, see resolveRemainingComputedData
 			debug("First round of computed data for %o", this.inputPath);
-			await this.computedData.setupData(data, function (entry) {
-				return !this.isUsesStartsWith(entry, "collections.");
-			});
+			await this.computedData.setupData(data, { deferCollections: true });
 		} else {
 			if (!("page" in data)) {
 				data.page = {};

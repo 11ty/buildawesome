@@ -214,7 +214,7 @@ test("Basic get/set with template string", async (t) => {
 });
 
 test("Basic get/set using array data", async (t) => {
-  t.plan(5);
+  t.plan(4);
   let cd = new ComputedData();
 
   cd.add("keystr", "this is a str");
@@ -290,7 +290,7 @@ test("Expect even missing collections to be arrays in data callback #1114", asyn
   let data = {
     collections: {},
   };
-  await cd.resolveVarOrder(data);
+  await cd.setupData(data, { deferCollections: true });
 });
 
 test("Expect collections to be arrays in data callback #1114", async (t) => {
@@ -314,32 +314,33 @@ test("Expect collections to be arrays in data callback #1114", async (t) => {
   await cd.setupData(data);
 });
 
-test("Get var order", async (t) => {
+test("Tracks dependencies", async (t) => {
   let cd = new ComputedData();
 
   cd.add("key1", (data) => data.collections.all);
-  cd.add("key2", (data) => data.collections.dog);
-  cd.add("key0", (data) => "");
+  cd.add("key2", (data) => data.key1 + data.key3);
+  cd.add("key3", (data) => "");
 
   let data = {
-    key2: "inject me",
     collections: {
       all: [1],
-      dog: [2],
     },
   };
 
-  await cd.resolveVarOrder(data);
-  t.deepEqual(cd.queue.getOrder(), ["collections.all", "key1", "collections.dog", "key2", "key0"]);
+  await cd.setupData(data);
+  t.deepEqual(cd.getDependencies("key1", data), []);
+  t.deepEqual(cd.getDependencies("key2", data), ["key1", "key3"]);
+  t.deepEqual(cd.getDependencies("key3", data), []);
 });
 
-test("Get var order and process it in two stages", async (t) => {
+test("Process in two stages (deferring collections)", async (t) => {
   let cd = new ComputedData();
 
   cd.add("page.url", (data) => data.key2);
   cd.add("page.outputPath", (data) => data.key2);
   cd.add("key0", (data) => "hi");
   cd.add("key1", (data) => data.collections.dog[0]);
+  cd.add("key3", (data) => data.key1 + 1);
   cd.add("collections.processed", (data) => "hi");
 
   let data = {
@@ -349,19 +350,13 @@ test("Get var order and process it in two stages", async (t) => {
     },
   };
 
-  // set page.url, page.outputPath, key2, collections.dog[0]
-  await cd.setupData(data, function (entry) {
-    // TODO see note in Template.js about changing the two pass computed data
-    return !this.isUsesStartsWith(entry, "collections.");
-  });
+  await cd.setupData(data, { deferCollections: true });
 
   t.deepEqual(data, {
     collections: {
       dog: [2],
-      processed: "",
     },
     key0: "hi",
-    key1: "",
     key2: "/my-path/",
     page: {
       url: "/my-path/",
@@ -369,8 +364,7 @@ test("Get var order and process it in two stages", async (t) => {
     },
   });
 
-  // set collections.processed
-  await cd.setupData(data);
+  await cd.processRemainingData(data);
 
   t.deepEqual(data, {
     collections: {
@@ -380,13 +374,104 @@ test("Get var order and process it in two stages", async (t) => {
     key0: "hi",
     key1: 2,
     key2: "/my-path/",
+    key3: 3,
     page: {
       url: "/my-path/",
       outputPath: "/my-path/",
     },
   });
+});
 
-  // t.deepEqual(cd.queue.getOrder(), ["collections.all", "key1", "collections.dog", "key2", "key0"]);
+test("Circular dependencies throw", async (t) => {
+  let cd = new ComputedData();
+
+  cd.add("a", (data) => data.b);
+  cd.add("b", (data) => data.a);
+
+  await t.throwsAsync(() => cd.setupData({}), {
+    message: "Circular computed data dependency: a -> b -> a",
+  });
+});
+
+test("Circular dependencies throw (template strings, symbol parsing)", async (t) => {
+  let cd = new ComputedData();
+
+  cd.addTemplateString("a", async (data) => `${data.b}`, [], () => ["b"]);
+  cd.addTemplateString("b", async (data) => `${data.a}`, [], () => ["a"]);
+
+  await t.throwsAsync(() => cd.setupData({}), {
+    message: "Circular computed data dependency: a -> b -> a",
+  });
+});
+
+test("Circular dependencies throw (template strings, placeholder rendering)", async (t) => {
+  let cd = new ComputedData();
+
+  cd.addTemplateString("a", async (data) => `${data.b}`);
+  cd.addTemplateString("b", async (data) => `${data.a}`);
+
+  await t.throwsAsync(() => cd.setupData({}), {
+    message: "Circular computed data dependency: a -> b -> a",
+  });
+});
+
+test("Circular dependencies throw (function and template string)", async (t) => {
+  let cd = new ComputedData();
+
+  cd.add("a", (data) => data.b);
+  cd.addTemplateString("b", async (data) => `${data.a}`, [], () => ["a"]);
+
+  await t.throwsAsync(() => cd.setupData({}), {
+    message: "Circular computed data dependency: a -> b -> a",
+  });
+});
+
+test("Template string reads its own upstream value", async (t) => {
+  let cd = new ComputedData();
+
+  cd.addTemplateString("title", async (data) => `(${data.title})`, [], () => ["title"]);
+
+  let data = { title: "hi" };
+  await cd.setupData(data);
+  t.is(data.title, "(hi)");
+});
+
+test("Reads its own upstream value", async (t) => {
+  let cd = new ComputedData();
+
+  cd.add("title", (data) => `(${data.title})`);
+
+  let data = { title: "hi" };
+  await cd.setupData(data);
+  t.is(data.title, "(hi)");
+});
+
+test("Swallowed reads of pending computed data still re-run", async (t) => {
+  let cd = new ComputedData();
+
+  cd.add("a", (data) => {
+    try {
+      return data.b.toUpperCase();
+    } catch (e) {
+      return "fallback";
+    }
+  });
+  cd.add("b", () => "b");
+
+  let data = {};
+  await cd.setupData(data);
+  t.is(data.a, "B");
+});
+
+test("Reads nested computed data through a parent object", async (t) => {
+  let cd = new ComputedData();
+
+  cd.add("summary", (data) => JSON.stringify(data.page));
+  cd.add("page.url", (data) => "/url/");
+
+  let data = { page: { inputPath: "./in.md" } };
+  await cd.setupData(data);
+  t.is(data.summary, `{"inputPath":"./in.md","url":"/url/"}`);
 });
 
 test("Use JavaScript functions (filters) in computed data functions", async (t) => {
