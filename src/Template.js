@@ -944,8 +944,24 @@ class Template extends TemplateContent {
 		let ret = [];
 
 		for (let page of mapEntry._pages) {
-			let content;
+			// Skip layouts and transforms for pages that won’t be written (JSON output reports content for every page).
+			if (to !== "json") {
+				if (!page.template.isRenderable()) {
+					debug("Template not written %o from %o.", page.outputPath, page.template.inputPath);
+					continue;
+				}
 
+				if (!page.template.behavior.isWriteable()) {
+					debug(
+						"Template not written %o from %o (via permalink: false).",
+						page.outputPath,
+						page.template.inputPath,
+					);
+					continue;
+				}
+			}
+
+			let content;
 			if (page.template.isRenderable()) {
 				// this reuses page.templateContent, it doesn’t render it
 				content = await page.template.renderPageEntry(page);
@@ -966,20 +982,6 @@ class Template extends TemplateContent {
 
 				// json
 				ret.push(obj);
-				continue;
-			}
-
-			if (!page.template.isRenderable()) {
-				debug("Template not written %o from %o.", page.outputPath, page.template.inputPath);
-				continue;
-			}
-
-			if (!page.template.behavior.isWriteable()) {
-				debug(
-					"Template not written %o from %o (via permalink: false).",
-					page.outputPath,
-					page.template.inputPath,
-				);
 				continue;
 			}
 
