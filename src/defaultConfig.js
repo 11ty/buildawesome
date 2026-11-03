@@ -1,4 +1,6 @@
 import fullBundleDefaultConfig from "./defaultConfigExtended.js";
+import { IsoDate } from "@11ty/parse-date-strings";
+
 import TransformsUtil from "./Util/TransformsUtil.js";
 
 /**
@@ -68,6 +70,9 @@ export default function (config) {
 		}
 		return input;
 	});
+
+	// Same parser used for `date` in the data cascade
+	config.addFilter("parseDateString", (dateString) => IsoDate.parse(dateString));
 
 	// Process arbitrary content with transforms
 	config.addFilter(
