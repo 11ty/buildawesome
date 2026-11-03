@@ -506,7 +506,7 @@ class Template extends TemplateContent {
 				this.inputPath,
 			),
 			outputFileExtension: this.engine.defaultTemplateFileExtension,
-			templateSyntax: this.templateRender.getEnginesList(data[this.config.keys.engineOverride]),
+			templateSyntax: this.templateRender.getEnginesList(this.getEngineOverride(data)),
 		};
 
 		let newDate = await this.getMappedDate(data?.date, page);

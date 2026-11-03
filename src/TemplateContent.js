@@ -449,10 +449,9 @@ class TemplateContent {
 		return this.templateRender.getEnginesList(engineOverride);
 	}
 
-	async getEngineOverride() {
-		return this.getFrontMatterData().then((data) => {
-			return data[this.config.keys.engineOverride];
-		});
+	// Pages pass the full data cascade, layouts pass their own front matter.
+	getEngineOverride(data) {
+		return data?.[this.config.keys.engineOverride];
 	}
 
 	// checks engines
@@ -674,7 +673,7 @@ class TemplateContent {
 
 			let fn = await this.compile(str, {
 				templateOnly,
-				engineOverride: data[this.config.keys.engineOverride],
+				engineOverride: this.getEngineOverride(data),
 				type,
 			});
 
