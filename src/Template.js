@@ -502,6 +502,9 @@ class Template extends TemplateContent {
 			inputPath: this.inputPath,
 			fileSlug: this.fileSlugStr,
 			filePathStem: this.filePathStem,
+			relativeInputPath: this.eleventyConfig.directories.getInputPathRelativeToInputDirectory(
+				this.inputPath,
+			),
 			outputFileExtension: this.engine.defaultTemplateFileExtension,
 			templateSyntax: this.templateRender.getEnginesList(data[this.config.keys.engineOverride]),
 		};

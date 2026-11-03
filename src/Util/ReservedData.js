@@ -21,6 +21,7 @@ class ReservedData {
 		"inputPath",
 		"fileSlug",
 		"filePathStem",
+		"relativeInputPath",
 		"outputFileExtension",
 		"templateSyntax",
 		"url",

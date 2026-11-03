@@ -800,6 +800,7 @@ test("getRenderedData() has all the page variables", async (t) => {
   t.is(data.page.url, "/template/");
   t.is(data.page.fileSlug, "template");
   t.is(data.page.filePathStem, "/template");
+  t.is(data.page.relativeInputPath, "template.liquid");
   t.truthy(data.page.date.getTime());
   t.is(data.page.inputPath, "./test/stubs/template.liquid");
   t.is(data.page.outputPath, "./dist/template/index.html");
