@@ -277,20 +277,106 @@ test("Boolean computed value Issue #1114", async (t) => {
   t.is(data.key2, "inject me");
 });
 
-test("Expect even missing collections to be arrays in data callback #1114", async (t) => {
-  t.plan(2);
+test("Reading an unavailable path stops the function and defers it", async (t) => {
+  let runs = 0;
   let cd = new ComputedData();
 
   cd.add("key1", (data) => {
-    t.is(Array.isArray(data.collections.first), true);
-    t.is(Array.isArray(data.collections.second), true);
-    return ``;
+    runs++;
+    return data.collections.first.length;
   });
 
   let data = {
     collections: {},
   };
-  await cd.setupData(data, { deferCollections: true });
+  await cd.setupData(data, { unavailable: ["collections"] });
+  t.is(runs, 1);
+  t.false("key1" in data);
+
+  data.collections.first = [1, 2];
+  await cd.processRemainingData(data);
+  t.is(runs, 2);
+  t.is(data.key1, 2);
+});
+
+test("Swallowed reads of an unavailable path still defer", async (t) => {
+  let cd = new ComputedData();
+
+  cd.add("key1", (data) => {
+    try {
+      return data.page.rawInput.length;
+    } catch (e) {
+      return -1;
+    }
+  });
+
+  let data = { page: {} };
+  await cd.setupData(data, { unavailable: ["page.rawInput"] });
+  t.false("key1" in data);
+});
+
+test("Enumerating a parent object reads its unavailable children", async (t) => {
+  let cd = new ComputedData();
+
+  cd.add("key1", (data) => JSON.stringify(data.page));
+
+  let data = { page: { inputPath: "./in.md" } };
+  await cd.setupData(data, { unavailable: ["page.rawInput"] });
+  t.false("key1" in data);
+
+  data.page.rawInput = "raw";
+  await cd.processRemainingData(data);
+  t.is(data.key1, `{"inputPath":"./in.md","rawInput":"raw"}`);
+});
+
+test("Template strings that use an unavailable path are deferred (placeholder rendering)", async (t) => {
+  let cd = new ComputedData();
+
+  cd.addTemplateString("key1", async (data) => `${data.collections.posts}`);
+
+  let data = {};
+  await cd.setupData(data, { unavailable: ["collections"] });
+  t.false("key1" in data);
+});
+
+test("Template strings that use an unavailable path are deferred (symbol parsing)", async (t) => {
+  let cd = new ComputedData();
+
+  cd.addTemplateString("key1", async (data) => `${data.page.rawInput}`, [], () => ["page.rawInput"]);
+  cd.addTemplateString("key2", async (data) => `${data.key1}!`, [], () => ["key1"]);
+
+  let data = { page: {} };
+  await cd.setupData(data, { unavailable: ["page.rawInput"] });
+  t.false("key1" in data);
+  t.false("key2" in data);
+
+  data.page.rawInput = "raw";
+  await cd.processRemainingData(data);
+  t.is(data.key2, "raw!");
+});
+
+test("Inherits resolved signals from another data object", async (t) => {
+  let runs = { a: 0, b: 0 };
+  let parent = new ComputedData();
+  parent.add("a", () => ++runs.a);
+  parent.add("b", (data) => `${data.item}:${++runs.b}`);
+
+  let parentData = {};
+  await parent.setupData(parentData, { unavailable: ["item"] });
+  t.is(parentData.a, 1);
+  t.false("b" in parentData);
+
+  let child = new ComputedData();
+  child.add("a", () => ++runs.a);
+  child.add("b", (data) => `${data.item}:${++runs.b}`);
+
+  let childData = { ...parentData, item: "x" };
+  child.inherit(childData, parent, parentData);
+  await child.setupData(childData);
+
+  t.is(childData.a, 1);
+  t.is(runs.a, 1);
+  t.is(childData.b, "x:1");
 });
 
 test("Expect collections to be arrays in data callback #1114", async (t) => {
@@ -350,7 +436,7 @@ test("Process in two stages (deferring collections)", async (t) => {
     },
   };
 
-  await cd.setupData(data, { deferCollections: true });
+  await cd.setupData(data, { unavailable: ["collections"] });
 
   t.deepEqual(data, {
     collections: {

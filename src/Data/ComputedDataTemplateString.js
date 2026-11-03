@@ -13,16 +13,35 @@ class ComputedDataTemplateString {
 	prefix = "(((11ty(((";
 	suffix = ")))11ty)))";
 
-	constructor(computedKeys) {
+	constructor(computedKeys, unavailable = []) {
 		this.computedKeys = new Set(computedKeys);
+		this.unavailable = unavailable;
 	}
 
-	getProxyData() {
+	getProxyData(found = new Set()) {
 		let proxyData = {};
 		for (let key of this.computedKeys) {
 			lodashSet(proxyData, key, this.prefix + key + this.suffix);
 		}
+		for (let path of this.unavailable) {
+			lodashSet(proxyData, path, this.#getRecorder(path, found));
+		}
 		return proxyData;
+	}
+
+	// Any use of an unavailable path (property access or printing) records it.
+	#getRecorder(path, found) {
+		return new Proxy(
+			{},
+			{
+				get: (target, prop) => {
+					found.add(path);
+					if (prop === Symbol.toPrimitive || prop === "toString" || prop === "valueOf") {
+						return () => "";
+					}
+				},
+			},
+		);
 	}
 
 	findVarsInOutput(output = "") {
@@ -37,19 +56,22 @@ class ComputedDataTemplateString {
 	}
 
 	async findVarsUsed(fn) {
+		let found = new Set();
 		let output;
 		// Mitigation for #1061, errors with filters in the first pass shouldn’t fail the whole thing.
 		try {
-			output = await fn(this.getProxyData());
+			output = await fn(this.getProxyData(found));
 		} catch (e) {
 			debug("Computed Data first pass data resolution error: %o", e);
 		}
 
 		// e.g. `page.outputPath` can be `false`
 		if (typeof output === "string") {
-			return this.findVarsInOutput(output);
+			for (let varUsed of this.findVarsInOutput(output)) {
+				found.add(varUsed);
+			}
 		}
-		return [];
+		return Array.from(found);
 	}
 }
 

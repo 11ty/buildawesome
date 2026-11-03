@@ -7,10 +7,10 @@ import Signals from "./Signals.js";
 const { set: lodashSet } = lodash;
 const debug = createDebug("ComputedData");
 
-// Thrown from a data read that targets a computed key that hasn’t resolved yet.
-class PendingRead {
-	constructor(key) {
-		this.key = key;
+// Thrown from a data read that can’t resolve yet: a pending computed key or an unavailable path.
+class InterruptedRead {
+	constructor(path) {
+		this.path = path;
 	}
 }
 
@@ -65,10 +65,11 @@ export default class ComputedData {
 		return signals;
 	}
 
-	// `deferCollections` skips anything that reads collections (they aren’t built yet), see processRemainingData.
-	async setupData(data, { deferCollections = false } = {}) {
+	// Resolves what it can, deferring anything that reads an `unavailable` path (retried on the next call).
+	async setupData(data, { unavailable = [] } = {}) {
 		let signals = this.#getSignals(data);
-		signals.deferCollections = deferCollections;
+		signals.resetDeferred();
+		signals.unavailable = unavailable;
 
 		for (let key of this.#entries.keys()) {
 			await this.#pull(key, data, signals, []);
@@ -76,17 +77,20 @@ export default class ComputedData {
 	}
 
 	async processRemainingData(data) {
-		this.#getSignals(data).resetDeferred();
 		await this.setupData(data);
+	}
+
+	// Reuses signals already resolved for `parentData` by `parent`, e.g. a paginated page reusing its template’s.
+	inherit(data, parent, parentData) {
+		let parentSignals = parent.#signals.get(parentData);
+		if (parentSignals) {
+			this.#getSignals(data).inherit(parentSignals);
+		}
 	}
 
 	// Keys a computed entry was observed reading.
 	getDependencies(key, data) {
 		return this.#signals.get(data)?.getDependencies(key) || [];
-	}
-
-	#isCollectionsKey(key) {
-		return key === "collections" || key.startsWith("collections.");
 	}
 
 	async #pull(key, data, signals, stack) {
@@ -104,7 +108,7 @@ export default class ComputedData {
 		let entry = this.#entries.get(key);
 		let childStack = [...stack, key];
 
-		if (signals.deferCollections && this.#isCollectionsKey(key)) {
+		if (signals.isUnavailable(key)) {
 			signal.defer();
 			return;
 		}
@@ -116,7 +120,7 @@ export default class ComputedData {
 		}
 
 		if (signal.isDeferred) {
-			debug("Deferred %o until collections are available", key);
+			debug("Deferred %o until its data is available", key);
 			return;
 		}
 
@@ -140,7 +144,7 @@ export default class ComputedData {
 	// Resolves every computed key overlapping the variable paths in `varsUsed`.
 	async #pullVars(key, varsUsed, data, signals, stack) {
 		for (let varUsed of varsUsed) {
-			if (signals.deferCollections && this.#isCollectionsKey(varUsed)) {
+			if (signals.isUnavailable(varUsed) || signals.hasUnavailableChild(varUsed)) {
 				signals.get(key).defer();
 				return false;
 			}
@@ -167,7 +171,10 @@ export default class ComputedData {
 		if (symbolParseFn) {
 			varsUsed = symbolParseFn();
 		} else {
-			varsUsed = await new ComputedDataTemplateString(this.#entries.keys()).findVarsUsed(value);
+			varsUsed = await new ComputedDataTemplateString(
+				this.#entries.keys(),
+				signals.unavailable,
+			).findVarsUsed(value);
 		}
 
 		debug("%o accesses %o variables", key, varsUsed);
@@ -186,7 +193,7 @@ export default class ComputedData {
 		}
 
 		while (true) {
-			let context = { key, signals, pending: undefined, usesCollections: false };
+			let context = { key, signals, pending: undefined, unavailable: false };
 			let result;
 			let error;
 
@@ -196,7 +203,12 @@ export default class ComputedData {
 				error = e;
 			}
 
-			// Checked before `error` so a swallowed PendingRead still forces a re-run.
+			// Checked before `error` so a swallowed InterruptedRead still defers or re-runs.
+			if (context.unavailable) {
+				signals.get(key).defer();
+				return;
+			}
+
 			if (context.pending) {
 				if (!(await this.#pullDependency(key, context.pending, data, signals, stack))) {
 					return;
@@ -213,11 +225,6 @@ export default class ComputedData {
 				result = this.#proxyTargets.get(result);
 			}
 
-			if (signals.deferCollections && context.usesCollections) {
-				signals.get(key).defer();
-				return;
-			}
-
 			return result;
 		}
 	}
@@ -231,12 +238,9 @@ export default class ComputedData {
 
 			let path = parentPath ? `${parentPath}.${prop}` : prop;
 
-			// Issue #1137: collections are always Arrays (empty until they exist)
-			if (path === "collections") {
-				context.usesCollections = true;
-				if (context.signals.deferCollections) {
-					return new Proxy({}, { get: (obj, name) => (typeof name === "string" ? [] : obj[name]) });
-				}
+			if (context.signals.isUnavailable(path)) {
+				context.unavailable = true;
+				throw new InterruptedRead(path);
 			}
 
 			let signal = context.signals.get(path);
@@ -244,12 +248,12 @@ export default class ComputedData {
 				context.signals.get(context.key).deps.add(path);
 				if (!signal.isDone) {
 					context.pending ??= path;
-					throw new PendingRead(path);
+					throw new InterruptedRead(path);
 				}
 			}
 
 			let value = target[prop];
-			if (context.signals.hasUnresolvedChild(path, context.key)) {
+			if (context.signals.hasPendingChild(path, context.key)) {
 				// e.g. reading `page` before `page.url` is set
 				return this.#getTrackingProxy(
 					value && typeof value === "object" ? value : {},

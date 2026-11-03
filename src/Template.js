@@ -509,10 +509,14 @@ class Template extends TemplateContent {
 			templateSyntax: this.templateRender.getEnginesList(this.getEngineOverride(data)),
 		};
 
-		let newDate = await this.getMappedDate(data?.date, page);
-		// Skip date assignment if custom date is falsy.
-		if (newDate) {
-			page.date = newDate;
+		// A computed `date` is mapped (once) with the rest of computed data
+		let computedData = ResolveConfigurationData.getValue(data, this.config.keys.computed);
+		if (!isPlainObject(computedData) || !("date" in computedData)) {
+			let newDate = await this.getMappedDate(data?.date, page);
+			// Skip date assignment if custom date is falsy.
+			if (newDate) {
+				page.date = newDate;
+			}
 		}
 
 		// page.url
@@ -658,43 +662,85 @@ class Template extends TemplateContent {
 		}
 	}
 
-	async addComputedData(data) {
+	#createComputedData(data) {
 		let computedData = ResolveConfigurationData.getValue(data, this.config.keys.computed);
-		if (isPlainObject(computedData)) {
-			this.computedData = new ComputedData(this.config);
+		if (!isPlainObject(computedData)) {
+			return;
+		}
 
-			// `permalink` is consumed (not added to data) so computed entries can use page.url/page.outputPath
-			// Template strings so placeholder rendering detects a computed `permalink` dependency
-			// TODO Room for optimization here—we don’t need to recalculate `getOutputHref` and `getOutputPath`
-			let declaredDependencies = data.permalink ? ["permalink"] : undefined;
-			this.computedData.addTemplateString(
-				"page.url",
-				async function (data) {
-					return this.tmpl.getOutputHref(data);
-				},
-				declaredDependencies,
-				undefined,
-				this,
-			);
-			this.computedData.addTemplateString(
-				"page.outputPath",
-				async function (data) {
-					return this.tmpl.getOutputPath(data);
-				},
-				declaredDependencies,
-				undefined,
-				this,
-			);
+		let cd = new ComputedData(this.config);
 
-			if (this.config.freezeReservedData) {
-				ReservedData.checkSubset(computedData);
+		// `permalink` is consumed (not added to data) so computed entries can use page.url/page.outputPath
+		// Template strings so placeholder rendering detects a computed `permalink` dependency
+		// TODO Room for optimization here—we don’t need to recalculate `getOutputHref` and `getOutputPath`
+		let declaredDependencies = data.permalink ? ["permalink"] : undefined;
+		cd.addTemplateString(
+			"page.url",
+			async function (data) {
+				return this.tmpl.getOutputHref(data);
+			},
+			declaredDependencies,
+			undefined,
+			this,
+		);
+		cd.addTemplateString(
+			"page.outputPath",
+			async function (data) {
+				return this.tmpl.getOutputPath(data);
+			},
+			declaredDependencies,
+			undefined,
+			this,
+		);
+
+		// Computed `date` maps to `page.date`, Issue #4415
+		if ("date" in computedData) {
+			// Raw page data (not the tracking proxy) so date parsing callbacks see the same object as without computed data
+			let pageData = data.page;
+			cd.add("page.date", async (computed) => this.getMappedDate(computed.date, pageData), [
+				"date",
+			]);
+		}
+
+		if (this.config.freezeReservedData) {
+			ReservedData.checkSubset(computedData);
+		}
+
+		this._addComputedEntry(cd, computedData);
+
+		return cd;
+	}
+
+	// Stage 1: before preprocessors and pagination, resolves computed data that doesn’t need either.
+	async #setupComputedData(data) {
+		this.computedData = this.#createComputedData(data);
+		if (!this.computedData) {
+			return;
+		}
+
+		let unavailable = ["page.rawInput", "collections"];
+		if (Pagination.hasPagination(data)) {
+			unavailable.push("pagination", "page.url", "page.outputPath");
+			if (data.pagination.alias) {
+				unavailable.push(data.pagination.alias);
 			}
+		}
 
-			this._addComputedEntry(this.computedData, computedData);
+		debug("First round of computed data for %o", this.inputPath);
+		await this.computedData.setupData(data, { unavailable });
+	}
 
-			// First round skips entries that depend on collections, see resolveRemainingComputedData
-			debug("First round of computed data for %o", this.inputPath);
-			await this.computedData.setupData(data, { deferCollections: true });
+	// Stage 2: per page (after pagination), `parent` is the paginated template’s computed data.
+	async addComputedData(data, parent) {
+		if (parent?.computedData) {
+			this.computedData = this.#createComputedData(data);
+			this.computedData.inherit(data, parent.computedData, parent.data);
+		}
+
+		if (this.computedData) {
+			// Collections aren’t built yet, see resolveRemainingComputedData
+			debug("Second round of computed data for %o", this.inputPath);
+			await this.computedData.setupData(data, { unavailable: ["collections"] });
 		} else {
 			if (!("page" in data)) {
 				data.page = {};
@@ -722,7 +768,7 @@ class Template extends TemplateContent {
 	async resolveRemainingComputedData(data) {
 		// If it doesn’t exist, computed data is not used for this template
 		if (this.computedData) {
-			debug("Second round of computed data for %o", this.inputPath);
+			debug("Last round of computed data for %o", this.inputPath);
 			return this.computedData.processRemainingData(data);
 		}
 	}
@@ -739,7 +785,9 @@ class Template extends TemplateContent {
 	async runPreprocessors(data) {
 		// @cachedproperty
 		if (!this.#preprocessorCache) {
-			this.#preprocessorCache = TemplatePreprocessors.runAll(this.#preprocessors, this, data);
+			this.#preprocessorCache = this.#setupComputedData(data).then(() =>
+				TemplatePreprocessors.runAll(this.#preprocessors, this, data),
+			);
 		}
 
 		return this.#preprocessorCache;
@@ -792,7 +840,10 @@ class Template extends TemplateContent {
 			let objects = [];
 
 			for (let pageEntry of pageTemplates) {
-				await pageEntry.template.addComputedData(pageEntry.data);
+				await pageEntry.template.addComputedData(pageEntry.data, {
+					computedData: this.computedData,
+					data,
+				});
 
 				let obj = {
 					template: pageEntry.template, // not on the docs but folks are relying on it
