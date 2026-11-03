@@ -88,6 +88,20 @@ export default class ComputedData {
 		}
 	}
 
+	// The first deferred computed key overlapping `path` (and the unavailable path that deferred it).
+	getDeferred(path, data) {
+		let signals = this.#signals.get(data);
+		for (let key of this.#entries.keys()) {
+			let signal = signals?.get(key);
+			if (
+				signal?.isDeferred &&
+				(key === path || key.startsWith(path + ".") || path.startsWith(key + "."))
+			) {
+				return { key, reason: signal.reason };
+			}
+		}
+	}
+
 	// Keys a computed entry was observed reading.
 	getDependencies(key, data) {
 		return this.#signals.get(data)?.getDependencies(key) || [];
@@ -109,7 +123,7 @@ export default class ComputedData {
 		let childStack = [...stack, key];
 
 		if (signals.isUnavailable(key)) {
-			signal.defer();
+			signal.defer(key);
 			return;
 		}
 
@@ -135,7 +149,7 @@ export default class ComputedData {
 		await this.#pull(dep, data, signals, stack);
 
 		if (signals.get(dep).isDeferred) {
-			signal.defer();
+			signal.defer(signals.get(dep).reason);
 			return false;
 		}
 		return true;
@@ -145,7 +159,7 @@ export default class ComputedData {
 	async #pullVars(key, varsUsed, data, signals, stack) {
 		for (let varUsed of varsUsed) {
 			if (signals.isUnavailable(varUsed) || signals.hasUnavailableChild(varUsed)) {
-				signals.get(key).defer();
+				signals.get(key).defer(varUsed);
 				return false;
 			}
 
@@ -193,7 +207,7 @@ export default class ComputedData {
 		}
 
 		while (true) {
-			let context = { key, signals, pending: undefined, unavailable: false };
+			let context = { key, signals, pending: undefined, unavailable: undefined };
 			let result;
 			let error;
 
@@ -205,7 +219,7 @@ export default class ComputedData {
 
 			// Checked before `error` so a swallowed InterruptedRead still defers or re-runs.
 			if (context.unavailable) {
-				signals.get(key).defer();
+				signals.get(key).defer(context.unavailable);
 				return;
 			}
 
@@ -239,7 +253,7 @@ export default class ComputedData {
 			let path = parentPath ? `${parentPath}.${prop}` : prop;
 
 			if (context.signals.isUnavailable(path)) {
-				context.unavailable = true;
+				context.unavailable ??= path;
 				throw new InterruptedRead(path);
 			}
 

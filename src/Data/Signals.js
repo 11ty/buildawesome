@@ -2,6 +2,8 @@
 class Signal {
 	state = "idle"; // idle, done, deferred
 	deps = new Set();
+	// Unavailable data path that caused a deferral
+	reason;
 
 	get isIdle() {
 		return this.state === "idle";
@@ -19,13 +21,15 @@ class Signal {
 		this.state = "done";
 	}
 
-	defer() {
+	defer(reason) {
 		this.state = "deferred";
+		this.reason = reason;
 	}
 
 	reset() {
 		this.state = "idle";
 		this.deps.clear();
+		this.reason = undefined;
 	}
 }
 

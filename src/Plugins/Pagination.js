@@ -11,7 +11,7 @@ import { withoutTracking } from "../Data/GlobalDataReads.js";
 const { set: lodashSet, get: lodashGet, chunk: lodashChunk } = lodash;
 
 class PaginationConfigError extends BaseError {}
-class PaginationError extends BaseError {}
+export class PaginationError extends BaseError {}
 
 class Pagination {
 	static NOT_FOUND_VALUE = "__NOT_FOUND_ERROR__";

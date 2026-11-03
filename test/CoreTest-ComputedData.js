@@ -266,3 +266,154 @@ test("Computed `date` per paginated page, Issue #4415", async (t) => {
   let results = await elev.toJSON();
   t.deepEqual(results.map((entry) => entry.content).sort(), ["2001-01-01T00:00:00.000Z", "2002-02-02T00:00:00.000Z"]);
 });
+
+test("Computed `eleventyImport` adds collection dependencies, Issue #4415", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("post.njk", "", { tags: ["posts"] });
+      configApi.addTemplate("computed.njk", "", {
+        eleventyComputed: {
+          eleventyImport: () => ({ collections: ["posts"] }),
+        },
+      });
+      configApi.addTemplate("front-matter.njk", "", { eleventyImport: { collections: ["posts"] } });
+    }
+  });
+
+  await elev.toJSON();
+  t.deepEqual(Array.from(elev.eleventyConfig.usesGraph.getTemplatesThatConsumeCollections(["posts"])).sort(), [
+    "test/stubs-virtual/computed.njk",
+    "test/stubs-virtual/front-matter.njk",
+  ]);
+});
+
+function getPaginationError(e) {
+  while (e && e.name !== "PaginationError") {
+    e = e.originalError ?? e.cause;
+  }
+  return e;
+}
+
+async function getOutputLocations(templates, config) {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      config?.(configApi);
+      for (let [name, data] of Object.entries(templates)) {
+        configApi.addTemplate(name, "", data);
+      }
+    }
+  });
+
+  let results = await elev.toJSON();
+  return Object.fromEntries(results.map((entry) => [entry.inputPath.split("/").pop(), [entry.url, entry.outputPath]]));
+}
+
+test("Computed `dynamicPermalink`, Issue #4415", async (t) => {
+  let locations = await getOutputLocations({
+    "computed.njk": { x: "hi", permalink: "/computed-{{ x }}/", eleventyComputed: { dynamicPermalink: () => false } },
+    "front-matter.njk": { x: "hi", permalink: "/front-matter-{{ x }}/", dynamicPermalink: false },
+  });
+
+  t.deepEqual(locations["computed.njk"], ["/computed-{{ x }}/", "./_site/computed-{{ x }}/index.html"]);
+  t.deepEqual(locations["front-matter.njk"], ["/front-matter-{{ x }}/", "./_site/front-matter-{{ x }}/index.html"]);
+});
+
+test("Computed `dynamicPermalink` using other computed data, Issue #4415", async (t) => {
+  let locations = await getOutputLocations({
+    "index.njk": {
+      x: "hi",
+      permalink: "/{{ x }}/",
+      eleventyComputed: { literal: () => true, dynamicPermalink: (data) => !data.literal },
+    },
+  });
+
+  t.deepEqual(locations["index.njk"], ["/{{ x }}/", "./_site/{{ x }}/index.html"]);
+});
+
+test("Computed `permalinkBypassOutputDir`, Issue #4415", async (t) => {
+  let locations = await getOutputLocations({
+    "computed.njk": { permalink: "computed.html", eleventyComputed: { permalinkBypassOutputDir: () => true } },
+    "front-matter.njk": { permalink: "front-matter.html", permalinkBypassOutputDir: true },
+    "neither.njk": { permalink: "neither.html" },
+  });
+
+  t.deepEqual(locations["computed.njk"], ["/computed.html", "./computed.html"]);
+  t.deepEqual(locations["front-matter.njk"], ["/front-matter.html", "./front-matter.html"]);
+  t.deepEqual(locations["neither.njk"], ["/neither.html", "./_site/neither.html"]);
+});
+
+test("`permalinkBypassOutputDir` from the data cascade (not only front matter)", async (t) => {
+  let locations = await getOutputLocations({
+    "index.njk": { permalink: "global.html" },
+  }, (configApi) => {
+    configApi.addGlobalData("permalinkBypassOutputDir", true);
+  });
+
+  t.deepEqual(locations["index.njk"], ["/global.html", "./global.html"]);
+});
+
+test("Computed `permalinkBypassOutputDir` with pagination, Issue #4415", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("index.njk", "", {
+        items: ["a", "b"],
+        pagination: { data: "items", size: 1, alias: "item" },
+        permalink: "{{ item }}.html",
+        eleventyComputed: { permalinkBypassOutputDir: () => true },
+      });
+    }
+  });
+  let results = await elev.toJSON();
+  t.deepEqual(results.map((entry) => entry.outputPath).sort(), ["./a.html", "./b.html"]);
+});
+
+test("Computed `pagination` throws, Issue #4415", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("index.njk", "", {
+        items: ["a", "b"],
+        eleventyComputed: { pagination: () => ({ data: "items", size: 1 }) },
+      });
+    }
+  });
+  elev.disableLogger();
+
+  let e = getPaginationError(await t.throwsAsync(() => elev.toJSON()));
+  t.true(e.message.startsWith("`pagination` can’t be set in computed data"));
+});
+
+test("Paginating over computed data that needs collections throws, Issue #4415", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("post.njk", "", { tags: ["posts"] });
+      configApi.addTemplate("index.njk", "", {
+        // Without the error, this static value would be paginated silently
+        postsCopy: ["static"],
+        pagination: { data: "postsCopy", size: 1 },
+        eleventyComputed: { postsCopy: (data) => data.collections.posts },
+      });
+    }
+  });
+  elev.disableLogger();
+
+  let e = getPaginationError(await t.throwsAsync(() => elev.toJSON()));
+  t.is(e.message, "Pagination data `postsCopy` can’t use computed data `postsCopy` (./test/stubs-virtual/index.njk) because it reads `collections`, which isn’t available until after pagination.");
+});
+
+test("Paginating over computed data that depends on per-page data throws, Issue #4415", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("index.njk", "", {
+        pagination: { data: "list", size: 1 },
+        eleventyComputed: {
+          url: (data) => data.page.url,
+          list: (data) => [data.url],
+        },
+      });
+    }
+  });
+  elev.disableLogger();
+
+  let e = getPaginationError(await t.throwsAsync(() => elev.toJSON()));
+  t.is(e.message, "Pagination data `list` can’t use computed data `list` (./test/stubs-virtual/index.njk) because it reads `page.url`, which isn’t available until after pagination.");
+});

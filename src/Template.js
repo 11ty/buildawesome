@@ -12,7 +12,7 @@ import TemplatePermalink from "./TemplatePermalink.js";
 import TemplateLayout from "./TemplateLayout.js";
 import TemplateFileSlug from "./TemplateFileSlug.js";
 import ComputedData from "./Data/ComputedData.js";
-import Pagination from "./Plugins/Pagination.js";
+import Pagination, { PaginationError } from "./Plugins/Pagination.js";
 import TemplateBehavior from "./TemplateBehavior.js";
 import TemplateContentPrematureUseError from "./Errors/TemplateContentPrematureUseError.js";
 import TemplateContentUnrenderedTemplateError from "./Errors/TemplateContentUnrenderedTemplateError.js";
@@ -360,15 +360,8 @@ class Template extends TemplateContent {
 		return p;
 	}
 
-	async usePermalinkRoot() {
-		// @cachedproperty
-		if (this._usePermalinkRoot === undefined) {
-			// TODO this only works with immediate front matter and not data files
-			let { data } = await this.getFrontMatterData();
-			this._usePermalinkRoot = data[this.config.keys.permalinkRoot];
-		}
-
-		return this._usePermalinkRoot;
+	usePermalinkRoot(data) {
+		return Boolean(data?.[this.config.keys.permalinkRoot]);
 	}
 
 	async getOutputLocations(data) {
@@ -376,7 +369,7 @@ class Template extends TemplateContent {
 		let link = await this._getLink(data);
 
 		let path;
-		if (await this.usePermalinkRoot()) {
+		if (this.usePermalinkRoot(data)) {
 			path = link.toPathFromRoot();
 		} else {
 			path = link.toPath(this.outputDir);
@@ -411,7 +404,7 @@ class Template extends TemplateContent {
 	async getOutputPath(data) {
 		this.bench.get("(count) getOutputPath").incrementCount();
 		let link = await this._getLink(data);
-		if (await this.usePermalinkRoot()) {
+		if (this.usePermalinkRoot(data)) {
 			return link.toPathFromRoot();
 		}
 		return link.toPath(this.outputDir);
@@ -668,12 +661,19 @@ class Template extends TemplateContent {
 			return;
 		}
 
+		// Pagination splits pages before computed data resolves for each page, Issue #4415
+		if ("pagination" in computedData) {
+			throw new PaginationError(
+				`\`pagination\` can’t be set in computed data (${this.inputPath}). Set it in front matter or a data file instead, computed data can supply the data that \`pagination.data\` points to.`,
+			);
+		}
+
 		let cd = new ComputedData(this.config);
 
 		// `permalink` is consumed (not added to data) so computed entries can use page.url/page.outputPath
 		// Template strings so placeholder rendering detects a computed `permalink` dependency
 		// TODO Room for optimization here—we don’t need to recalculate `getOutputHref` and `getOutputPath`
-		let declaredDependencies = data.permalink ? ["permalink"] : undefined;
+		let declaredDependencies = ["permalink", "dynamicPermalink", this.config.keys.permalinkRoot];
 		cd.addTemplateString(
 			"page.url",
 			async function (data) {
@@ -728,6 +728,17 @@ class Template extends TemplateContent {
 
 		debug("First round of computed data for %o", this.inputPath);
 		await this.computedData.setupData(data, { unavailable });
+	}
+
+	// Pagination data from computed data must resolve before pagination (stage 1), Issue #4415
+	#checkComputedPaginationData(data) {
+		let key = data.pagination?.data;
+		let deferred = typeof key === "string" && this.computedData?.getDeferred(key, data);
+		if (deferred) {
+			throw new PaginationError(
+				`Pagination data \`${key}\` can’t use computed data \`${deferred.key}\` (${this.inputPath}) because it reads \`${deferred.reason}\`, which isn’t available until after pagination.`,
+			);
+		}
 	}
 
 	// Stage 2: per page (after pagination), `parent` is the paginated template’s computed data.
@@ -832,6 +843,8 @@ class Template extends TemplateContent {
 
 			return [obj];
 		} else {
+			this.#checkComputedPaginationData(data);
+
 			// needs collections for pagination items
 			// but individual pagination entries won’t be part of a collection
 			this.paging = new Pagination(this, data, this.config);
