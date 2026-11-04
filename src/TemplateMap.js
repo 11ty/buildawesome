@@ -262,8 +262,10 @@ class TemplateMap {
 
 				if (counter === 0 || map.data.pagination?.addAllPagesToCollections) {
 					if (
-						ResolveConfigurationData.getValue(map.data, "buildawesomeExcludeFromCollections") !==
-						true
+						ResolveConfigurationData.getValue(
+							map.data,
+							ResolveConfigurationData.EXCLUDE_FROM_COLLECTIONS_KEY,
+						) !== true
 					) {
 						// is in *some* collections
 						this.#checkForStaleUserConfigCollections(map, page);

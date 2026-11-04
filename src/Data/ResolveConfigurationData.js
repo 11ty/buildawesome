@@ -6,11 +6,13 @@ const { get: lodashGet } = lodash;
 // buildawesomeDataSchema looks for buildawesomeDataSchema and eleventyDataSchema (this is what we use internally)
 // eleventyDataSchema looks for eleventyDataSchema (and not buildawesomeDataSchema)
 export class ResolveConfigurationData {
+	static EXCLUDE_FROM_COLLECTIONS_KEY = "buildawesomeExcludeFromCollections";
+
 	static ELIGIBLE_PROPS = new Set([
 		// If these props are overridden by a user’s configuration, they will not be aliased (which is ok)
 		"buildawesomeComputed",
 		"buildawesomeDataSchema",
-		"buildawesomeExcludeFromCollections",
+		this.EXCLUDE_FROM_COLLECTIONS_KEY,
 		"buildawesomeImport",
 	]);
 	static BUILDAWESOME_PREFIX = "buildawesome";

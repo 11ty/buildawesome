@@ -287,6 +287,137 @@ test("Computed `eleventyImport` adds collection dependencies, Issue #4415", asyn
   ]);
 });
 
+test("Computed `tags` create collections, Issue #2529", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      let eleventyComputed = { tags: (data) => (data.draft ? [] : ["posts"]) };
+      configApi.addTemplate("post.njk", "", { eleventyComputed });
+      configApi.addTemplate("draft.njk", "", { draft: true, eleventyComputed });
+      configApi.addTemplate("index.njk", "{{ collections.posts | length }}", {
+        permalink: "/list/",
+        eleventyExcludeFromCollections: true,
+      });
+    }
+  });
+
+  let results = await elev.toJSON();
+  t.is(results.find((entry) => entry.url === "/list/").content, "1");
+});
+
+test("Computed `tags` are in collections paginated alongside static `tags`, Issue #2529", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("static.njk", "", { tags: ["posts"] });
+      configApi.addTemplate("computed.njk", "", { eleventyComputed: { tags: () => ["posts"] } });
+      configApi.addTemplate("index.njk", "{{ post.inputPath }}", {
+        permalink: "/list-{{ pagination.pageNumber }}/",
+        pagination: { data: "collections.posts", size: 1, alias: "post" },
+      });
+    }
+  });
+
+  let results = await elev.toJSON();
+  t.deepEqual(results.filter((entry) => entry.url.startsWith("/list-")).map((entry) => entry.content).sort(), [
+    "./test/stubs-virtual/computed.njk",
+    "./test/stubs-virtual/static.njk",
+  ]);
+});
+
+test("Computed `buildawesomeImport` adds collection dependencies, Issue #4415", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("post.njk", "", { tags: ["posts"] });
+      configApi.addTemplate("computed.njk", "", {
+        buildawesomeComputed: {
+          buildawesomeImport: () => ({ collections: ["posts"] }),
+        },
+      });
+    }
+  });
+
+  await elev.toJSON();
+  t.deepEqual(Array.from(elev.eleventyConfig.usesGraph.getTemplatesThatConsumeCollections(["posts"])), [
+    "test/stubs-virtual/computed.njk",
+  ]);
+});
+
+for (let key of ["eleventyExcludeFromCollections", "buildawesomeExcludeFromCollections"]) {
+  test(`Computed \`${key}: true\` excludes from all collections, Issue #4415`, async (t) => {
+    let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+      config: configApi => {
+        let eleventyComputed = { [key]: (data) => !!data.draft };
+        configApi.addTemplate("post.njk", "", { tags: ["posts"], eleventyComputed });
+        configApi.addTemplate("draft.njk", "", { tags: ["posts"], draft: true, eleventyComputed });
+        configApi.addTemplate("index.njk", "{{ collections.posts | length }},{{ collections.all | length }}", {
+          permalink: "/list/",
+          [key]: true,
+        });
+      }
+    });
+
+    let results = await elev.toJSON();
+    t.is(results.find((entry) => entry.url === "/list/").content, "1,1");
+  });
+
+  test(`Computed \`${key}\` excludes from specific collections, Issue #4415`, async (t) => {
+    let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+      config: configApi => {
+        configApi.addTemplate("post.njk", "", { tags: ["posts", "feed"] });
+        configApi.addTemplate("draft.njk", "", {
+          tags: ["posts", "feed"],
+          eleventyComputed: { [key]: () => ["feed"] },
+        });
+        configApi.addTemplate("index.njk", "{{ collections.posts | length }},{{ collections.feed | length }}", {
+          permalink: "/list/",
+          [key]: true,
+        });
+      }
+    });
+
+    let results = await elev.toJSON();
+    t.is(results.find((entry) => entry.url === "/list/").content, "2,1");
+  });
+}
+
+test("Computed `templateEngineOverride`, Issue #4415", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("index.njk", "# {{ title }}", {
+        title: "Hi",
+        eleventyComputed: { templateEngineOverride: () => "njk,md" },
+      });
+    }
+  });
+
+  let [result] = await elev.toJSON();
+  t.is(result.content.trim(), "<h1>Hi</h1>");
+});
+
+for (let key of ["eleventyDataSchema", "buildawesomeDataSchema"]) {
+  test(`Computed \`${key}\`, Issue #4415`, async (t) => {
+    let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+      config: configApi => {
+        configApi.addTemplate("index.njk", "", {
+          draft: 1,
+          eleventyComputed: {
+            [key]: () => (data) => {
+              if (typeof data.draft !== "boolean") {
+                throw new Error("Invalid data type for draft.");
+              }
+            },
+          },
+        });
+      }
+    });
+    elev.disableLogger();
+
+    let e = await t.throwsAsync(() => elev.toJSON(), {
+      message: "Error in the data schema for: ./test/stubs-virtual/index.njk (via `buildawesomeDataSchema` or `eleventyDataSchema`)",
+    });
+    t.is(e.cause.toString(), "Error: Invalid data type for draft.");
+  });
+}
+
 function getPaginationError(e) {
   while (e && e.name !== "PaginationError") {
     e = e.originalError ?? e.cause;

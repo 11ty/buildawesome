@@ -783,10 +783,9 @@ class TemplateData {
 
 	static getNormalizedExcludedCollections(data) {
 		let excludes = [];
-		// TODO move this key to defaultConfig->keys->excludeFromCollections
 		let excludeValue = ResolveConfigurationData.getValue(
 			data,
-			"buildawesomeExcludeFromCollections",
+			ResolveConfigurationData.EXCLUDE_FROM_COLLECTIONS_KEY,
 		);
 		if (excludeValue !== true) {
 			if (Array.isArray(excludeValue)) {
