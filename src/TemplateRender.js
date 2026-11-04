@@ -242,6 +242,24 @@ export default class TemplateRender {
 		return templateSteps;
 	}
 
+	// The first engine that renders template-only strings (e.g. computed data), honoring `templateEngineOverride`
+	async getTemplateOnlyEngine(engineOverride) {
+		let steps = [...this.#precedingSteps, this.engine];
+		let engineName = this.engineName;
+		if (engineOverride !== undefined) {
+			steps = TemplatePipeline.parse(engineOverride);
+			if (!steps.length) {
+				steps = [TemplatePipeline.PLAINTEXT_FORMAT];
+			}
+			engineName = steps.at(-1);
+		}
+
+		let [first] = TemplateRender.#getTemplateOnlySteps(steps, engineName, this.config);
+		if (first) {
+			return this.#getEngine(first);
+		}
+	}
+
 	async _testRender(str, data) {
 		return this.engine._testRender(str, data);
 	}

@@ -689,7 +689,7 @@ class Template extends TemplateContent {
 					return this.tmpl.#renderComputedUnit(obj, innerData);
 				},
 				declaredDependencies,
-				this.getParseForSymbolsFunction(obj),
+				async (innerData) => this.parseForSymbols(obj, await this.getComputedDataEngine(innerData)),
 				this,
 			);
 		} else if (isPlainObject(obj)) {

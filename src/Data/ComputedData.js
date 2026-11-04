@@ -287,10 +287,8 @@ export default class ComputedData {
 	async #runTemplateString(key, entry, data, signals, stack) {
 		let { value, declaredDependencies, symbolParseFn } = entry;
 
-		let varsUsed;
-		if (symbolParseFn) {
-			varsUsed = symbolParseFn();
-		} else {
+		let varsUsed = await symbolParseFn?.(data);
+		if (!varsUsed) {
 			varsUsed = await new ComputedDataTemplateString(
 				this.#entries.keys(),
 				signals.unavailable,

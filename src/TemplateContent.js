@@ -557,29 +557,28 @@ class TemplateContent {
 		}
 	}
 
-	getParseForSymbolsFunction(str) {
-		let engine = this.engine;
+	// The engine computed data renders with (e.g. Liquid for Markdown), Issue #2131
+	async getComputedDataEngine(data) {
+		let tr = await this.getTemplateRender();
+		return tr.getTemplateOnlyEngine(this.getEngineOverride(data));
+	}
 
-		// Don’t use markdown as the engine to parse for symbols
-		// TODO pass in engineOverride here
-		if (this.#renderPreprocessorEngine) {
-			engine = this.#renderPreprocessorEngine;
+	// Returns `undefined` when the engine can’t parse for symbols.
+	parseForSymbols(str, engine) {
+		if (!engine || !("parseForSymbols" in engine)) {
+			return;
 		}
 
-		if ("parseForSymbols" in engine) {
-			return () => {
-				if (Array.isArray(str)) {
-					return str
-						.filter((entry) => typeof entry === "string")
-						.map((entry) => engine.parseForSymbols(entry))
-						.flat();
-				}
-				if (typeof str === "string") {
-					return engine.parseForSymbols(str);
-				}
-				return [];
-			};
+		if (Array.isArray(str)) {
+			return str
+				.filter((entry) => typeof entry === "string")
+				.map((entry) => engine.parseForSymbols(entry))
+				.flat();
 		}
+		if (typeof str === "string") {
+			return engine.parseForSymbols(str);
+		}
+		return [];
 	}
 
 	// used by computed data or for permalink functions
