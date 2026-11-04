@@ -104,6 +104,37 @@ const TEMPLATE_CONTENT_PROPERTIES = {
 			return this._contentPipeline;
 		},
 	},
+	// Live from `page`, computed data can resolve them after collections are built, Issue #1469
+	url: {
+		enumerable: true,
+		configurable: true,
+		get() {
+			return this.page.url;
+		},
+		set(value) {
+			Object.defineProperty(this, "url", {
+				value,
+				writable: true,
+				enumerable: true,
+				configurable: true,
+			});
+		},
+	},
+	outputPath: {
+		enumerable: true,
+		configurable: true,
+		get() {
+			return this.page.outputPath;
+		},
+		set(value) {
+			Object.defineProperty(this, "outputPath", {
+				value,
+				writable: true,
+				enumerable: true,
+				configurable: true,
+			});
+		},
+	},
 	// Alias for templateContent for consistency
 	content: {
 		enumerable: true,
@@ -881,8 +912,6 @@ class Template extends TemplateContent {
 				fileSlug: this.fileSlugStr,
 				filePathStem: this.filePathStem,
 				date: data.page.date,
-				outputPath: data.page.outputPath,
-				url: data.page.url,
 			};
 
 			obj = Template.augmentWithTemplateContentProperty(obj);
@@ -918,8 +947,6 @@ class Template extends TemplateContent {
 
 					page: pageEntry.data.page,
 					date: pageEntry.data.page.date,
-					outputPath: pageEntry.data.page.outputPath,
-					url: pageEntry.data.page.url,
 				};
 
 				obj = Template.augmentWithTemplateContentProperty(obj);

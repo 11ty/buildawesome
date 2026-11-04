@@ -108,9 +108,25 @@ export default class ComputedData {
 		return path;
 	}
 
-	#addGuard(data, key, deferredPath) {
+	// Dotted keys guard the parent object, e.g. `page.url` resolves after collections, Issue #1469
+	#getGuardTarget(rootData, path) {
+		let parts = path.split(".");
+		let key = parts.pop();
+		let data = parts.reduce((obj, part) => obj?.[part], rootData);
+		if (data && typeof data === "object") {
+			return { data, key };
+		}
+		return {};
+	}
+
+	#addGuard(rootData, path, deferredPath) {
+		let { data, key } = this.#getGuardTarget(rootData, path);
+		if (!data) {
+			return;
+		}
+
 		let original = Reflect.getOwnPropertyDescriptor(data, key);
-		if (key.includes(".") || original?.configurable === false) {
+		if (original?.configurable === false) {
 			return;
 		}
 
@@ -143,8 +159,9 @@ export default class ComputedData {
 		});
 	}
 
-	#removeGuard(data, key) {
-		let guards = this.#guards.get(data);
+	#removeGuard(rootData, path) {
+		let { data, key } = this.#getGuardTarget(rootData, path);
+		let guards = data && this.#guards.get(data);
 		let restore = guards?.get(key);
 		if (restore) {
 			guards.delete(key);
@@ -195,8 +212,10 @@ export default class ComputedData {
 			);
 		}
 
-		// Its own resolution may read the previous value (e.g. overriding front matter)
-		this.#removeGuard(data, key);
+		// Its own resolution may read the previous value (e.g. overriding front matter), dotted keys (e.g. `page.url`) stay guarded until set
+		if (!key.includes(".")) {
+			this.#removeGuard(data, key);
+		}
 
 		let entry = this.#entries.get(key);
 		let childStack = [...stack, key];
@@ -217,6 +236,8 @@ export default class ComputedData {
 			return;
 		}
 
+		// lodash `set` reads the previous value
+		this.#removeGuard(data, key);
 		lodashSet(data, key, result);
 		signal.done();
 	}

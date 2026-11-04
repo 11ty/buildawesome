@@ -252,8 +252,12 @@ class TemplateMap {
 							},
 						});
 					}
-				} else if (!map.outputPath) {
-					map.outputPath = page.outputPath;
+				} else if (!Object.prototype.hasOwnProperty.call(map, "outputPath")) {
+					// Live, computed data can resolve it after collections, Issue #1469
+					Object.defineProperty(map, "outputPath", {
+						enumerable: true,
+						get: () => page.outputPath,
+					});
 				}
 
 				if (counter === 0 || map.data.pagination?.addAllPagesToCollections) {
