@@ -556,3 +556,28 @@ test("Computed data renders the permalink once for `page.url` and `page.outputPa
   t.is(result.outputPath, "./_site/custom/index.html");
   t.is(renders, 1);
 });
+
+test("Computed functions see front matter objects on their first run, Issue #2240", async (t) => {
+  let seen = [];
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplate("index.njk", "", {
+        object: { key: "value" },
+        eleventyComputed: {
+          sync: (data) => {
+            seen.push(["sync", data.object]);
+          },
+          async: async (data) => {
+            seen.push(["async", data.object]);
+          },
+        },
+      });
+    }
+  });
+
+  await elev.toJSON();
+  t.deepEqual(seen, [
+    ["sync", { key: "value" }],
+    ["async", { key: "value" }],
+  ]);
+});
