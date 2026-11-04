@@ -4,6 +4,7 @@ import { createDebug } from "../Util/DebugLogUtil.js";
 import ComputedDataTemplateString from "./ComputedDataTemplateString.js";
 import Signals from "./Signals.js";
 import { isInternalRead, withoutTracking } from "./InternalReads.js";
+import { augmentObject } from "../Engines/Util/ContextAugmenter.js";
 
 const { set: lodashSet } = lodash;
 const debug = createDebug("ComputedData");
@@ -46,15 +47,24 @@ export default class ComputedData {
 		templateInstance,
 		isTemplateString = false,
 	) {
-		if (typeof value === "function") {
-			// TODO bug? no access to non-universal config things?
-			value = value.bind({
-				...this.config?.javascriptFunctions,
-				tmpl: templateInstance,
-			});
+		// TODO bug? no access to non-universal config things?
+		let context = {
+			...this.config?.javascriptFunctions,
+			tmpl: templateInstance,
+		};
+
+		// Functions are called with a per-page context instead, see #runFunction
+		if (typeof value === "function" && isTemplateString) {
+			value = value.bind(context);
 		}
 
-		this.#entries.set(key, { value, declaredDependencies, symbolParseFn, isTemplateString });
+		this.#entries.set(key, {
+			value,
+			context,
+			declaredDependencies,
+			symbolParseFn,
+			isTemplateString,
+		});
 	}
 
 	addTemplateString(key, value, declaredDependencies = [], symbolParseFn, templateInstance) {
@@ -304,11 +314,14 @@ export default class ComputedData {
 
 	// Functions read through a tracking proxy and re-run after each unresolved computed key they hit.
 	async #runFunction(key, entry, data, signals, stack) {
-		let { value, declaredDependencies } = entry;
+		let { value, context: baseContext, declaredDependencies } = entry;
 
 		if (!(await this.#pullVars(key, declaredDependencies, data, signals, stack))) {
 			return;
 		}
+
+		// Filters and shortcodes called on `this` see this page’s `page` and `eleventy`, Issue #2885
+		let thisArg = augmentObject({ ...baseContext }, { source: data, overwrite: false });
 
 		while (true) {
 			let context = { key, signals, pending: undefined, unavailable: undefined };
@@ -316,7 +329,7 @@ export default class ComputedData {
 			let error;
 
 			try {
-				result = await value(this.#getTrackingProxy(data, context));
+				result = await value.call(thisArg, this.#getTrackingProxy(data, context));
 			} catch (e) {
 				error = e;
 			}
