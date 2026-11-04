@@ -403,7 +403,7 @@ class TemplateContent {
 		if (virtualTemplateDefinition) {
 			virtualTemplateData = virtualTemplateDefinition.data;
 
-			TemplateData.cleanupData(virtualTemplateData, {
+			TemplateData.cleanupData(virtualTemplateData, this.config.keys.tags, {
 				file: this.inputPath,
 				isVirtualTemplate: Boolean(virtualTemplateData),
 			});
@@ -416,7 +416,7 @@ class TemplateContent {
 
 		let frontMatterData = Object.assign({}, fm.data);
 
-		TemplateData.cleanupData(frontMatterData, {
+		TemplateData.cleanupData(frontMatterData, this.config.keys.tags, {
 			file: this.inputPath,
 			isVirtualTemplate: Boolean(virtualTemplateData),
 		});
@@ -424,7 +424,7 @@ class TemplateContent {
 		let tr = await this.getTemplateRender();
 		let extraData = await tr.engine.getExtraDataFromFile(this.inputPath);
 
-		TemplateData.cleanupData(extraData, {
+		TemplateData.cleanupData(extraData, this.config.keys.tags, {
 			file: this.inputPath,
 			isVirtualTemplate: Boolean(virtualTemplateData),
 		});

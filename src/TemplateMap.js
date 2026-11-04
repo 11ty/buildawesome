@@ -796,7 +796,7 @@ This is usually but not *always* an error so if you’d like to disable this err
 	_testGetAllTags() {
 		let allTags = {};
 		for (let map of this.map) {
-			let tags = map.data.tags;
+			let tags = map.data[this.config.keys.tags];
 			if (Array.isArray(tags)) {
 				for (let tag of tags) {
 					allTags[tag] = true;

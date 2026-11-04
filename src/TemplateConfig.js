@@ -546,6 +546,13 @@ class TemplateConfig {
 
 		debug("Current configuration: %o", mergedConfig);
 
+		let tagsKey = mergedConfig.keys?.tags;
+		if (typeof tagsKey === "string" && tagsKey.includes(".")) {
+			throw new ConfigError(
+				`Nested properties are not supported in \`keys.tags\`, received: ${JSON.stringify(tagsKey)}`,
+			);
+		}
+
 		// Add to the merged config too
 		mergedConfig.uses = this.usesGraph;
 

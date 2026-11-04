@@ -1255,6 +1255,40 @@ test("keys.tags false skips tag collections, #1254", async (t) => {
   t.assert.strictEqual(index.content, "custom:1,byTag:0,all:2,");
 });
 
+test("keys.tags renamed creates collections from another key, #1254", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addCollection("byTag", api => api.getFilteredByTag("news"));
+      configApi.addTemplate("post.md", "", { category: "news", tags: { custom: true } });
+      configApi.addTemplate("index.njk", `{% for name, items in collections %}{{ name }}:{{ items.length }},{% endfor %}`);
+    }
+  });
+  elev.disableLogger();
+
+  await elev.initializeConfig({
+    keys: {
+      tags: "category"
+    }
+  });
+
+  let results = await elev.toJSON();
+  let index = results.find(entry => entry.inputPath.endsWith("index.njk"));
+  t.assert.strictEqual(index.content, "news:1,byTag:1,all:2,");
+});
+
+test("keys.tags with a nested property throws, #1254", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/");
+  elev.disableLogger();
+
+  await t.assert.rejects(elev.initializeConfig({
+    keys: {
+      tags: "meta.tags"
+    }
+  }), {
+    message: /Nested properties are not supported in `keys.tags`/
+  });
+});
+
 test("Eleventy setting reserved data throws error (pkg remapped to parkour)", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
     config: configApi => {

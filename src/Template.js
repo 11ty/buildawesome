@@ -775,7 +775,7 @@ class Template extends TemplateContent {
 		if (path.length === 1) {
 			this.#warnOnce(
 				path.join(" › "),
-				`${prefix} Computed data resolves after preprocessors (except \`date\`, \`layout\`, \`tags\`, \`${ResolveConfigurationData.EXCLUDE_FROM_COLLECTIONS_KEY}\`, \`${this.config.keys.import}\`, and paginated data), so read this value at render time instead.`,
+				`${prefix} Computed data resolves after preprocessors (except \`date\`, \`layout\`, ${this.config.keys.tags ? `\`${this.config.keys.tags}\`, ` : ""}\`${ResolveConfigurationData.EXCLUDE_FROM_COLLECTIONS_KEY}\`, \`${this.config.keys.import}\`, and paginated data), so read this value at render time instead.`,
 			);
 			return;
 		}
@@ -822,7 +822,7 @@ class Template extends TemplateContent {
 	#getEarlyComputedKeys(data) {
 		let early = [
 			"page.date",
-			"tags",
+			...(this.config.keys.tags ? [this.config.keys.tags] : []),
 			...ResolveConfigurationData.getEligibleLocations(this.config.keys.import),
 			...ResolveConfigurationData.getEligibleLocations(
 				ResolveConfigurationData.EXCLUDE_FROM_COLLECTIONS_KEY,

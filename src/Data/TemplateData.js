@@ -28,6 +28,8 @@ const debug = createDebug("TemplateData");
 class TemplateDataParseError extends BaseError {}
 
 class TemplateData {
+	static DEFAULT_TAGS_KEY = "tags";
+
 	// Would be nice if the priorities here matched (see also FilePathUtil used by config file paths)
 
 	// (json not included) priority is reverse order
@@ -484,7 +486,7 @@ class TemplateData {
 				);
 			} else {
 				// clean up data for template/directory data files only.
-				let cleanedDataForPath = TemplateData.cleanupData(dataForPath, {
+				let cleanedDataForPath = TemplateData.cleanupData(dataForPath, this.config.keys.tags, {
 					file: path,
 				});
 				for (let key in cleanedDataForPath) {
@@ -758,17 +760,18 @@ class TemplateData {
 	}
 
 	/* Like cleanupData() but does not mutate */
-	static getCleanedTagsImmutable(data, options = {}) {
+	static getCleanedTagsImmutable(data, tagsKey = TemplateData.DEFAULT_TAGS_KEY, options = {}) {
 		let tags = [];
 
-		if (isPlainObject(data) && data.tags) {
-			if (typeof data.tags === "string") {
-				tags = (data.tags || "").split(",");
-			} else if (Array.isArray(data.tags)) {
-				tags = data.tags;
-			} else if (data.tags) {
+		if (tagsKey && isPlainObject(data) && data[tagsKey]) {
+			let value = data[tagsKey];
+			if (typeof value === "string") {
+				tags = value.split(",");
+			} else if (Array.isArray(value)) {
+				tags = value;
+			} else {
 				throw new Error(
-					`String or Array expected for \`tags\`${options.file ? ` in ${options.isVirtualTemplate ? "virtual " : ""}template: ${options.file}` : ""}. Received: ${inspect(data.tags)}`,
+					`String or Array expected for \`${tagsKey}\`${options.file ? ` in ${options.isVirtualTemplate ? "virtual " : ""}template: ${options.file}` : ""}. Received: ${inspect(value)}`,
 				);
 			}
 
@@ -780,9 +783,9 @@ class TemplateData {
 		return tags;
 	}
 
-	static cleanupData(data, options = {}) {
-		if (isPlainObject(data) && "tags" in data) {
-			data.tags = this.getCleanedTagsImmutable(data, options);
+	static cleanupData(data, tagsKey = TemplateData.DEFAULT_TAGS_KEY, options = {}) {
+		if (tagsKey && isPlainObject(data) && tagsKey in data) {
+			data[tagsKey] = this.getCleanedTagsImmutable(data, tagsKey, options);
 		}
 
 		return data;
@@ -808,8 +811,8 @@ class TemplateData {
 		};
 	}
 
-	static getIncludedCollectionNames(data, tagsKey) {
-		let tags = tagsKey === false ? [] : TemplateData.getCleanedTagsImmutable(data);
+	static getIncludedCollectionNames(data, tagsKey = TemplateData.DEFAULT_TAGS_KEY) {
+		let tags = TemplateData.getCleanedTagsImmutable(data, tagsKey);
 
 		let { excludes, excludeAll } = TemplateData.getNormalizedExcludedCollections(data);
 		if (excludeAll) {
@@ -819,7 +822,7 @@ class TemplateData {
 		return ["all", ...tags].filter((tag) => !excludes.includes(tag));
 	}
 
-	static getIncludedTagNames(data, tagsKey) {
+	static getIncludedTagNames(data, tagsKey = TemplateData.DEFAULT_TAGS_KEY) {
 		return this.getIncludedCollectionNames(data, tagsKey).filter((tagName) => tagName !== "all");
 	}
 }

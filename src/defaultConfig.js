@@ -32,7 +32,7 @@ import TransformsUtil from "./Util/TransformsUtil.js";
  * @property {object} keys
  * @property {string} [keys.package='pkg'] - Global data property for package.json data
  * @property {string} [keys.layout='layout']
- * @property {string|false} [keys.tags='tags'] - Use `false` to skip creating collections from tags
+ * @property {string|false} [keys.tags='tags'] - Data key used to create collections, `false` to skip
  * @property {string} [keys.permalink='permalink']
  * @property {string} [keys.permalinkRoot='permalinkBypassOutputDir']
  * @property {string} [keys.engineOverride='templateEngineOverride']
