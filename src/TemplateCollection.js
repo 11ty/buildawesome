@@ -7,6 +7,7 @@ import { isGlobMatch } from "./Util/GlobMatcher.js";
 export default class TemplateCollection extends Sortable {
 	// Sorted items, tag index, and glob matches, reset by `add`, the only entry point that mutates `items`
 	#cache = {};
+	tagsKey = "tags";
 
 	add(item) {
 		this.#cache = {};
@@ -28,7 +29,7 @@ export default class TemplateCollection extends Sortable {
 			let index = new Map();
 
 			for (let item of this.#getAllSorted()) {
-				for (let tagName of TemplateData.getIncludedTagNames(item.data)) {
+				for (let tagName of TemplateData.getIncludedTagNames(item.data, this.tagsKey)) {
 					let tagItems = index.get(tagName);
 					if (!tagItems) {
 						tagItems = [];

@@ -611,7 +611,7 @@ test("No circular dependency (does not throw)", async (t) => {
       },
       tags: ["tag2"],
     },
-    $config
+    $config.getConfig()
   );
 
   t.assert.strictEqual(true, true);
@@ -634,7 +634,7 @@ test("Circular dependency (pagination iterates over tag1 but also supplies pages
         },
         tags: ["tag1"],
       },
-      $config
+      $config.getConfig()
     );
   });
 });
@@ -656,7 +656,7 @@ test("Circular dependency but should not error because it uses eleventyExcludeFr
       },
       tags: ["tag1"],
     },
-    $config
+    $config.getConfig()
   );
 
   t.assert.strictEqual(true, true);

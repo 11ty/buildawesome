@@ -1233,6 +1233,28 @@ pkg:
   });
 });
 
+test("keys.tags false skips tag collections, #1254", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addCollection("custom", api => api.getAll().filter(item => item.data.tags?.includes("post")));
+      configApi.addCollection("byTag", api => api.getFilteredByTag("post"));
+      configApi.addTemplate("post.md", "", { tags: ["post"] });
+      configApi.addTemplate("index.njk", `{% for name, items in collections %}{{ name }}:{{ items.length }},{% endfor %}`);
+    }
+  });
+  elev.disableLogger();
+
+  await elev.initializeConfig({
+    keys: {
+      tags: false
+    }
+  });
+
+  let results = await elev.toJSON();
+  let index = results.find(entry => entry.inputPath.endsWith("index.njk"));
+  t.assert.strictEqual(index.content, "custom:1,byTag:0,all:2,");
+});
+
 test("Eleventy setting reserved data throws error (pkg remapped to parkour)", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
     config: configApi => {

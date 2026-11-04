@@ -808,8 +808,8 @@ class TemplateData {
 		};
 	}
 
-	static getIncludedCollectionNames(data) {
-		let tags = TemplateData.getCleanedTagsImmutable(data);
+	static getIncludedCollectionNames(data, tagsKey) {
+		let tags = tagsKey === false ? [] : TemplateData.getCleanedTagsImmutable(data);
 
 		let { excludes, excludeAll } = TemplateData.getNormalizedExcludedCollections(data);
 		if (excludeAll) {
@@ -819,8 +819,8 @@ class TemplateData {
 		return ["all", ...tags].filter((tag) => !excludes.includes(tag));
 	}
 
-	static getIncludedTagNames(data) {
-		return this.getIncludedCollectionNames(data).filter((tagName) => tagName !== "all");
+	static getIncludedTagNames(data, tagsKey) {
+		return this.getIncludedCollectionNames(data, tagsKey).filter((tagName) => tagName !== "all");
 	}
 }
 

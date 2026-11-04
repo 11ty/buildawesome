@@ -32,6 +32,7 @@ import TransformsUtil from "./Util/TransformsUtil.js";
  * @property {object} keys
  * @property {string} [keys.package='pkg'] - Global data property for package.json data
  * @property {string} [keys.layout='layout']
+ * @property {string|false} [keys.tags='tags'] - Use `false` to skip creating collections from tags
  * @property {string} [keys.permalink='permalink']
  * @property {string} [keys.permalinkRoot='permalinkBypassOutputDir']
  * @property {string} [keys.engineOverride='templateEngineOverride']
@@ -104,6 +105,7 @@ export default function (config) {
 			// TODO breaking: use `false` by default
 			package: "pkg", // supports `false`
 			layout: "layout",
+			tags: "tags", // supports `false`
 			permalink: "permalink",
 			permalinkRoot: "permalinkBypassOutputDir",
 			engineOverride: "templateEngineOverride",

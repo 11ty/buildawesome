@@ -144,7 +144,9 @@ class TemplateMap {
 		// TODO it’d be nice to set the dependency relationship for addCollection here
 		// But collections are not yet populated (they populate after template order)
 		// Computed `tags` reading pagination data resolve per page, so this read is expected to miss them, Issue #1952
-		let publishes = withoutTracking(() => TemplateData.getIncludedCollectionNames(entry.data));
+		let publishes = withoutTracking(() =>
+			TemplateData.getIncludedCollectionNames(entry.data, this.config.keys.tags),
+		);
 
 		this.config.uses.addNewNodeRelationships(entry.inputPath, consumes, publishes);
 	}
@@ -185,6 +187,8 @@ class TemplateMap {
 		// Temporary workaround for async constructor work in templates
 		// Issue #3170 #3870
 		this.#ignoreDeferForPaginatedCollections();
+
+		this.collection.tagsKey = this.config.keys.tags;
 
 		let inputPathSet = new Set(fullTemplateOrder);
 		await Promise.all(
@@ -565,7 +569,7 @@ class TemplateMap {
 			return true;
 		}
 
-		let tags = TemplateData.getIncludedTagNames(page.data);
+		let tags = TemplateData.getIncludedTagNames(page.data, this.config.keys.tags);
 		if (reads.tags.some((tagSet) => tagSet.every((tag) => tags.includes(tag)))) {
 			return true;
 		}
