@@ -617,16 +617,21 @@ class Template extends TemplateContent {
 			return this.renderComputedData(entry, data);
 		}
 
-		if (isPlainObject(entry)) {
-			for (let key in entry) {
-				entry[key] = await this.#renderComputedUnit(entry[key], data);
-			}
+		if (typeof entry === "function") {
+			return entry(data);
 		}
 
+		// Returns new objects/arrays, the source is shared across pages
 		if (Array.isArray(entry)) {
-			for (let j = 0, k = entry.length; j < k; j++) {
-				entry[j] = await this.#renderComputedUnit(entry[j], data);
+			return Promise.all(entry.map((child) => this.#renderComputedUnit(child, data)));
+		}
+
+		if (isPlainObject(entry)) {
+			let rendered = {};
+			for (let key in entry) {
+				rendered[key] = await this.#renderComputedUnit(entry[key], data);
 			}
+			return rendered;
 		}
 
 		return entry;
