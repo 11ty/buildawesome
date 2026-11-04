@@ -6,6 +6,6 @@ export type HeadProps = {
 
 export function Head(props: HeadProps): JSX.Element {
   return <head>
-    <title>My test pagefirst</title>
+    <title>My test page</title>
   </head>;
 }
