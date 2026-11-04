@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 // This tests Eleventy Watch WITHOUT using the file system!
@@ -35,7 +35,7 @@ test("#3870 templateRender has not yet initialized (not incremental)", async (t)
       });
 
       $config.on("buildawesome.after", ({ results }) => {
-        t.is(results[0]?.content, runs[index].expected);
+        t.assert.strictEqual(results[0]?.content, runs[index].expected);
       });
     }
   });

@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#1609: Custom filter in a paginated eleventyComputed template string gets the pagination alias", async (t) => {
@@ -28,7 +28,7 @@ test("#1609: Custom filter in a paginated eleventyComputed template string gets 
 
 	let results = (await elev.toJSON()).filter(({ url }) => url.startsWith("/tag-"));
 	results.sort((a, b) => a.url.localeCompare(b.url));
-	t.deepEqual(
+	t.assert.deepStrictEqual(
 		results.map(({ content }) => content),
 		["Posts tagged “CSS”", "Posts tagged “WEBGL”"],
 	);

@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 
 import { PreserveClosingTagsPlugin } from "../src/Plugins/PreserveClosingTagsPlugin.js";
 import Eleventy from "../src/Core.js";
@@ -13,7 +13,7 @@ test("Using the PreserveClosingTagsPlugin plugin (meta off) #3356", async (t) =>
   });
 
   let results = await elev.toJSON();
-	t.is(results[0].content, `<html><meta></html>`);
+	t.assert.strictEqual(results[0].content, `<html><meta></html>`);
 });
 
 test("Using the PreserveClosingTagsPlugin plugin (meta on) #3356", async (t) => {
@@ -28,7 +28,7 @@ test("Using the PreserveClosingTagsPlugin plugin (meta on) #3356", async (t) => 
   });
 
   let results = await elev.toJSON();
-	t.is(results[0].content, `<html><meta /></html>`);
+	t.assert.strictEqual(results[0].content, `<html><meta /></html>`);
 });
 
 test("Using the PreserveClosingTagsPlugin plugin (meta on, link off) #3356", async (t) => {
@@ -43,7 +43,7 @@ test("Using the PreserveClosingTagsPlugin plugin (meta on, link off) #3356", asy
   });
 
   let results = await elev.toJSON();
-	t.is(results[0].content, `<html><meta /><link></html>`);
+	t.assert.strictEqual(results[0].content, `<html><meta /><link></html>`);
 });
 
 test("Using the PreserveClosingTagsPlugin plugin (meta on, link on) #3356", async (t) => {
@@ -58,7 +58,7 @@ test("Using the PreserveClosingTagsPlugin plugin (meta on, link on) #3356", asyn
   });
 
   let results = await elev.toJSON();
-	t.is(results[0].content, `<html><meta /><link /></html>`);
+	t.assert.strictEqual(results[0].content, `<html><meta /><link /></html>`);
 });
 
 test("Using the PreserveClosingTagsPlugin plugin (meta on, link on, title off) #3356", async (t) => {
@@ -73,5 +73,5 @@ test("Using the PreserveClosingTagsPlugin plugin (meta on, link on, title off) #
   });
 
   let results = await elev.toJSON();
-	t.is(results[0].content, `<html><title>My Title</title><meta /><link /></html>`);
+	t.assert.strictEqual(results[0].content, `<html><title>My Title</title><meta /><link /></html>`);
 });

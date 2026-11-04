@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 
 import TemplateMap from "../src/TemplateMap.js";
 import TemplateCollection from "../src/TemplateCollection.js";
@@ -47,8 +47,8 @@ test("TemplateMap has collections added", async (t) => {
   await tm.add(tmpl2);
   await tm.cache();
 
-  t.is(tm.getMap().length, 2);
-  t.is(tm.collection.getAll().length, 2);
+  t.assert.strictEqual(tm.getMap().length, 2);
+  t.assert.strictEqual(tm.collection.getAll().length, 2);
 });
 
 test("TemplateMap compared to Collection API", async (t) => {
@@ -62,19 +62,19 @@ test("TemplateMap compared to Collection API", async (t) => {
   await tm.cache();
 
   let map = tm.getMap();
-  t.deepEqual(map[0].template, tmpl1);
-  t.deepEqual(map[0].data.collections.post[0].template, tmpl1);
-  t.deepEqual(map[1].template, tmpl4);
-  t.deepEqual(map[1].data.collections.post[1].template, tmpl4);
+  t.assert.deepStrictEqual(map[0].template, tmpl1);
+  t.assert.deepStrictEqual(map[0].data.collections.post[0].template, tmpl1);
+  t.assert.deepStrictEqual(map[1].template, tmpl4);
+  t.assert.deepStrictEqual(map[1].data.collections.post[1].template, tmpl4);
 
   let c = new TemplateCollection();
   await addTemplate(c, tmpl1);
   await addTemplate(c, tmpl4);
 
   let posts = c.getFilteredByTag("post");
-  t.is(posts.length, 2);
-  t.deepEqual(posts[0].template, tmpl1);
-  t.deepEqual(posts[1].template, tmpl4);
+  t.assert.strictEqual(posts.length, 2);
+  t.assert.deepStrictEqual(posts[0].template, tmpl1);
+  t.assert.deepStrictEqual(posts[1].template, tmpl4);
 });
 
 test("populating the collection twice should clear the previous values (--watch was making it cumulative)", async (t) => {
@@ -90,7 +90,7 @@ test("populating the collection twice should clear the previous values (--watch 
   await tm.cache();
   await tm.cache();
 
-  t.is(tm.getMap().length, 2);
+  t.assert.strictEqual(tm.getMap().length, 2);
 });
 
 test("TemplateMap adds collections data and has templateContent values", async (t) => {
@@ -104,25 +104,25 @@ test("TemplateMap adds collections data and has templateContent values", async (
   await tm.add(tmpl2);
 
   let map = tm.getMap();
-  t.falsy(map[0].data.collections);
-  t.falsy(map[1].data.collections);
+  t.assert.ok(!(map[0].data.collections));
+  t.assert.ok(!(map[1].data.collections));
 
   await tm.cache();
 
-  t.truthy(map[0]._pages[0].templateContent);
-  t.truthy(map[1]._pages[0].templateContent);
-  t.truthy(map[0].data.collections);
-  t.truthy(map[1].data.collections);
-  t.is(map[0].data.collections.post.length, 1);
-  t.is(map[0].data.collections.all.length, 2);
-  t.is(map[1].data.collections.post.length, 1);
-  t.is(map[1].data.collections.all.length, 2);
+  t.assert.ok(map[0]._pages[0].templateContent);
+  t.assert.ok(map[1]._pages[0].templateContent);
+  t.assert.ok(map[0].data.collections);
+  t.assert.ok(map[1].data.collections);
+  t.assert.strictEqual(map[0].data.collections.post.length, 1);
+  t.assert.strictEqual(map[0].data.collections.all.length, 2);
+  t.assert.strictEqual(map[1].data.collections.post.length, 1);
+  t.assert.strictEqual(map[1].data.collections.all.length, 2);
 
-  t.is(
+  t.assert.strictEqual(
     await testRenderWithoutLayouts(map[0].template, map[0].data),
     map[0]._pages[0].templateContent,
   );
-  t.is(
+  t.assert.strictEqual(
     await testRenderWithoutLayouts(map[1].template, map[1].data),
     map[1]._pages[0].templateContent,
   );
@@ -137,14 +137,14 @@ test("TemplateMap circular references (map without templateContent)", async (t) 
   await tm.add(tmpl3);
 
   let map = tm.getMap();
-  t.falsy(map[0].data.collections);
+  t.assert.ok(!(map[0].data.collections));
 
   await tm.cache();
-  t.truthy(map[0]._pages[0].templateContent);
-  t.truthy(map[0].data.collections);
-  t.is(map[0].data.collections.all.length, 1);
+  t.assert.ok(map[0]._pages[0].templateContent);
+  t.assert.ok(map[0].data.collections);
+  t.assert.strictEqual(map[0].data.collections.all.length, 1);
 
-  t.is(
+  t.assert.strictEqual(
     await testRenderWithoutLayouts(map[0].template, map[0].data),
     map[0]._pages[0].templateContent,
   );
@@ -163,15 +163,13 @@ test("TemplateMap circular references (map.templateContent)", async (t) => {
   await tm.add(tmpl);
 
   let map = tm.getMap();
-  t.falsy(map[0].data.collections);
+  t.assert.ok(!(map[0].data.collections));
 
-  await t.throwsAsync(
+  await t.assert.rejects(
     async () => {
       await tm.cache();
     },
-    {
-      instanceOf: UsingCircularTemplateContentReferenceError,
-    },
+    UsingCircularTemplateContentReferenceError,
   );
 });
 
@@ -204,36 +202,36 @@ test("Issue #115, mixing pagination and collections", async (t) => {
   await tm.cache();
 
   let map = tm.getMap();
-  t.is(map.length, 3);
-  t.deepEqual(map[2].template, tmplIndex);
+  t.assert.strictEqual(map.length, 3);
+  t.assert.deepStrictEqual(map[2].template, tmplIndex);
 
   let collections = await tm._testGetAllCollectionsData();
-  t.is(Object.keys(collections.all).length, 3);
-  t.is(Object.keys(collections.foos).length, 1);
-  t.is(Object.keys(collections.bars).length, 1);
-  t.is(Object.keys((await tm._testGetCollectionsData()).all).length, 3);
-  t.is(Object.keys((await tm._testGetCollectionsData()).foos).length, 1);
-  t.is(Object.keys((await tm._testGetCollectionsData()).bars).length, 1);
+  t.assert.strictEqual(Object.keys(collections.all).length, 3);
+  t.assert.strictEqual(Object.keys(collections.foos).length, 1);
+  t.assert.strictEqual(Object.keys(collections.bars).length, 1);
+  t.assert.strictEqual(Object.keys((await tm._testGetCollectionsData()).all).length, 3);
+  t.assert.strictEqual(Object.keys((await tm._testGetCollectionsData()).foos).length, 1);
+  t.assert.strictEqual(Object.keys((await tm._testGetCollectionsData()).bars).length, 1);
 
-  t.truthy(map[0].data.collections);
-  t.truthy(map[1].data.collections);
-  t.truthy(map[2].data.collections);
-  t.truthy(Object.keys(map[2].data.collections).length);
+  t.assert.ok(map[0].data.collections);
+  t.assert.ok(map[1].data.collections);
+  t.assert.ok(map[2].data.collections);
+  t.assert.ok(Object.keys(map[2].data.collections).length);
 
-  t.is(Object.keys(map[0].data.collections.all).length, 3);
-  t.is(Object.keys(map[0].data.collections.foos).length, 1);
-  t.is(Object.keys(map[0].data.collections.bars).length, 1);
+  t.assert.strictEqual(Object.keys(map[0].data.collections.all).length, 3);
+  t.assert.strictEqual(Object.keys(map[0].data.collections.foos).length, 1);
+  t.assert.strictEqual(Object.keys(map[0].data.collections.bars).length, 1);
 
-  t.is(Object.keys(map[1].data.collections.all).length, 3);
-  t.is(Object.keys(map[1].data.collections.foos).length, 1);
-  t.is(Object.keys(map[1].data.collections.bars).length, 1);
+  t.assert.strictEqual(Object.keys(map[1].data.collections.all).length, 3);
+  t.assert.strictEqual(Object.keys(map[1].data.collections.foos).length, 1);
+  t.assert.strictEqual(Object.keys(map[1].data.collections.bars).length, 1);
 
-  t.is(Object.keys(map[2].data.collections.all).length, 3);
-  t.is(Object.keys(map[2].data.collections.foos).length, 1);
-  t.is(Object.keys(map[2].data.collections.bars).length, 1);
+  t.assert.strictEqual(Object.keys(map[2].data.collections.all).length, 3);
+  t.assert.strictEqual(Object.keys(map[2].data.collections.foos).length, 1);
+  t.assert.strictEqual(Object.keys(map[2].data.collections.bars).length, 1);
 
   let entry = await getRenderedTmpls(map[2].template, map[2].data);
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     normalizeNewLines(entry[0].templateContent),
     `This page is foos
 This page is bars
@@ -275,36 +273,36 @@ test("Issue #115 with layout, mixing pagination and collections", async (t) => {
   await tm.cache();
 
   let map = tm.getMap();
-  t.is(map.length, 3);
-  t.deepEqual(map[2].template, tmplIndex);
+  t.assert.strictEqual(map.length, 3);
+  t.assert.deepStrictEqual(map[2].template, tmplIndex);
 
   let collections = await tm._testGetAllCollectionsData();
-  t.is(Object.keys(collections.all).length, 3);
-  t.is(Object.keys(collections.foos).length, 1);
-  t.is(Object.keys(collections.bars).length, 1);
-  t.is(Object.keys((await tm._testGetCollectionsData()).all).length, 3);
-  t.is(Object.keys((await tm._testGetCollectionsData()).foos).length, 1);
-  t.is(Object.keys((await tm._testGetCollectionsData()).bars).length, 1);
+  t.assert.strictEqual(Object.keys(collections.all).length, 3);
+  t.assert.strictEqual(Object.keys(collections.foos).length, 1);
+  t.assert.strictEqual(Object.keys(collections.bars).length, 1);
+  t.assert.strictEqual(Object.keys((await tm._testGetCollectionsData()).all).length, 3);
+  t.assert.strictEqual(Object.keys((await tm._testGetCollectionsData()).foos).length, 1);
+  t.assert.strictEqual(Object.keys((await tm._testGetCollectionsData()).bars).length, 1);
 
-  t.truthy(map[0].data.collections);
-  t.truthy(map[1].data.collections);
-  t.truthy(map[2].data.collections);
-  t.truthy(Object.keys(map[2].data.collections).length);
+  t.assert.ok(map[0].data.collections);
+  t.assert.ok(map[1].data.collections);
+  t.assert.ok(map[2].data.collections);
+  t.assert.ok(Object.keys(map[2].data.collections).length);
 
-  t.is(Object.keys(map[0].data.collections.all).length, 3);
-  t.is(Object.keys(map[0].data.collections.foos).length, 1);
-  t.is(Object.keys(map[0].data.collections.bars).length, 1);
+  t.assert.strictEqual(Object.keys(map[0].data.collections.all).length, 3);
+  t.assert.strictEqual(Object.keys(map[0].data.collections.foos).length, 1);
+  t.assert.strictEqual(Object.keys(map[0].data.collections.bars).length, 1);
 
-  t.is(Object.keys(map[1].data.collections.all).length, 3);
-  t.is(Object.keys(map[1].data.collections.foos).length, 1);
-  t.is(Object.keys(map[1].data.collections.bars).length, 1);
+  t.assert.strictEqual(Object.keys(map[1].data.collections.all).length, 3);
+  t.assert.strictEqual(Object.keys(map[1].data.collections.foos).length, 1);
+  t.assert.strictEqual(Object.keys(map[1].data.collections.bars).length, 1);
 
-  t.is(Object.keys(map[2].data.collections.all).length, 3);
-  t.is(Object.keys(map[2].data.collections.foos).length, 1);
-  t.is(Object.keys(map[2].data.collections.bars).length, 1);
+  t.assert.strictEqual(Object.keys(map[2].data.collections.all).length, 3);
+  t.assert.strictEqual(Object.keys(map[2].data.collections.foos).length, 1);
+  t.assert.strictEqual(Object.keys(map[2].data.collections.bars).length, 1);
 
   let entry = await getRenderedTmpls(map[2].template, map[2].data);
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     normalizeNewLines(entry[0].templateContent),
     `This page is foos
 This page is bars
@@ -329,11 +327,11 @@ test("TemplateMap adds collections data and has page data values using .cache()"
 
   let map = tm.getMap();
   await tm.cache();
-  t.is(map[0].data.page.url, "/templateMapCollection/test1/");
-  t.is(map[0].data.page.outputPath, "./test/stubs/_site/templateMapCollection/test1/index.html");
-  t.is(map[0].data.page.inputPath, "./test/stubs/templateMapCollection/test1.md");
-  t.is(map[0].data.page.fileSlug, "test1");
-  t.truthy(map[0].data.page.date);
+  t.assert.strictEqual(map[0].data.page.url, "/templateMapCollection/test1/");
+  t.assert.strictEqual(map[0].data.page.outputPath, "./test/stubs/_site/templateMapCollection/test1/index.html");
+  t.assert.strictEqual(map[0].data.page.inputPath, "./test/stubs/templateMapCollection/test1.md");
+  t.assert.strictEqual(map[0].data.page.fileSlug, "test1");
+  t.assert.ok(map[0].data.page.date);
 });
 
 test("TemplateMap adds collections data and has page data values using ._testGetCollectionsData()", async (t) => {
@@ -352,16 +350,16 @@ test("TemplateMap adds collections data and has page data values using ._testGet
   await tm.add(tmpl2);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.all[0].url, "/templateMapCollection/test1/");
-  t.is(collections.all[0].outputPath, "./test/stubs/_site/templateMapCollection/test1/index.html");
+  t.assert.strictEqual(collections.all[0].url, "/templateMapCollection/test1/");
+  t.assert.strictEqual(collections.all[0].outputPath, "./test/stubs/_site/templateMapCollection/test1/index.html");
 
-  t.is(collections.all[0].data.page.url, "/templateMapCollection/test1/");
-  t.is(
+  t.assert.strictEqual(collections.all[0].data.page.url, "/templateMapCollection/test1/");
+  t.assert.strictEqual(
     collections.all[0].data.page.outputPath,
     "./test/stubs/_site/templateMapCollection/test1/index.html",
   );
-  t.is(collections.all[0].data.page.inputPath, "./test/stubs/templateMapCollection/test1.md");
-  t.is(collections.all[0].data.page.fileSlug, "test1");
+  t.assert.strictEqual(collections.all[0].data.page.inputPath, "./test/stubs/templateMapCollection/test1.md");
+  t.assert.strictEqual(collections.all[0].data.page.fileSlug, "test1");
 });
 
 test("Url should be available in user config collections API calls", async (t) => {
@@ -385,16 +383,16 @@ test("Url should be available in user config collections API calls", async (t) =
   await tm.add(tmpl2);
 
   let collections = await tm._testGetCollectionsData();
-  t.truthy(collections.userCollection);
-  t.truthy(collections.userCollection.length);
-  t.is(collections.userCollection[0].url, "/templateMapCollection/test1/");
-  t.is(
+  t.assert.ok(collections.userCollection);
+  t.assert.ok(collections.userCollection.length);
+  t.assert.strictEqual(collections.userCollection[0].url, "/templateMapCollection/test1/");
+  t.assert.strictEqual(
     collections.userCollection[0].outputPath,
     "./test/stubs/_site/templateMapCollection/test1/index.html",
   );
 
-  t.is(collections.userCollection[0].data.page.url, "/templateMapCollection/test1/");
-  t.is(
+  t.assert.strictEqual(collections.userCollection[0].data.page.url, "/templateMapCollection/test1/");
+  t.assert.strictEqual(
     collections.userCollection[0].data.page.outputPath,
     "./test/stubs/_site/templateMapCollection/test1/index.html",
   );
@@ -409,10 +407,10 @@ test("Url should be available in user config collections API calls (test in call
     function(cfg) {
       cfg.addCollection("userCollection", function (collection) {
         let all = collection.getAll();
-        t.is(all[0].url, "/templateMapCollection/test1/");
-        t.is(all[0].outputPath, "./test/stubs/_site/templateMapCollection/test1/index.html");
-        t.is(all[1].url, "/templateMapCollection/test2/");
-        t.is(all[1].outputPath, "./test/stubs/_site/templateMapCollection/test2/index.html");
+        t.assert.strictEqual(all[0].url, "/templateMapCollection/test1/");
+        t.assert.strictEqual(all[0].outputPath, "./test/stubs/_site/templateMapCollection/test1/index.html");
+        t.assert.strictEqual(all[1].url, "/templateMapCollection/test2/");
+        t.assert.strictEqual(all[1].outputPath, "./test/stubs/_site/templateMapCollection/test2/index.html");
 
         return all;
       });
@@ -446,8 +444,8 @@ test("Should be able to paginate a tag generated collection", async (t) => {
   await tm.add(pagedTmpl);
 
   let collections = await tm._testGetCollectionsData();
-  t.truthy(collections.dog);
-  t.truthy(collections.dog.length);
+  t.assert.ok(collections.dog);
+  t.assert.ok(collections.dog.length);
 });
 
 test("Should be able to paginate a user config collection", async (t) => {
@@ -480,8 +478,8 @@ test("Should be able to paginate a user config collection", async (t) => {
   await tm.add(pagedTmpl);
 
   let collections = await tm._testGetCollectionsData();
-  t.truthy(collections.userCollection);
-  t.truthy(collections.userCollection.length);
+  t.assert.ok(collections.userCollection);
+  t.assert.ok(collections.userCollection.length);
 });
 
 test("Should be able to paginate a user config collection (uses rendered permalink)", async (t) => {
@@ -493,8 +491,8 @@ test("Should be able to paginate a user config collection (uses rendered permali
     function(cfg) {
       cfg.addCollection("userCollection", function (collection) {
         let all = collection.getFilteredByTag("dog");
-        t.is(all[0].url, "/templateMapCollection/test1/");
-        t.is(all[0].outputPath, "./test/stubs/_site/templateMapCollection/test1/index.html");
+        t.assert.strictEqual(all[0].url, "/templateMapCollection/test1/");
+        t.assert.strictEqual(all[0].outputPath, "./test/stubs/_site/templateMapCollection/test1/index.html");
         return all;
       });
     }
@@ -516,14 +514,14 @@ test("Should be able to paginate a user config collection (uses rendered permali
   await tm.add(pagedTmpl);
 
   let collections = await tm._testGetCollectionsData();
-  t.truthy(collections.userCollection);
-  t.truthy(collections.userCollection.length);
+  t.assert.ok(collections.userCollection);
+  t.assert.ok(collections.userCollection.length);
 
   let urls = [];
   for (let item of collections.all) {
     urls.push(item.url);
   }
-  t.is(urls.indexOf("/test-title/hello/") > -1, true);
+  t.assert.strictEqual(urls.indexOf("/test-title/hello/") > -1, true);
 });
 
 test("Should be able to paginate a user config collection (paged template is also tagged)", async (t) => {
@@ -558,11 +556,11 @@ test("Should be able to paginate a user config collection (paged template is als
   await tm.add(pagedTmpl);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.dog.length, 2);
+  t.assert.strictEqual(collections.dog.length, 2);
 
-  t.truthy(collections.haha);
-  t.is(collections.haha.length, 1);
-  t.is(collections.haha[0].url, "/templateMapCollection/paged-cfg-tagged/");
+  t.assert.ok(collections.haha);
+  t.assert.strictEqual(collections.haha.length, 1);
+  t.assert.strictEqual(collections.haha[0].url, "/templateMapCollection/paged-cfg-tagged/");
 });
 
 test("Should be able to paginate a user config collection (paged template is also tagged, add all pages to collections)", async (t) => {
@@ -597,12 +595,12 @@ test("Should be able to paginate a user config collection (paged template is als
   await tm.add(pagedTmpl);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.dog.length, 2);
+  t.assert.strictEqual(collections.dog.length, 2);
 
-  t.truthy(collections.haha);
-  t.is(collections.haha.length, 2);
-  t.is(collections.haha[0].url, "/templateMapCollection/paged-cfg-tagged-apply-to-all/");
-  t.is(collections.haha[1].url, "/templateMapCollection/paged-cfg-tagged-apply-to-all/1/");
+  t.assert.ok(collections.haha);
+  t.assert.strictEqual(collections.haha.length, 2);
+  t.assert.strictEqual(collections.haha[0].url, "/templateMapCollection/paged-cfg-tagged-apply-to-all/");
+  t.assert.strictEqual(collections.haha[1].url, "/templateMapCollection/paged-cfg-tagged-apply-to-all/1/");
 });
 
 test("Should be able to paginate a user config collection (paged template is also tagged, uses custom rendered permalink)", async (t) => {
@@ -637,9 +635,9 @@ test("Should be able to paginate a user config collection (paged template is als
   await tm.add(pagedTmpl);
 
   let collections = await tm._testGetCollectionsData();
-  t.truthy(collections.haha);
-  t.is(collections.haha.length, 1);
-  t.is(collections.haha[0].url, "/test-title/goodbye/");
+  t.assert.ok(collections.haha);
+  t.assert.strictEqual(collections.haha.length, 1);
+  t.assert.strictEqual(collections.haha[0].url, "/test-title/goodbye/");
 });
 
 test("Should be able to paginate a user config collection (paged template is also tagged, uses custom rendered permalink, add all pages to collections)", async (t) => {
@@ -674,10 +672,10 @@ test("Should be able to paginate a user config collection (paged template is als
   await tm.add(pagedTmpl);
 
   let collections = await tm._testGetCollectionsData();
-  t.truthy(collections.haha);
-  t.is(collections.haha.length, 2);
-  t.is(collections.haha[0].url, "/test-title/goodbye/");
-  t.is(collections.haha[1].url, "/test-title-4/goodbye/");
+  t.assert.ok(collections.haha);
+  t.assert.strictEqual(collections.haha.length, 2);
+  t.assert.strictEqual(collections.haha[0].url, "/test-title/goodbye/");
+  t.assert.strictEqual(collections.haha[1].url, "/test-title-4/goodbye/");
 });
 
 test("TemplateMap render and templateContent are the same (templateContent doesn’t have layout but makes proper use of layout front matter data)", async (t) => {
@@ -700,8 +698,8 @@ test("TemplateMap render and templateContent are the same (templateContent doesn
 
   let map = tm.getMap();
   await tm.cache();
-  t.is(map[0]._pages[0].templateContent.trim(), "<p>Inherited</p>");
-  t.is((await renderTemplate(map[0].template, map[0].data)).trim(), "<p>Inherited</p>");
+  t.assert.strictEqual(map[0]._pages[0].templateContent.trim(), "<p>Inherited</p>");
+  t.assert.strictEqual((await renderTemplate(map[0].template, map[0].data)).trim(), "<p>Inherited</p>");
 });
 
 test("Should be able to paginate a tag generated collection (and it has templateContent)", async (t) => {
@@ -731,17 +729,17 @@ test("Should be able to paginate a tag generated collection (and it has template
   );
 
   let templates = await getRenderedTmpls(pagedMapEntry.template, pagedMapEntry.data);
-  t.is(templates.length, 2);
-  t.is(templates[0].data.pagination.pageNumber, 0);
-  t.is(templates[1].data.pagination.pageNumber, 1);
+  t.assert.strictEqual(templates.length, 2);
+  t.assert.strictEqual(templates[0].data.pagination.pageNumber, 0);
+  t.assert.strictEqual(templates[1].data.pagination.pageNumber, 1);
 
-  t.is(
+  t.assert.strictEqual(
     templates[0].templateContent.trim(),
     `<p>Before</p>
 <h1>Test 1</h1>
 <p>After</p>`,
   );
-  t.is(
+  t.assert.strictEqual(
     templates[1].templateContent.trim(),
     `<p>Before</p>
 <h1>Test 4</h1>
@@ -776,9 +774,9 @@ test("Should be able to paginate a tag generated collection when aliased (and it
   );
 
   let templates = await getRenderedTmpls(pagedMapEntry.template, pagedMapEntry.data);
-  t.is(templates.length, 1);
-  t.is(templates[0].data.pagination.pageNumber, 0);
-  t.is(
+  t.assert.strictEqual(templates.length, 1);
+  t.assert.strictEqual(templates[0].data.pagination.pageNumber, 0);
+  t.assert.strictEqual(
     templates[0].templateContent.trim(),
     `<p>Before</p>
 <h1>Test 1</h1>
@@ -820,12 +818,12 @@ test("Issue #253: Paginated template with a tag should put multiple pages into a
   await tm.add(pagedTmpl);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.dog.length, 2);
+  t.assert.strictEqual(collections.dog.length, 2);
 
-  t.truthy(collections.haha);
-  t.is(collections.haha.length, 2);
-  t.is(collections.haha[0].url, "/tagged-pagination-multiples/test/");
-  t.is(collections.haha[1].url, "/tagged-pagination-multiples/test/1/");
+  t.assert.ok(collections.haha);
+  t.assert.strictEqual(collections.haha.length, 2);
+  t.assert.strictEqual(collections.haha[0].url, "/tagged-pagination-multiples/test/");
+  t.assert.strictEqual(collections.haha[1].url, "/tagged-pagination-multiples/test/1/");
 });
 
 test("getUserConfigCollectionNames", async (t) => {
@@ -842,7 +840,7 @@ test("getUserConfigCollectionNames", async (t) => {
   );
 
   let tm = new TemplateMap(eleventyConfig);
-  t.deepEqual(tm.getUserConfigCollectionNames(), ["userCollection", "otherUserCollection"]);
+  t.assert.deepStrictEqual(tm.getUserConfigCollectionNames(), ["userCollection", "otherUserCollection"]);
 });
 
 test("isUserConfigCollectionName", async (t) => {
@@ -857,8 +855,8 @@ test("isUserConfigCollectionName", async (t) => {
 
   let tm = new TemplateMap(eleventyConfig);
 
-  t.is(tm.isUserConfigCollectionName("userCollection"), true);
-  t.is(tm.isUserConfigCollectionName("userCollection2"), false);
+  t.assert.strictEqual(tm.isUserConfigCollectionName("userCollection"), true);
+  t.assert.strictEqual(tm.isUserConfigCollectionName("userCollection2"), false);
 });
 
 test("Dependency Map should have nodes that have no dependencies and no dependents", async (t) => {
@@ -874,10 +872,10 @@ test("Dependency Map should have nodes that have no dependencies and no dependen
   await tm.cache();
 
   let deps = tm.getTemplateOrder();
-  t.true(deps.filter((dep) => dep.indexOf("test5.md") > -1).length > 0);
+  t.assert.strictEqual(deps.filter((dep) => dep.indexOf("test5.md") > -1).length > 0, true);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.all.length, 2);
+  t.assert.strictEqual(collections.all.length, 2);
 });
 
 test("Dependency Map should have include orphan user config collections (in the correct order) #3711", async (t) => {
@@ -900,7 +898,7 @@ test("Dependency Map should have include orphan user config collections (in the 
   await tm.cache();
 
   let deps = tm.getTemplateOrder();
-  t.deepEqual(deps,  [
+  t.assert.deepStrictEqual(deps,  [
     './test/stubs/templateMapCollection/test1.md',
     '__collection:post',
     '__collection:dog',
@@ -911,8 +909,8 @@ test("Dependency Map should have include orphan user config collections (in the 
   ]);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.all.length, 2);
-  t.is(collections.userCollection.length, 2);
+  t.assert.strictEqual(collections.all.length, 2);
+  t.assert.strictEqual(collections.userCollection.length, 2);
 });
 
 test("Dependency Map should have include orphan user config collections, mapped by user collection api to tag #3711", async (t) => {
@@ -935,7 +933,7 @@ test("Dependency Map should have include orphan user config collections, mapped 
   await tm.cache();
 
   let deps = tm.getTemplateOrder();
-  t.deepEqual(deps,  [
+  t.assert.deepStrictEqual(deps,  [
     './test/stubs/templateMapCollection/test1.md',
     '__collection:post',
     '__collection:dog',
@@ -946,8 +944,8 @@ test("Dependency Map should have include orphan user config collections, mapped 
   ]);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.all.length, 2);
-  t.is(collections.userCollection.length, 1);
+  t.assert.strictEqual(collections.all.length, 2);
+  t.assert.strictEqual(collections.userCollection.length, 1);
 });
 
 test("Template pages should not have layouts when added to collections", async (t) => {
@@ -966,11 +964,11 @@ test("Template pages should not have layouts when added to collections", async (
     eleventyConfig,
   );
   await tm.add(tmpl);
-  t.is(await renderTemplate(tmpl, await tmpl.getData()), "<div>Layout Test</div>");
+  t.assert.strictEqual(await renderTemplate(tmpl, await tmpl.getData()), "<div>Layout Test</div>");
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.all.length, 1);
-  t.is(collections.all[0].templateContent, "Layout Test");
+  t.assert.strictEqual(collections.all.length, 1);
+  t.assert.strictEqual(collections.all[0].templateContent, "Layout Test");
 });
 
 test("Paginated template pages should not have layouts when added to collections", async (t) => {
@@ -993,10 +991,10 @@ test("Paginated template pages should not have layouts when added to collections
 
   let collections = await tm._testGetCollectionsData();
 
-  t.is(collections.all.length, 3);
-  t.is(collections.all[0].templateContent, "one");
-  t.is(collections.all[1].templateContent, "two");
-  t.is(collections.all[2].templateContent, "three");
+  t.assert.strictEqual(collections.all.length, 3);
+  t.assert.strictEqual(collections.all[0].templateContent, "one");
+  t.assert.strictEqual(collections.all[1].templateContent, "two");
+  t.assert.strictEqual(collections.all[2].templateContent, "three");
 });
 
 test("Tag pages. Allow pagination over all collections a la `data: collections`", async (t) => {
@@ -1019,7 +1017,7 @@ test("Tag pages. Allow pagination over all collections a la `data: collections`"
   await tm.add(tmpl2);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.all.length, 3);
+  t.assert.strictEqual(collections.all.length, 3);
 
   let collectionTagPagesTemplateContents = new Set(
     collections.all
@@ -1030,7 +1028,7 @@ test("Tag pages. Allow pagination over all collections a la `data: collections`"
         return entry.templateContent.trim();
       }),
   );
-  t.deepEqual(collectionTagPagesTemplateContents, new Set(["post"]));
+  t.assert.deepStrictEqual(collectionTagPagesTemplateContents, new Set(["post"]));
 });
 
 test("Tag pages (all pages added to collections). Allow pagination over all collections a la `data: collections`", async (t) => {
@@ -1053,7 +1051,7 @@ test("Tag pages (all pages added to collections). Allow pagination over all coll
   await tm.add(tmpl2);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.all.length, 5);
+  t.assert.strictEqual(collections.all.length, 5);
 
   let collectionTagPagesTemplateContents = new Set(
     collections.all
@@ -1064,7 +1062,7 @@ test("Tag pages (all pages added to collections). Allow pagination over all coll
         return entry.templateContent.trim();
       }),
   );
-  t.deepEqual(collectionTagPagesTemplateContents, new Set(["post", "dog", "cat"]));
+  t.assert.deepStrictEqual(collectionTagPagesTemplateContents, new Set(["post", "dog", "cat"]));
 });
 
 test("eleventyExcludeFromCollections", async (t) => {
@@ -1086,12 +1084,12 @@ test("eleventyExcludeFromCollections", async (t) => {
 
   await tm.cache();
 
-  t.is(tm.getMap().length, 2);
+  t.assert.strictEqual(tm.getMap().length, 2);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.all.length, 1);
-  t.is(collections.post.length, 1);
-  t.is(collections.dog.length, 1);
+  t.assert.strictEqual(collections.all.length, 1);
+  t.assert.strictEqual(collections.post.length, 1);
+  t.assert.strictEqual(collections.dog.length, 1);
 });
 
 test("eleventyExcludeFromCollections and permalink: false", async (t) => {
@@ -1113,12 +1111,12 @@ test("eleventyExcludeFromCollections and permalink: false", async (t) => {
 
   await tm.cache();
 
-  t.is(tm.getMap().length, 2);
+  t.assert.strictEqual(tm.getMap().length, 2);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.all.length, 1);
-  t.is(collections.post.length, 1);
-  t.is(collections.dog.length, 1);
+  t.assert.strictEqual(collections.all.length, 1);
+  t.assert.strictEqual(collections.post.length, 1);
+  t.assert.strictEqual(collections.dog.length, 1);
 });
 
 test("Paginate over collections.all", async (t) => {
@@ -1141,20 +1139,20 @@ test("Paginate over collections.all", async (t) => {
   await tm.add(tmpl2);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.all.length, 4);
-  t.is(
+  t.assert.strictEqual(collections.all.length, 4);
+  t.assert.strictEqual(
     collections.all.filter(function (entry) {
       return entry.inputPath.endsWith("test1.md");
     }).length,
     1,
   );
-  t.is(
+  t.assert.strictEqual(
     collections.all.filter(function (entry) {
       return entry.inputPath.endsWith("test2.md");
     }).length,
     1,
   );
-  t.is(
+  t.assert.strictEqual(
     collections.all.filter(function (entry) {
       return entry.inputPath.endsWith("paginateall.njk");
     }).length,
@@ -1162,14 +1160,14 @@ test("Paginate over collections.all", async (t) => {
   );
 
   let map = tm.getMap();
-  t.is(map[0].inputPath, "./test/stubs/page-target-collections/paginateall.njk");
-  t.is(map[0]._pages.length, 2);
-  t.is(map[0]._pages[0].templateContent, "INPUT PATH:./test/stubs/templateMapCollection/test1.md");
-  t.is(map[0]._pages[1].templateContent, "INPUT PATH:./test/stubs/templateMapCollection/test2.md");
-  t.is(map[1].inputPath, "./test/stubs/templateMapCollection/test1.md");
-  t.is(map[1]._pages[0].templateContent.trim(), "<h1>Test 1</h1>");
-  t.is(map[2].inputPath, "./test/stubs/templateMapCollection/test2.md");
-  t.is(map[2]._pages[0].templateContent.trim(), "<h1>Test 2</h1>");
+  t.assert.strictEqual(map[0].inputPath, "./test/stubs/page-target-collections/paginateall.njk");
+  t.assert.strictEqual(map[0]._pages.length, 2);
+  t.assert.strictEqual(map[0]._pages[0].templateContent, "INPUT PATH:./test/stubs/templateMapCollection/test1.md");
+  t.assert.strictEqual(map[0]._pages[1].templateContent, "INPUT PATH:./test/stubs/templateMapCollection/test2.md");
+  t.assert.strictEqual(map[1].inputPath, "./test/stubs/templateMapCollection/test1.md");
+  t.assert.strictEqual(map[1]._pages[0].templateContent.trim(), "<h1>Test 1</h1>");
+  t.assert.strictEqual(map[2].inputPath, "./test/stubs/templateMapCollection/test2.md");
+  t.assert.strictEqual(map[2]._pages[0].templateContent.trim(), "<h1>Test 2</h1>");
 });
 
 test("Paginate over collections (tag pages) related to #3823", async (t) => {
@@ -1193,7 +1191,7 @@ test("Paginate over collections (tag pages) related to #3823", async (t) => {
 
   let collections = await tm._testGetCollectionsData();
   // 2 individual templates, 3 pages for tagpagesall
-  t.deepEqual(collections.all.map(entry => entry.url).sort(), [
+  t.assert.deepStrictEqual(collections.all.map(entry => entry.url).sort(), [
     '/test/stubs/page-target-collections/tagpagesall/',
     '/test/stubs/page-target-collections/tagpagesall/1/',
     '/test/stubs/page-target-collections/tagpagesall/2/',
@@ -1230,7 +1228,7 @@ test("Paginate over collections.all WITH a paginate over collections (tag pages)
 
   let collections = await tm._testGetCollectionsData();
   // 2 individual templates, 3 pages for tagpagesall, 5 pages from paginateall to paginate the 2+3
-  t.is(collections.all.length, 10);
+  t.assert.strictEqual(collections.all.length, 10);
 });
 
 test("Test a transform with a layout (via templateMap)", async (t) => {
@@ -1252,15 +1250,15 @@ test("Test a transform with a layout (via templateMap)", async (t) => {
 
   tmpl.addLinter(function (content, inputPath, outputPath) {
     // should be pre-transform content
-    t.is(content, "<html><body>This is content.</body></html>");
-    t.true(inputPath.endsWith("transform-layout.njk"));
-    t.true(outputPath.endsWith("transform-layout/index.html"));
+    t.assert.strictEqual(content, "<html><body>This is content.</body></html>");
+    t.assert.strictEqual(inputPath.endsWith("transform-layout.njk"), true);
+    t.assert.strictEqual(outputPath.endsWith("transform-layout/index.html"), true);
   });
 
   tmpl.setTransforms({
     transformName: function (content, outputPath) {
-      t.is(content, "<html><body>This is content.</body></html>");
-      t.true(outputPath.endsWith("transform-layout/index.html"));
+      t.assert.strictEqual(content, "<html><body>This is content.</body></html>");
+      t.assert.strictEqual(outputPath.endsWith("transform-layout/index.html"), true);
       return "OVERRIDE BY A TRANSFORM";
     }
   });
@@ -1268,11 +1266,11 @@ test("Test a transform with a layout (via templateMap)", async (t) => {
   await tm.add(tmpl);
 
   await tm.cache();
-  t.is(tm.getMap().length, 1);
+  t.assert.strictEqual(tm.getMap().length, 1);
 
   for (let entry of tm.getMap()) {
     for (let page of entry._pages) {
-      t.is(await page.template.renderPageEntry(page), "OVERRIDE BY A TRANSFORM");
+      t.assert.strictEqual(await page.template.renderPageEntry(page), "OVERRIDE BY A TRANSFORM");
     }
   }
 });
@@ -1300,9 +1298,9 @@ test("Async user collection addCollection method", async (t) => {
   await tm.add(tmpl1);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.userCollection[0].url, "/templateMapCollection/test1/");
+  t.assert.strictEqual(collections.userCollection[0].url, "/templateMapCollection/test1/");
 
-  t.is(collections.userCollection[0].data.collections.userCollection.length, 1);
+  t.assert.strictEqual(collections.userCollection[0].data.collections.userCollection.length, 1);
 });
 
 test("Duplicate permalinks in template map", async (t) => {
@@ -1324,7 +1322,7 @@ test("Duplicate permalinks in template map", async (t) => {
   let tm = new TemplateMap(eleventyConfig);
   await tm.add(tmpl1);
   await tm.add(tmpl2);
-  await t.throwsAsync(async () => {
+  await t.assert.rejects(async () => {
     await tm.cache();
   });
 });
@@ -1349,7 +1347,7 @@ test("No duplicate permalinks in template map, using false", async (t) => {
   await tm.add(tmpl1);
   await tm.add(tmpl2);
   await tm.cache();
-  t.true(true);
+  t.assert.strictEqual(true, true);
 });
 
 test("Duplicate permalinks in template map, no leading slash", async (t) => {
@@ -1372,7 +1370,7 @@ test("Duplicate permalinks in template map, no leading slash", async (t) => {
   await tm.add(tmpl1);
   await tm.add(tmpl3);
 
-  await t.throwsAsync(async () => {
+  await t.assert.rejects(async () => {
     await tm.cache();
   });
 });
@@ -1399,22 +1397,22 @@ test("TemplateMap circular references (map.templateContent) using eleventyExclud
   await tm.add(tmpl);
 
   let map = tm.getMap();
-  t.falsy(map[0].data.collections);
+  t.assert.ok(!(map[0].data.collections));
 
   await tm.cache();
 
   let deps = tm.getTemplateOrder();
-  t.deepEqual(deps, [
+  t.assert.deepStrictEqual(deps, [
     "./test/stubs/issue-522/excluded.md",
     "./test/stubs/issue-522/template.md",
     "__collection:[keys]",
     "__collection:all",
   ]);
 
-  t.is(tm.getMap().length, 2);
+  t.assert.strictEqual(tm.getMap().length, 2);
 
   let collections = await tm._testGetCollectionsData();
-  t.is(collections.all.length, 1);
+  t.assert.strictEqual(collections.all.length, 1);
 });
 
 test("eleventy.layouts Event", async (t) => {
@@ -1427,7 +1425,7 @@ test("eleventy.layouts Event", async (t) => {
 		},
     function(cfg) {
       cfg.on("buildawesome.layouts", (layoutMap) => {
-        t.deepEqual(layoutMap, {
+        t.assert.deepStrictEqual(layoutMap, {
           "./test/stubs-layouts-event/_includes/first.liquid": ["./test/stubs-layouts-event/page.md"],
           "./test/stubs-layouts-event/_includes/second.liquid": [
             "./test/stubs-layouts-event/page.md",

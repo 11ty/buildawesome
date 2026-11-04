@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#3788 Nunjucks shortcodes args", async (t) => {
@@ -14,5 +14,5 @@ test("#3788 Nunjucks shortcodes args", async (t) => {
 
 	let [result] = await elev.toJSON();
 
-	t.is(result.content, `undefined:""`);
+	t.assert.strictEqual(result.content, `undefined:""`);
 });

@@ -54,15 +54,13 @@
 	],
 	"scripts": {
 		"default": "npm run test",
-		"test": "npm run test:server && npm run test:browser",
-		"test:server": "npm run test:node && npm run test:ava",
-		"test:ava": "ava --verbose --timeout 20s",
-		"test:node": "node --test 'test_node/**/*test.js'",
+		"test": "npm run test:core && npm run test:browser",
+		"test:core": "node --test --test-timeout=20000 'test/[!_]*.js' 'test/_issues/**/*test.js'",
 		"test:browser": "cross-env CI=true npm run test --workspaces",
 		"format": "prettier . --write",
 		"check": "eslint src",
 		"typescript": "tsc && node scripts/prune-types.js",
-		"coverage": "npx c8 ava && npx c8 report --reporter=json-summary && cp coverage/coverage-summary.json docs/_data/coverage.json && node cmd.cjs --config=docs/eleventy.coverage.js",
+		"coverage": "npx c8 npm run test:core && npx c8 report --reporter=json-summary && cp coverage/coverage-summary.json docs/_data/coverage.json && node cmd.cjs --config=docs/eleventy.coverage.js",
 		"nano-staged": "nano-staged",
 		"prepare": "simple-git-hooks"
 	},
@@ -73,21 +71,6 @@
 	},
 	"bugs": "https://github.com/11ty/buildawesome/issues",
 	"homepage": "https://www.11ty.dev/",
-	"ava": {
-		"environmentVariables": {},
-		"failFast": true,
-		"files": [
-			"./test/*.js",
-			"./test/_issues/**/*test.js"
-		],
-		"watchMode": {
-			"ignoreChanges": [
-				"./test/stubs*/**/*",
-				"./test/**/_site/**/*",
-				".cache"
-			]
-		}
-	},
 	"nano-staged": {
 		"*.{js,css,md}": [
 			"prettier --write"
@@ -109,7 +92,6 @@
 		"@types/node": "^26.6.6",
 		"@vue/server-renderer": "^3.5.44",
 		"@zachleat/noop": "^1.0.7",
-		"ava": "^8.3.0",
 		"c8": "^12.0.0",
 		"cross-env": "^10.1.0",
 		"eslint": "^10.14.0",

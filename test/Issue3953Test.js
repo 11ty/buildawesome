@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#3953 Functions nested in computed data arrays, not shared across pages", async (t) => {
@@ -22,7 +22,7 @@ test("#3953 Functions nested in computed data arrays, not shared across pages", 
   let results = await elev.toJSON();
   results.sort((a, b) => a.url.localeCompare(b.url));
 
-  t.is(results.length, 2);
-  t.is(results[0].content.trim(), `{"@graph":[{"name":"Acme Co.","title":"One"},"One","fn-One"]}`);
-  t.is(results[1].content.trim(), `{"@graph":[{"name":"Acme Co.","title":"Two"},"Two","fn-Two"]}`);
+  t.assert.strictEqual(results.length, 2);
+  t.assert.strictEqual(results[0].content.trim(), `{"@graph":[{"name":"Acme Co.","title":"One"},"One","fn-One"]}`);
+  t.assert.strictEqual(results[1].content.trim(), `{"@graph":[{"name":"Acme Co.","title":"Two"},"Two","fn-Two"]}`);
 });

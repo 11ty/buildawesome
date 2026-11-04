@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import fs from "fs";
 import { load } from "js-yaml";
 
@@ -29,24 +29,24 @@ test("Local data", async (t) => {
   let data = await dataObj.getGlobalData();
 
   // YAML GLOBAL DATA
-  t.is(data.globalData3.datakey1, "datavalue3");
-  t.is(data.globalData3.datakey2, "{{pkg.name}}--yaml");
+  t.assert.strictEqual(data.globalData3.datakey1, "datavalue3");
+  t.assert.strictEqual(data.globalData3.datakey2, "{{pkg.name}}--yaml");
 
   // NOSJ (JSON) GLOBAL DATA
-  t.is(data.globalData4.datakey1, "datavalue4");
-  t.is(data.globalData4.datakey2, "{{pkg.name}}--nosj");
+  t.assert.strictEqual(data.globalData4.datakey1, "datavalue4");
+  t.assert.strictEqual(data.globalData4.datakey2, "{{pkg.name}}--nosj");
 
   let withLocalData = await dataObj.getTemplateDirectoryData(
     "./test/stubs-630/component-yaml/component.njk"
   );
 
-  t.is(withLocalData.yamlKey1, "yaml1");
-  t.is(withLocalData.yamlKey2, "yaml2");
-  t.is(withLocalData.yamlKey3, "yaml3");
-  t.is(withLocalData.nosjKey1, "nosj1");
-  t.is(withLocalData.jsonKey1, "json1");
-  t.is(withLocalData.jsonKey2, "json2");
-  t.is(withLocalData.jsKey1, "js1");
+  t.assert.strictEqual(withLocalData.yamlKey1, "yaml1");
+  t.assert.strictEqual(withLocalData.yamlKey2, "yaml2");
+  t.assert.strictEqual(withLocalData.yamlKey3, "yaml3");
+  t.assert.strictEqual(withLocalData.nosjKey1, "nosj1");
+  t.assert.strictEqual(withLocalData.jsonKey1, "json1");
+  t.assert.strictEqual(withLocalData.jsonKey2, "json2");
+  t.assert.strictEqual(withLocalData.jsKey1, "js1");
 });
 
 test("Local files", async (t) => {
@@ -64,7 +64,7 @@ test("Local files", async (t) => {
   dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
   let files = await dataObj.getLocalDataPaths("./test/stubs-630/component-yaml/component.njk");
-  t.deepEqual(files, [
+  t.assert.deepStrictEqual(files, [
     "./test/stubs-630/stubs-630.yaml",
     "./test/stubs-630/stubs-630.nosj",
     "./test/stubs-630/stubs-630.json",
@@ -155,31 +155,31 @@ test("Global data", async (t) => {
   dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
 
-  t.deepEqual(dataObj.getGlobalDataGlob(), [
+  t.assert.deepStrictEqual(dataObj.getGlobalDataGlob(), [
     `./test/stubs-630/_data/**/*.{nosj,yaml,json,mjs,cjs,js${isTypeScriptSupported() ? ",mts,cts,ts" : ""}}`,
   ]);
 
   let data = await dataObj.getGlobalData();
 
   // JS GLOBAL DATA
-  t.is(data.globalData0.datakey1, "datavalue0");
+  t.assert.strictEqual(data.globalData0.datakey1, "datavalue0");
 
   // CJS GLOBAL DATA
-  t.is(data.globalData1.datakey1, "datavalue1");
+  t.assert.strictEqual(data.globalData1.datakey1, "datavalue1");
 
   // JSON GLOBAL DATA
-  t.is(data.globalData2.datakey1, "datavalue2");
-  t.is(data.globalData2.datakey2, "{{pkg.name}}--json");
+  t.assert.strictEqual(data.globalData2.datakey1, "datavalue2");
+  t.assert.strictEqual(data.globalData2.datakey2, "{{pkg.name}}--json");
 
   // YAML GLOBAL DATA
-  t.is(data.globalData3.datakey1, "datavalue3");
-  t.is(data.globalData3.datakey2, "{{pkg.name}}--yaml");
+  t.assert.strictEqual(data.globalData3.datakey1, "datavalue3");
+  t.assert.strictEqual(data.globalData3.datakey2, "{{pkg.name}}--yaml");
 
   // NOSJ (JSON) GLOBAL DATA
-  t.is(data.globalData4.datakey1, "datavalue4");
-  t.is(data.globalData4.datakey2, "{{pkg.name}}--nosj");
+  t.assert.strictEqual(data.globalData4.datakey1, "datavalue4");
+  t.assert.strictEqual(data.globalData4.datakey2, "{{pkg.name}}--nosj");
 
-  t.is(data.subdir.globalDataSubdir.keyyaml, "yaml");
+  t.assert.strictEqual(data.subdir.globalDataSubdir.keyyaml, "yaml");
 });
 
 test("Global data merging and priority", async (t) => {
@@ -201,17 +201,17 @@ test("Global data merging and priority", async (t) => {
   let data = await dataObj.getGlobalData();
 
   // TESTING GLOBAL DATA PRIORITY AND MERGING
-  t.is(data.mergingGlobalData.datakey0, "js-value0");
-  t.is(data.mergingGlobalData.datakey1, "cjs-value1");
-  t.is(data.mergingGlobalData.datakey2, "json-value2");
-  t.is(data.mergingGlobalData.datakey3, "yaml-value3");
-  t.is(data.mergingGlobalData.datakey4, "nosj-value4");
+  t.assert.strictEqual(data.mergingGlobalData.datakey0, "js-value0");
+  t.assert.strictEqual(data.mergingGlobalData.datakey1, "cjs-value1");
+  t.assert.strictEqual(data.mergingGlobalData.datakey2, "json-value2");
+  t.assert.strictEqual(data.mergingGlobalData.datakey3, "yaml-value3");
+  t.assert.strictEqual(data.mergingGlobalData.datakey4, "nosj-value4");
 
-  t.is(data.mergingGlobalData.jskey, "js");
-  t.is(data.mergingGlobalData.cjskey, "cjs");
-  t.is(data.mergingGlobalData.jsonkey, "json");
-  t.is(data.mergingGlobalData.yamlkey, "yaml");
-  t.is(data.mergingGlobalData.nosjkey, "nosj");
+  t.assert.strictEqual(data.mergingGlobalData.jskey, "js");
+  t.assert.strictEqual(data.mergingGlobalData.cjskey, "cjs");
+  t.assert.strictEqual(data.mergingGlobalData.jsonkey, "json");
+  t.assert.strictEqual(data.mergingGlobalData.yamlkey, "yaml");
+  t.assert.strictEqual(data.mergingGlobalData.nosjkey, "nosj");
 });
 
 test("Binary data files, encoding: null", async (t) => {
@@ -224,7 +224,7 @@ test("Binary data files, encoding: null", async (t) => {
     function(cfg) {
       cfg.addDataExtension("jpg", {
         parser: (s) => {
-          t.true(Buffer.isBuffer(s));
+          t.assert.strictEqual(Buffer.isBuffer(s), true);
           // s is a Buffer, just return the length as a sample
           return s.length;
         },
@@ -239,7 +239,7 @@ test("Binary data files, encoding: null", async (t) => {
   dataObj.setFileSystemSearch(new FileSystemSearch());
 
   let data = await dataObj.getGlobalData();
-  t.is(data.images.dog, 43183);
+  t.assert.strictEqual(data.images.dog, 43183);
 });
 
 test("Binary data files, read: false", async (t) => {
@@ -252,7 +252,7 @@ test("Binary data files, read: false", async (t) => {
     function(cfg) {
       cfg.addDataExtension("jpg", {
         parser: (s) => {
-          t.true(fs.existsSync(s));
+          t.assert.strictEqual(fs.existsSync(s), true);
           // s is a Buffer, just return the length as a sample
           return s;
         },
@@ -267,7 +267,7 @@ test("Binary data files, read: false", async (t) => {
   dataObj.setFileSystemSearch(new FileSystemSearch());
 
   let data = await dataObj.getGlobalData();
-  t.is(data.images.dog, "./test/stubs-2378/_data/images/dog.jpg");
+  t.assert.strictEqual(data.images.dog, "./test/stubs-2378/_data/images/dog.jpg");
 });
 
 test("Binary data files, encoding: null (multiple data extensions)", async (t) => {
@@ -280,7 +280,7 @@ test("Binary data files, encoding: null (multiple data extensions)", async (t) =
     function(cfg) {
       cfg.addDataExtension("jpg, png", {
         parser: function (s) {
-          t.true(Buffer.isBuffer(s));
+          t.assert.strictEqual(Buffer.isBuffer(s), true);
           // s is a Buffer, just return the length as a sample
           return s.length;
         },
@@ -295,13 +295,13 @@ test("Binary data files, encoding: null (multiple data extensions)", async (t) =
   dataObj.setFileSystemSearch(new FileSystemSearch());
 
   let data = await dataObj.getGlobalData();
-  t.is(data.images.dog, 43183);
-  t.is(data.images.dogpng, 2890);
+  t.assert.strictEqual(data.images.dog, 43183);
+  t.assert.strictEqual(data.images.dogpng, 2890);
 });
 
 test("Missing `parser` property to addDataExtension object throws error", async (t) => {
   let eleventyConfig = new TemplateConfig();
-  t.throws(() => {
+  t.assert.throws(() => {
     eleventyConfig.userConfig.addDataExtension("jpg", {});
   }, {
     message: "Expected `parser` property in second argument object to `eleventyConfig.addDataExtension`"
@@ -327,8 +327,12 @@ test("Async parser rejection is wrapped with the data file path", async (t) => {
   dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
 
-  let e = await t.throwsAsync(() => dataObj.getGlobalData());
+  let e;
+  await t.assert.rejects(() => dataObj.getGlobalData(), (err) => {
+  	e = err;
+  	return true;
+  });
 
-  t.true(e.message.startsWith("Having trouble parsing data file"));
-  t.true(e.filePath.endsWith(".yaml"));
+  t.assert.strictEqual(e.message.startsWith("Having trouble parsing data file"), true);
+  t.assert.strictEqual(e.filePath.endsWith(".yaml"), true);
 });

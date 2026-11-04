@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#3850 Computed Data regression part 2", async (t) => {
@@ -21,6 +21,6 @@ eleventyComputed:
   let results = await elev.toJSON();
   results.sort();
 
-  t.is(results.length, 1);
-  t.is(results[0]?.content.trim(), `http://example.com/:::[{"links":[{"url":"http://example.com/"}]}]`)
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0]?.content.trim(), `http://example.com/:::[{"links":[{"url":"http://example.com/"}]}]`)
 });

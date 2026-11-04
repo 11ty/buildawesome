@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 function captureWarnings(elev) {
@@ -43,9 +43,9 @@ test("#2448: Warns once when computed data reads other pages’ unresolved compu
 	let warnings = captureWarnings(elev);
 
 	let results = await elev.toJSON();
-	t.is(results.find((entry) => entry.url === "/page/0/").content, "|1 categories");
-	t.is(warnings.length, 1);
-	t.true(warnings[0].includes(": ./test/noop/articles/first.md › label › categoryCount › collections. "));
+	t.assert.strictEqual(results.find((entry) => entry.url === "/page/0/").content, "|1 categories");
+	t.assert.strictEqual(warnings.length, 1);
+	t.assert.strictEqual(warnings[0].includes(": ./test/noop/articles/first.md › label › categoryCount › collections. "), true);
 });
 
 test("#2448: No warning when another page’s computed data is read after it resolves", async (t) => {
@@ -53,8 +53,8 @@ test("#2448: No warning when another page’s computed data is read after it res
 	let warnings = captureWarnings(elev);
 
 	let results = await elev.toJSON();
-	t.is(results.find((entry) => entry.url === "/page/0/").content, "|1 categories");
-	t.is(warnings.length, 0);
+	t.assert.strictEqual(results.find((entry) => entry.url === "/page/0/").content, "|1 categories");
+	t.assert.strictEqual(warnings.length, 0);
 });
 
 test("#2448: Warns when a preprocessor reads computed data before it resolves", async (t) => {
@@ -73,10 +73,10 @@ test("#2448: Warns when a preprocessor reads computed data before it resolves", 
 	let warnings = captureWarnings(elev);
 
 	let results = await elev.toJSON();
-	t.is(seen, "front matter");
-	t.is(results[0].content, "computed");
-	t.is(warnings.length, 1);
-	t.true(warnings[0].includes(": ./test/noop/lazy.njk › title. Computed data resolves after preprocessors"));
+	t.assert.strictEqual(seen, "front matter");
+	t.assert.strictEqual(results[0].content, "computed");
+	t.assert.strictEqual(warnings.length, 1);
+	t.assert.strictEqual(warnings[0].includes(": ./test/noop/lazy.njk › title. Computed data resolves after preprocessors"), true);
 });
 
 test("#2448: No warning when a preprocessor reads computed data resolved before preprocessors", async (t) => {
@@ -95,5 +95,5 @@ test("#2448: No warning when a preprocessor reads computed data resolved before 
 	let warnings = captureWarnings(elev);
 
 	await elev.toJSON();
-	t.is(warnings.length, 0);
+	t.assert.strictEqual(warnings.length, 0);
 });

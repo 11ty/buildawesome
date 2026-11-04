@@ -1,17 +1,17 @@
-import test from "ava";
+import test from "node:test";
 import ConsoleLogger from "../src/Util/ConsoleLogger.js";
 
 test("Disable chalk", (t) => {
   let cl = new ConsoleLogger();
   cl.isChalkEnabled = false;
-  t.is(cl.isChalkEnabled, false);
+  t.assert.strictEqual(cl.isChalkEnabled, false);
 });
 
 test("Re-enable chalk", (t) => {
   let cl = new ConsoleLogger();
   cl.isChalkEnabled = false;
   cl.isChalkEnabled = true;
-  t.is(cl.isChalkEnabled, true);
+  t.assert.strictEqual(cl.isChalkEnabled, true);
 });
 
 test("Message styles", (t) => {
@@ -21,7 +21,7 @@ test("Message styles", (t) => {
     (logged = { msg, type, color, forceToConsole });
 
   cl.log("test");
-  t.deepEqual(logged, {
+  t.assert.deepStrictEqual(logged, {
     msg: "test",
     type: undefined,
     color: undefined,
@@ -29,7 +29,7 @@ test("Message styles", (t) => {
   });
 
   cl.forceLog("test");
-  t.deepEqual(logged, {
+  t.assert.deepStrictEqual(logged, {
     msg: "test",
     type: undefined,
     color: undefined,
@@ -37,7 +37,7 @@ test("Message styles", (t) => {
   });
 
   cl.info("test");
-  t.deepEqual(logged, {
+  t.assert.deepStrictEqual(logged, {
     msg: "test",
     type: "log",
     color: "blue",
@@ -45,7 +45,7 @@ test("Message styles", (t) => {
   });
 
   cl.warn("test");
-  t.deepEqual(logged, {
+  t.assert.deepStrictEqual(logged, {
     msg: "test",
     type: "warn",
     color: "yellow",
@@ -53,7 +53,7 @@ test("Message styles", (t) => {
   });
 
   cl.error("test");
-  t.deepEqual(logged, {
+  t.assert.deepStrictEqual(logged, {
     msg: "test",
     type: "error",
     color: "red",

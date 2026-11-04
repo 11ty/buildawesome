@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import getNewTemplate from "./_getNewTemplateForTests.js";
 
 async function getRenderedData(tmpl, pageNumber = 0) {
@@ -12,8 +12,8 @@ test("getMappedDate (empty, assume created)", async (t) => {
   let data = await getRenderedData(tmpl);
   let date = await tmpl.getMappedDate(data.date, data.page);
 
-  t.true(date instanceof Date);
-  t.truthy(date.getTime());
+  t.assert.strictEqual(date instanceof Date, true);
+  t.assert.ok(date.getTime());
 });
 
 test("getMappedDate (explicit date, yaml String)", async (t) => {
@@ -21,9 +21,9 @@ test("getMappedDate (explicit date, yaml String)", async (t) => {
   let data = await getRenderedData(tmpl);
   let date = await tmpl.getMappedDate(data.date, data.page);
 
-  t.true(date instanceof Date);
-  t.truthy(date.getTime());
-  t.is(Date.UTC(2016, 0, 1), date.getTime());
+  t.assert.strictEqual(date instanceof Date, true);
+  t.assert.ok(date.getTime());
+  t.assert.strictEqual(Date.UTC(2016, 0, 1), date.getTime());
 });
 
 test("getMappedDate (explicit date, yaml Date)", async (t) => {
@@ -31,9 +31,9 @@ test("getMappedDate (explicit date, yaml Date)", async (t) => {
   let data = await getRenderedData(tmpl);
   let date = await tmpl.getMappedDate(data.date, data.page);
 
-  t.true(date instanceof Date);
-  t.truthy(date.getTime());
-  t.is(Date.UTC(2016, 0, 1), date.getTime());
+  t.assert.strictEqual(date instanceof Date, true);
+  t.assert.ok(date.getTime());
+  t.assert.strictEqual(Date.UTC(2016, 0, 1), date.getTime());
 });
 
 test("getMappedDate (explicit date, yaml Date and string should be the same)", async (t) => {
@@ -45,9 +45,9 @@ test("getMappedDate (explicit date, yaml Date and string should be the same)", a
   let dataB = await getRenderedData(tmplB);
   let yamlDate = await tmplB.getMappedDate(dataB.date, dataB.page);
 
-  t.truthy(stringDate);
-  t.truthy(yamlDate);
-  t.deepEqual(stringDate, yamlDate);
+  t.assert.ok(stringDate);
+  t.assert.ok(yamlDate);
+  t.assert.deepStrictEqual(stringDate, yamlDate);
 });
 
 test("getMappedDate (modified date)", async (t) => {
@@ -55,8 +55,8 @@ test("getMappedDate (modified date)", async (t) => {
   let data = await getRenderedData(tmpl);
   let date = await tmpl.getMappedDate(data.date, data.page);
 
-  t.true(date instanceof Date);
-  t.truthy(date.getTime());
+  t.assert.strictEqual(date instanceof Date, true);
+  t.assert.ok(date.getTime());
 });
 
 test("getMappedDate (created date)", async (t) => {
@@ -64,8 +64,8 @@ test("getMappedDate (created date)", async (t) => {
   let data = await getRenderedData(tmpl);
   let date = await tmpl.getMappedDate(data.date, data.page);
 
-  t.true(date instanceof Date);
-  t.truthy(date.getTime());
+  t.assert.strictEqual(date instanceof Date, true);
+  t.assert.ok(date.getTime());
 });
 
 test("getMappedDate (falls back to filename date)", async (t) => {
@@ -77,9 +77,9 @@ test("getMappedDate (falls back to filename date)", async (t) => {
   let data = await getRenderedData(tmpl);
   let date = await tmpl.getMappedDate(data.date, data.page);
 
-  t.true(date instanceof Date);
-  t.truthy(date.getTime());
-  t.is(Date.UTC(2018, 0, 1), date.getTime());
+  t.assert.strictEqual(date instanceof Date, true);
+  t.assert.ok(date.getTime());
+  t.assert.strictEqual(Date.UTC(2018, 0, 1), date.getTime());
 });
 
 test("getMappedDate (found multiple dates, picks first)", async (t) => {
@@ -91,7 +91,7 @@ test("getMappedDate (found multiple dates, picks first)", async (t) => {
   let data = await getRenderedData(tmpl);
   let date = await tmpl.getMappedDate(data.date, data.page);
 
-  t.true(date instanceof Date);
-  t.truthy(date.getTime());
-  t.is(Date.UTC(2019, 0, 1), date.getTime());
+  t.assert.strictEqual(date instanceof Date, true);
+  t.assert.ok(date.getTime());
+  t.assert.strictEqual(Date.UTC(2019, 0, 1), date.getTime());
 });

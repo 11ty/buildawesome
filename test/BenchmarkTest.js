@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Benchmark from "../src/Benchmark/Benchmark.js";
 
 test("Standard Benchmark", async (t) => {
@@ -7,7 +7,7 @@ test("Standard Benchmark", async (t) => {
     b.before();
     setTimeout(function () {
       b.after();
-      t.truthy(b.getTotal() >= 0);
+      t.assert.ok(b.getTotal() >= 0);
       resolve();
     }, 100);
   });
@@ -21,10 +21,10 @@ test("Nested Benchmark (nested calls are ignored while a parent is measuring)", 
     setTimeout(function () {
       b.before();
       b.after();
-      t.truthy(b.getTotal() <= 0.1);
+      t.assert.ok(b.getTotal() <= 0.1);
 
       b.after();
-      t.truthy(b.getTotal() >= 10);
+      t.assert.ok(b.getTotal() >= 10);
       resolve();
     }, 100);
   });
@@ -40,7 +40,7 @@ test("Reset Benchmark", async (t) => {
       b.before();
       b.after();
 
-      t.throws(function () {
+      t.assert.throws(function () {
         // throws because we reset
         b.after();
       });

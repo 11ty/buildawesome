@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#188: Content preprocessing (dot in file extension)", async (t) => {
@@ -17,8 +17,8 @@ test("#188: Content preprocessing (dot in file extension)", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content, `Hello Before`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, `Hello Before`);
 });
 
 test("#188: Content preprocessing (no dot in file extension)", async (t) => {
@@ -37,8 +37,8 @@ test("#188: Content preprocessing (no dot in file extension)", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content, `Hello Before`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, `Hello Before`);
 });
 
 
@@ -58,8 +58,8 @@ test("#188: Content preprocessing (array, no dot in file extension)", async (t) 
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content, `Hello Before`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, `Hello Before`);
 });
 
 test("#188: Content preprocessing (array, dot in file extension)", async (t) => {
@@ -78,8 +78,8 @@ test("#188: Content preprocessing (array, dot in file extension)", async (t) => 
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content, `Hello Before`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, `Hello Before`);
 });
 
 test("#188: Content preprocessing (wildcard)", async (t) => {
@@ -98,8 +98,8 @@ test("#188: Content preprocessing (wildcard)", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content, `Hello Before`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, `Hello Before`);
 });
 
 
@@ -109,8 +109,8 @@ test("addPreprocessor with 11ty.js, Issue #3433", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
     config: $config => {
       $config.addPreprocessor("testing", "11ty.js", (data, content) => {
-        t.is( typeof content, "function" );
-        t.is(content(), "Hello!");
+        t.assert.strictEqual( typeof content, "function" );
+        t.assert.strictEqual(content(), "Hello!");
 
         return {
           render: function() {
@@ -126,9 +126,9 @@ test("addPreprocessor with 11ty.js, Issue #3433", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].url, `/template/`);
-  t.is(results[0].content.trim(), `naw`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].url, `/template/`);
+  t.assert.strictEqual(results[0].content.trim(), `naw`);
 });
 
 
@@ -143,8 +143,8 @@ test("addPreprocessor and addExtension, Issue #3433", async (t) => {
       });
 
       $config.addPreprocessor("testing", "11ty.test", (data, content) => {
-        t.is( typeof content, "function" );
-        t.is(content(), "Hello!");
+        t.assert.strictEqual( typeof content, "function" );
+        t.assert.strictEqual(content(), "Hello!");
 
         return {
           render: function() {
@@ -160,9 +160,9 @@ test("addPreprocessor and addExtension, Issue #3433", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].url, `/template/`);
-  t.is(results[0].content.trim(), `naw`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].url, `/template/`);
+  t.assert.strictEqual(results[0].content.trim(), `naw`);
 });
 
 test("addPreprocessor and addExtension with custom `compile` (defaultRenderer), Issue #3433", async (t) => {
@@ -179,8 +179,8 @@ test("addPreprocessor and addExtension with custom `compile` (defaultRenderer), 
       });
 
       $config.addPreprocessor("testing", "11ty.test", (data, content) => {
-        t.is( typeof content, "function" );
-        t.is(content(), "Hello!");
+        t.assert.strictEqual( typeof content, "function" );
+        t.assert.strictEqual(content(), "Hello!");
 
         return {
           render: function() {
@@ -196,9 +196,9 @@ test("addPreprocessor and addExtension with custom `compile` (defaultRenderer), 
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].url, `/template/`);
-  t.is(results[0].content.trim(), `naw`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].url, `/template/`);
+  t.assert.strictEqual(results[0].content.trim(), `naw`);
 });
 
 test("addPreprocessor and addExtension with custom `compile` (re-use render function directly), Issue #3433", async (t) => {
@@ -217,8 +217,8 @@ test("addPreprocessor and addExtension with custom `compile` (re-use render func
       });
 
       $config.addPreprocessor("testing", "11ty.test", (data, content) => {
-        t.is( typeof content, "function" );
-        t.is(content(), "Hello!");
+        t.assert.strictEqual( typeof content, "function" );
+        t.assert.strictEqual(content(), "Hello!");
 
         return {
           render: function() {
@@ -234,9 +234,9 @@ test("addPreprocessor and addExtension with custom `compile` (re-use render func
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].url, `/template/`);
-  t.is(results[0].content.trim(), `naw`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].url, `/template/`);
+  t.assert.strictEqual(results[0].content.trim(), `naw`);
 });
 
 test("addPreprocessor and addExtension with custom `compile` (new render function), Issue #3433", async (t) => {
@@ -249,8 +249,8 @@ test("addPreprocessor and addExtension with custom `compile` (new render functio
         key: "11ty.js",
         compile: function(content) {
           // check preprocessor override
-          t.is( typeof content.render, "function" );
-          t.is(content.render(), "Preprocessor override");
+          t.assert.strictEqual( typeof content.render, "function" );
+          t.assert.strictEqual(content.render(), "Preprocessor override");
 
           return function() {
             return "Compiled content";
@@ -260,8 +260,8 @@ test("addPreprocessor and addExtension with custom `compile` (new render functio
 
       $config.addPreprocessor("testing", "11ty.test", (data, content) => {
         // check template content directly
-        t.is( typeof content, "function" );
-        t.is(content(), "Original template content");
+        t.assert.strictEqual( typeof content, "function" );
+        t.assert.strictEqual(content(), "Original template content");
 
         return {
           render: function() {
@@ -277,9 +277,9 @@ test("addPreprocessor and addExtension with custom `compile` (new render functio
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].url, `/template/`);
-  t.is(results[0].content.trim(), `Compiled content`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].url, `/template/`);
+  t.assert.strictEqual(results[0].content.trim(), `Compiled content`);
 });
 
 // #3933
@@ -310,14 +310,14 @@ test("Tags in pages excluded with preprocessing should not populate collections 
   });
 
   let results = await elev.toJSON();
-  t.is(preprocessorRuns, 3);
-  t.is(results.length, 2);
-  t.truthy(results.find(entry => entry.inputPath.endsWith("source.njk")));
-  t.falsy(results.find(entry => entry.inputPath.endsWith("source-draft.njk")));
+  t.assert.strictEqual(preprocessorRuns, 3);
+  t.assert.strictEqual(results.length, 2);
+  t.assert.ok(results.find(entry => entry.inputPath.endsWith("source.njk")));
+  t.assert.ok(!(results.find(entry => entry.inputPath.endsWith("source-draft.njk"))));
 
   let pages = results.filter(entry => entry.inputPath.endsWith("paged.njk"));
-  t.is(pages.length, 1);
-  t.is(pages[0].content, "Hello yep");
+  t.assert.strictEqual(pages.length, 1);
+  t.assert.strictEqual(pages[0].content, "Hello yep");
 });
 
 test("#4292: Preprocessors should only run once per build (bug running twice during incremental and config reset)", async (t) => {
@@ -341,9 +341,9 @@ test("#4292: Preprocessors should only run once per build (bug running twice dur
 
   let results = await elev.toJSON();
 
-  t.is(results.length, 1);
-  t.is(results[0].content, `Hello Before Suffix`);
-  t.is(preprocessorRuns, 2);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, `Hello Before Suffix`);
+  t.assert.strictEqual(preprocessorRuns, 2);
 });
 
 test("#4292: Preprocessors mutable data", async (t) => {
@@ -352,10 +352,10 @@ test("#4292: Preprocessors mutable data", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", undefined, {
     config: $config => {
       $config.addPreprocessor("drafts", ".njk", (data, content) => {
-        t.is(data.title, "Title");
+        t.assert.strictEqual(data.title, "Title");
         data.title += " (draft)";
-        t.is(data.title, "Title (draft)");
-        t.is(content, "Hello {{title}} Suffix");
+        t.assert.strictEqual(data.title, "Title (draft)");
+        t.assert.strictEqual(content, "Hello {{title}} Suffix");
 
         return content;
       });
@@ -368,10 +368,10 @@ test("#4292: Preprocessors mutable data", async (t) => {
 
   elev.setIncrementalFiles(["./test/stubs-virtual/_includes/yo.njk"]);
   let results1 = await elev.toJSON();
-  t.is(results1[0].content, `Hello Title (draft) Suffix`);
+  t.assert.strictEqual(results1[0].content, `Hello Title (draft) Suffix`);
 
   elev.setIncrementalFiles(["./test/stubs-virtual/index.njk"]);
   let results2 = await elev.toJSON();
-  t.is(results2.length, 1);
-  t.is(results2[0].content, `Hello Title (draft) Suffix`);
+  t.assert.strictEqual(results2.length, 1);
+  t.assert.strictEqual(results2[0].content, `Hello Title (draft) Suffix`);
 });

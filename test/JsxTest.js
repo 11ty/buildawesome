@@ -1,6 +1,3 @@
-// This test file is using Node’s test runner because `tsx` doesn’t work with worker threads (used by avajs)
-// See https://github.com/privatenumber/tsx/issues/354
-// See https://github.com/nodejs/node/issues/47747
 import test from "node:test";
 import assert from "node:assert";
 import { renderToStaticMarkup } from "react-dom/server";

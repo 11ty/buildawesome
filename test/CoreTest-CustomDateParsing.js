@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import test from "ava";
+import test from "node:test";
 import { DateTime } from "luxon";
 import Eleventy from "../src/Core.js";
 
@@ -14,8 +14,8 @@ test("Custom date parsing callback (return string), Issue #867", async (t) => {
       $config.dataFilterSelectors.add("page.date");
 
       $config.addDateParsing(function(dateValue) {
-        t.truthy(this.page.inputPath);
-        t.is(dateValue, undefined);
+        t.assert.ok(this.page.inputPath);
+        t.assert.strictEqual(dateValue, undefined);
         return "2001-01-01T12:00:00Z";
       });
     }
@@ -23,7 +23,7 @@ test("Custom date parsing callback (return string), Issue #867", async (t) => {
   elev.disableLogger();
 
   let [result] = await elev.toJSON();
-  t.deepEqual(result.data.page.date, new Date(Date.UTC(2001,0,1,12)));
+  t.assert.deepStrictEqual(result.data.page.date, new Date(Date.UTC(2001,0,1,12)));
 });
 
 test("Custom date parsing callback (input a non-YAML date format), Issue #867", async (t) => {
@@ -38,7 +38,7 @@ date: 2019-08-31 23:59:56 America/New_York
       $config.dataFilterSelectors.add("page.date");
 
       $config.addDateParsing(function(dateValue) {
-        t.is(dateValue, "2019-08-31 23:59:56 America/New_York");
+        t.assert.strictEqual(dateValue, "2019-08-31 23:59:56 America/New_York");
         // returns DateTime instance from Luxon
         return DateTime.fromFormat(dateValue, "yyyy-MM-dd hh:mm:ss z");
       });
@@ -47,7 +47,7 @@ date: 2019-08-31 23:59:56 America/New_York
   elev.disableLogger();
 
   let [result] = await elev.toJSON();
-  t.deepEqual(result.data.page.date, new Date(Date.UTC(2019,8,1,3,59,56)));
+  t.assert.deepStrictEqual(result.data.page.date, new Date(Date.UTC(2019,8,1,3,59,56)));
 });
 
 test("Custom date parsing callback (return Date), Issue #867", async (t) => {
@@ -59,8 +59,8 @@ test("Custom date parsing callback (return Date), Issue #867", async (t) => {
       $config.dataFilterSelectors.add("page.date");
 
       $config.addDateParsing(function(dateValue) {
-        t.truthy(this.page.inputPath);
-        t.is(dateValue, undefined);
+        t.assert.ok(this.page.inputPath);
+        t.assert.strictEqual(dateValue, undefined);
         return new Date(Date.UTC(2001,0,1,12));
       });
     }
@@ -68,7 +68,7 @@ test("Custom date parsing callback (return Date), Issue #867", async (t) => {
   elev.disableLogger();
 
   let [result] = await elev.toJSON();
-  t.deepEqual(result.data.page.date, new Date(Date.UTC(2001,0,1,12)));
+  t.assert.deepStrictEqual(result.data.page.date, new Date(Date.UTC(2001,0,1,12)));
 });
 
 test("Custom date parsing callback (using date from data cascade, return string), Issue #867", async (t) => {
@@ -82,8 +82,8 @@ test("Custom date parsing callback (using date from data cascade, return string)
       $config.dataFilterSelectors.add("page.date");
 
       $config.addDateParsing(function (dateValue) {
-        t.truthy(this.page.inputPath);
-        t.true(dateValue instanceof Date);
+        t.assert.ok(this.page.inputPath);
+        t.assert.strictEqual(dateValue instanceof Date, true);
         return "2001-01-01T12:00:00Z";
       });
     }
@@ -91,7 +91,7 @@ test("Custom date parsing callback (using date from data cascade, return string)
   elev.disableLogger();
 
   let [result] = await elev.toJSON();
-  t.deepEqual(result.data.page.date, new Date(Date.UTC(2001,0,1,12)));
+  t.assert.deepStrictEqual(result.data.page.date, new Date(Date.UTC(2001,0,1,12)));
 });
 
 test("Custom date parsing callback (two, return undefined/falsy), Issue #867", async (t) => {
@@ -105,14 +105,14 @@ test("Custom date parsing callback (two, return undefined/falsy), Issue #867", a
       $config.dataFilterSelectors.add("page.date");
 
       $config.addDateParsing(function (dateValue) {
-        t.truthy(this.page.inputPath);
-        t.deepEqual(dateValue, new Date(Date.UTC(2003,0,1,12)));
+        t.assert.ok(this.page.inputPath);
+        t.assert.deepStrictEqual(dateValue, new Date(Date.UTC(2003,0,1,12)));
         // return nothing
       });
 
       $config.addDateParsing(function (dateValue) {
-        t.truthy(this.page.inputPath);
-        t.deepEqual(dateValue, new Date(Date.UTC(2003,0,1,12)));
+        t.assert.ok(this.page.inputPath);
+        t.assert.deepStrictEqual(dateValue, new Date(Date.UTC(2003,0,1,12)));
         // return nothing
       });
     }
@@ -120,7 +120,7 @@ test("Custom date parsing callback (two, return undefined/falsy), Issue #867", a
   elev.disableLogger();
 
   let [result] = await elev.toJSON();
-  t.deepEqual(result.data.page.date, new Date(Date.UTC(2003,0,1,12)));
+  t.assert.deepStrictEqual(result.data.page.date, new Date(Date.UTC(2003,0,1,12)));
 });
 
 test("Custom date parsing callback (return explicit false), Issue #867", async (t) => {
@@ -134,7 +134,7 @@ test("Custom date parsing callback (return explicit false), Issue #867", async (
       $config.dataFilterSelectors.add("page.date");
 
       $config.addDateParsing(function (dateValue) {
-        t.truthy(this.page.inputPath);
+        t.assert.ok(this.page.inputPath);
         return false;
       });
     }
@@ -143,7 +143,7 @@ test("Custom date parsing callback (return explicit false), Issue #867", async (
   elev.disableLogger();
 
   let [result] = await elev.toJSON();
-  t.deepEqual(result.data.page.date, new Date(Date.UTC(2003,0,1,12)));
+  t.assert.deepStrictEqual(result.data.page.date, new Date(Date.UTC(2003,0,1,12)));
 });
 
 test("Custom date parsing callbacks (two, last wins, return string), Issue #867", async (t) => {
@@ -155,14 +155,14 @@ test("Custom date parsing callbacks (two, last wins, return string), Issue #867"
       $config.dataFilterSelectors.add("page.date");
 
       $config.addDateParsing(function (dateValue) {
-        t.truthy(this.page.inputPath);
-        t.is(dateValue, undefined);
+        t.assert.ok(this.page.inputPath);
+        t.assert.strictEqual(dateValue, undefined);
         return "2010-01-01T12:00:00Z";
       });
 
       $config.addDateParsing(function (dateValue) {
-        t.truthy(this.page.inputPath);
-        t.is(dateValue, "2010-01-01T12:00:00Z");
+        t.assert.ok(this.page.inputPath);
+        t.assert.strictEqual(dateValue, "2010-01-01T12:00:00Z");
         return "2001-01-01T12:00:00Z";
       });
     }
@@ -170,7 +170,7 @@ test("Custom date parsing callbacks (two, last wins, return string), Issue #867"
   elev.disableLogger();
 
   let [result] = await elev.toJSON();
-  t.deepEqual(result.data.page.date, new Date(Date.UTC(2001,0,1,12)));
+  t.assert.deepStrictEqual(result.data.page.date, new Date(Date.UTC(2001,0,1,12)));
 });
 
 // https://github.com/11ty/eleventy/issues/3674
@@ -191,7 +191,7 @@ test("instanceof DateTime issue, Issue #3674", async (t) => {
   elev.disableLogger();
 
   let [result] = await elev.toJSON();
-  t.deepEqual(result.data.page.date, new Date(Date.UTC(2001,0,1,12)));
+  t.assert.deepStrictEqual(result.data.page.date, new Date(Date.UTC(2001,0,1,12)));
 });
 
 test("Custom date parsing callback with computed `date` (return DateTime), Issue #4415", async (t) => {
@@ -217,8 +217,8 @@ test("Custom date parsing callback with computed `date` (return DateTime), Issue
 
   let [result] = await elev.toJSON();
   // Runs once, with the computed value only
-  t.deepEqual(seen, ["2019-08-31 23:59:56 America/New_York"]);
-  t.deepEqual(result.data.page.date, new Date(Date.UTC(2019,8,1,3,59,56)));
+  t.assert.deepStrictEqual(seen, ["2019-08-31 23:59:56 America/New_York"]);
+  t.assert.deepStrictEqual(result.data.page.date, new Date(Date.UTC(2019,8,1,3,59,56)));
 });
 
 test("Custom date parsing callback with computed `date` (project time zone), Issue #4415", async (t) => {
@@ -251,8 +251,8 @@ test("Custom date parsing callback with computed `date` (project time zone), Iss
   elev.disableLogger();
 
   let [result] = await elev.toJSON();
-  t.deepEqual(seen, [["2019-08-31T23:59:56", "./test/stubs-virtual/test.html"]]);
-  t.deepEqual(result.data.page.date, new Date(Date.UTC(2019,8,1,4,59,56)));
+  t.assert.deepStrictEqual(seen, [["2019-08-31T23:59:56", "./test/stubs-virtual/test.html"]]);
+  t.assert.deepStrictEqual(result.data.page.date, new Date(Date.UTC(2019,8,1,4,59,56)));
 });
 
 test("Custom date parsing callback runs once for a computed `date` shared by paginated pages, Issue #4415", async (t) => {
@@ -276,6 +276,6 @@ test("Custom date parsing callback runs once for a computed `date` shared by pag
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.deepEqual(seen, ["2001-01-01T12:00:00Z"]);
-  t.deepEqual(results.map((entry) => entry.content), Array(3).fill("2001-01-01T12:00:00.000Z"));
+  t.assert.deepStrictEqual(seen, ["2001-01-01T12:00:00Z"]);
+  t.assert.deepStrictEqual(results.map((entry) => entry.content), Array(3).fill("2001-01-01T12:00:00.000Z"));
 });

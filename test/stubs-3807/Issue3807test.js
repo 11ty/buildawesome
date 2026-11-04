@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import fs from "node:fs";
 import Eleventy from "../../src/Core.js";
 
@@ -47,7 +47,7 @@ test("#3807 Nunjucks cacheable should be reused when Nunjucks is the preprocesso
 
   // Control
   let content = fs.readFileSync("test/stubs-3807/_site/index.html", "utf8");
-  t.is(content, `<html>Home<p>Index</p></html>`);
+  t.assert.strictEqual(content, `<html>Home<p>Index</p></html>`);
 
   // Stop after all runs are complete
   Promise.all(runs.map(entry => entry.promise)).then(async () => {
@@ -59,7 +59,7 @@ test("#3807 Nunjucks cacheable should be reused when Nunjucks is the preprocesso
     await run.promise;
 
     let content = fs.readFileSync("test/stubs-3807/_site/index.html", "utf8");
-    t.is(content, run.expected);
+    t.assert.strictEqual(content, run.expected);
   }
 
   fs.writeFileSync("test/stubs-3807/_layouts/base.html", ORIGINAL_CONTENT, "utf8");

@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import BuildAwesome from "../src/Core.js";
 
 test("Using buildawesomeComputed and eleventyComputed (prefers former)", async (t) => {
@@ -22,8 +22,8 @@ test("Using buildawesomeComputed and eleventyComputed (prefers former)", async (
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content, `value1`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, `value1`);
 });
 
 test("Using buildawesomeComputed and eleventyComputed (prefers former, reverse add)", async (t) => {
@@ -47,8 +47,8 @@ test("Using buildawesomeComputed and eleventyComputed (prefers former, reverse a
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content, `value1`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, `value1`);
 });
 
 test("Using buildawesomeComputed.permalink", async (t) => {
@@ -68,9 +68,9 @@ test("Using buildawesomeComputed.permalink", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content, `original`);
-  t.is(results[0].url, `/rewritten1.html`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, `original`);
+  t.assert.strictEqual(results[0].url, `/rewritten1.html`);
 });
 
 test("Computed `date` sets `page.date`, Issue #4415", async (t) => {
@@ -85,7 +85,7 @@ test("Computed `date` sets `page.date`, Issue #4415", async (t) => {
   });
 
   let [result] = await elev.toJSON();
-  t.is(result.content, "2001-02-03T00:00:00.000Z|2001-02-03");
+  t.assert.strictEqual(result.content, "2001-02-03T00:00:00.000Z|2001-02-03");
 });
 
 test("Computed `date` can use other computed data, Issue #4415", async (t) => {
@@ -101,7 +101,7 @@ test("Computed `date` can use other computed data, Issue #4415", async (t) => {
   });
 
   let [result] = await elev.toJSON();
-  t.is(result.content, "2001-02-03T00:00:00.000Z");
+  t.assert.strictEqual(result.content, "2001-02-03T00:00:00.000Z");
 });
 
 test("Computed `date` is available to permalinks, Issue #4415", async (t) => {
@@ -117,7 +117,7 @@ test("Computed `date` is available to permalinks, Issue #4415", async (t) => {
   });
 
   let [result] = await elev.toJSON();
-  t.is(result.url, "/2001/");
+  t.assert.strictEqual(result.url, "/2001/");
 });
 
 test("Computed `date` sorts collections, Issue #4415", async (t) => {
@@ -130,7 +130,7 @@ test("Computed `date` sorts collections, Issue #4415", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.find((entry) => entry.url === "/list/").content, "./test/stubs-virtual/list.njk,./test/stubs-virtual/b.njk,./test/stubs-virtual/a.njk,");
+  t.assert.strictEqual(results.find((entry) => entry.url === "/list/").content, "./test/stubs-virtual/list.njk,./test/stubs-virtual/b.njk,./test/stubs-virtual/a.njk,");
 });
 
 test("Computed `date` passes through custom date parsing, Issue #4415", async (t) => {
@@ -146,7 +146,7 @@ test("Computed `date` passes through custom date parsing, Issue #4415", async (t
   });
 
   let [result] = await elev.toJSON();
-  t.is(result.content, "2001-02-03T00:00:00.000Z");
+  t.assert.strictEqual(result.content, "2001-02-03T00:00:00.000Z");
 });
 
 test("Preprocessors see computed `page.date` but other computed data stays lazy, Issue #4415", async (t) => {
@@ -166,7 +166,7 @@ test("Preprocessors see computed `page.date` but other computed data stays lazy,
   });
 
   await elev.toJSON();
-  t.deepEqual(seen, { title: undefined, date: "2001-02-03T00:00:00.000Z" });
+  t.assert.deepStrictEqual(seen, { title: undefined, date: "2001-02-03T00:00:00.000Z" });
 });
 
 test("Preprocessors can skip a template using a computed `date`, Issue #4415", async (t) => {
@@ -183,7 +183,7 @@ test("Preprocessors can skip a template using a computed `date`, Issue #4415", a
   });
 
   let results = await elev.toJSON();
-  t.deepEqual(results.map((entry) => entry.url), ["/past/"]);
+  t.assert.deepStrictEqual(results.map((entry) => entry.url), ["/past/"]);
 });
 
 test("Computed data reading `page.rawInput` waits until after preprocessors", async (t) => {
@@ -203,9 +203,9 @@ test("Computed data reading `page.rawInput` waits until after preprocessors", as
   });
 
   let [result] = await elev.toJSON();
-  t.is(seen, undefined);
+  t.assert.strictEqual(seen, undefined);
   // Length of the preprocessed `{{ length }}!`
-  t.is(result.content, "13!");
+  t.assert.strictEqual(result.content, "13!");
 });
 
 test("Paginated templates compute shared values once and per-page values per page", async (t) => {
@@ -228,8 +228,8 @@ test("Paginated templates compute shared values once and per-page values per pag
   });
 
   let results = await elev.toJSON();
-  t.deepEqual(results.map((entry) => entry.content).sort(), ["shared1|a-shared1", "shared1|b-shared1", "shared1|c-shared1"]);
-  t.is(runs.shared, 1);
+  t.assert.deepStrictEqual(results.map((entry) => entry.content).sort(), ["shared1|a-shared1", "shared1|b-shared1", "shared1|c-shared1"]);
+  t.assert.strictEqual(runs.shared, 1);
 });
 
 test("Paginate over computed data, Issue #4415", async (t) => {
@@ -246,7 +246,7 @@ test("Paginate over computed data, Issue #4415", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.deepEqual(results.map((entry) => entry.url).sort(), ["/en/", "/fr/"]);
+  t.assert.deepStrictEqual(results.map((entry) => entry.url).sort(), ["/en/", "/fr/"]);
 });
 
 test("Computed `date` per paginated page, Issue #4415", async (t) => {
@@ -264,7 +264,7 @@ test("Computed `date` per paginated page, Issue #4415", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.deepEqual(results.map((entry) => entry.content).sort(), ["2001-01-01T00:00:00.000Z", "2002-02-02T00:00:00.000Z"]);
+  t.assert.deepStrictEqual(results.map((entry) => entry.content).sort(), ["2001-01-01T00:00:00.000Z", "2002-02-02T00:00:00.000Z"]);
 });
 
 test("Computed `eleventyImport` adds collection dependencies, Issue #4415", async (t) => {
@@ -281,7 +281,7 @@ test("Computed `eleventyImport` adds collection dependencies, Issue #4415", asyn
   });
 
   await elev.toJSON();
-  t.deepEqual(Array.from(elev.eleventyConfig.usesGraph.getTemplatesThatConsumeCollections(["posts"])).sort(), [
+  t.assert.deepStrictEqual(Array.from(elev.eleventyConfig.usesGraph.getTemplatesThatConsumeCollections(["posts"])).sort(), [
     "test/stubs-virtual/computed.njk",
     "test/stubs-virtual/front-matter.njk",
   ]);
@@ -301,7 +301,7 @@ test("Computed `tags` create collections, Issue #2529", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.find((entry) => entry.url === "/list/").content, "1");
+  t.assert.strictEqual(results.find((entry) => entry.url === "/list/").content, "1");
 });
 
 test("Computed `tags` are in collections paginated alongside static `tags`, Issue #2529", async (t) => {
@@ -317,7 +317,7 @@ test("Computed `tags` are in collections paginated alongside static `tags`, Issu
   });
 
   let results = await elev.toJSON();
-  t.deepEqual(results.filter((entry) => entry.url.startsWith("/list-")).map((entry) => entry.content).sort(), [
+  t.assert.deepStrictEqual(results.filter((entry) => entry.url.startsWith("/list-")).map((entry) => entry.content).sort(), [
     "./test/stubs-virtual/computed.njk",
     "./test/stubs-virtual/static.njk",
   ]);
@@ -336,7 +336,7 @@ test("Computed `buildawesomeImport` adds collection dependencies, Issue #4415", 
   });
 
   await elev.toJSON();
-  t.deepEqual(Array.from(elev.eleventyConfig.usesGraph.getTemplatesThatConsumeCollections(["posts"])), [
+  t.assert.deepStrictEqual(Array.from(elev.eleventyConfig.usesGraph.getTemplatesThatConsumeCollections(["posts"])), [
     "test/stubs-virtual/computed.njk",
   ]);
 });
@@ -356,7 +356,7 @@ for (let key of ["eleventyExcludeFromCollections", "buildawesomeExcludeFromColle
     });
 
     let results = await elev.toJSON();
-    t.is(results.find((entry) => entry.url === "/list/").content, "1,1");
+    t.assert.strictEqual(results.find((entry) => entry.url === "/list/").content, "1,1");
   });
 
   test(`Computed \`${key}\` excludes from specific collections, Issue #4415`, async (t) => {
@@ -375,7 +375,7 @@ for (let key of ["eleventyExcludeFromCollections", "buildawesomeExcludeFromColle
     });
 
     let results = await elev.toJSON();
-    t.is(results.find((entry) => entry.url === "/list/").content, "2,1");
+    t.assert.strictEqual(results.find((entry) => entry.url === "/list/").content, "2,1");
   });
 }
 
@@ -390,7 +390,7 @@ test("Computed `templateEngineOverride`, Issue #4415", async (t) => {
   });
 
   let [result] = await elev.toJSON();
-  t.is(result.content.trim(), "<h1>Hi</h1>");
+  t.assert.strictEqual(result.content.trim(), "<h1>Hi</h1>");
 });
 
 for (let key of ["eleventyDataSchema", "buildawesomeDataSchema"]) {
@@ -411,10 +411,13 @@ for (let key of ["eleventyDataSchema", "buildawesomeDataSchema"]) {
     });
     elev.disableLogger();
 
-    let e = await t.throwsAsync(() => elev.toJSON(), {
-      message: "Error in the data schema for: ./test/stubs-virtual/index.njk (via `buildawesomeDataSchema` or `eleventyDataSchema`)",
+    let e;
+    await t.assert.rejects(() => elev.toJSON(), (err) => {
+    	e = err;
+    	return true;
     });
-    t.is(e.cause.toString(), "Error: Invalid data type for draft.");
+    t.assert.strictEqual(e.message, "Error in the data schema for: ./test/stubs-virtual/index.njk (via `buildawesomeDataSchema` or `eleventyDataSchema`)");
+    t.assert.strictEqual(e.cause.toString(), "Error: Invalid data type for draft.");
   });
 }
 
@@ -445,8 +448,8 @@ test("Computed `dynamicPermalink`, Issue #4415", async (t) => {
     "front-matter.njk": { x: "hi", permalink: "/front-matter-{{ x }}/", dynamicPermalink: false },
   });
 
-  t.deepEqual(locations["computed.njk"], ["/computed-{{ x }}/", "./_site/computed-{{ x }}/index.html"]);
-  t.deepEqual(locations["front-matter.njk"], ["/front-matter-{{ x }}/", "./_site/front-matter-{{ x }}/index.html"]);
+  t.assert.deepStrictEqual(locations["computed.njk"], ["/computed-{{ x }}/", "./_site/computed-{{ x }}/index.html"]);
+  t.assert.deepStrictEqual(locations["front-matter.njk"], ["/front-matter-{{ x }}/", "./_site/front-matter-{{ x }}/index.html"]);
 });
 
 test("Computed `dynamicPermalink` using other computed data, Issue #4415", async (t) => {
@@ -458,7 +461,7 @@ test("Computed `dynamicPermalink` using other computed data, Issue #4415", async
     },
   });
 
-  t.deepEqual(locations["index.njk"], ["/{{ x }}/", "./_site/{{ x }}/index.html"]);
+  t.assert.deepStrictEqual(locations["index.njk"], ["/{{ x }}/", "./_site/{{ x }}/index.html"]);
 });
 
 test("Computed `permalinkBypassOutputDir`, Issue #4415", async (t) => {
@@ -468,9 +471,9 @@ test("Computed `permalinkBypassOutputDir`, Issue #4415", async (t) => {
     "neither.njk": { permalink: "neither.html" },
   });
 
-  t.deepEqual(locations["computed.njk"], ["/computed.html", "./computed.html"]);
-  t.deepEqual(locations["front-matter.njk"], ["/front-matter.html", "./front-matter.html"]);
-  t.deepEqual(locations["neither.njk"], ["/neither.html", "./_site/neither.html"]);
+  t.assert.deepStrictEqual(locations["computed.njk"], ["/computed.html", "./computed.html"]);
+  t.assert.deepStrictEqual(locations["front-matter.njk"], ["/front-matter.html", "./front-matter.html"]);
+  t.assert.deepStrictEqual(locations["neither.njk"], ["/neither.html", "./_site/neither.html"]);
 });
 
 test("`permalinkBypassOutputDir` from the data cascade (not only front matter)", async (t) => {
@@ -480,7 +483,7 @@ test("`permalinkBypassOutputDir` from the data cascade (not only front matter)",
     configApi.addGlobalData("permalinkBypassOutputDir", true);
   });
 
-  t.deepEqual(locations["index.njk"], ["/global.html", "./global.html"]);
+  t.assert.deepStrictEqual(locations["index.njk"], ["/global.html", "./global.html"]);
 });
 
 test("Computed `permalinkBypassOutputDir` with pagination, Issue #4415", async (t) => {
@@ -495,7 +498,7 @@ test("Computed `permalinkBypassOutputDir` with pagination, Issue #4415", async (
     }
   });
   let results = await elev.toJSON();
-  t.deepEqual(results.map((entry) => entry.outputPath).sort(), ["./a.html", "./b.html"]);
+  t.assert.deepStrictEqual(results.map((entry) => entry.outputPath).sort(), ["./a.html", "./b.html"]);
 });
 
 test("Computed `pagination`, Issue #4415", async (t) => {
@@ -514,7 +517,7 @@ test("Computed `pagination`, Issue #4415", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.deepEqual(results.map((entry) => [entry.url, entry.content]).sort(), [
+  t.assert.deepStrictEqual(results.map((entry) => [entry.url, entry.content]).sort(), [
     ["/page-0/", "a,b:a+b"],
     ["/page-1/", "c,d:c+d"],
   ]);
@@ -535,7 +538,7 @@ test("Computed `pagination` (object form) overrides front matter pagination, Iss
   });
 
   let results = await elev.toJSON();
-  t.deepEqual(results.map((entry) => entry.content).sort(), ["a,b", "c,d"]);
+  t.assert.deepStrictEqual(results.map((entry) => entry.content).sort(), ["a,b", "c,d"]);
 });
 
 test("Computed `pagination` over a collection, Issue #4415", async (t) => {
@@ -553,7 +556,7 @@ test("Computed `pagination` over a collection, Issue #4415", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.deepEqual(results.filter((entry) => entry.url.startsWith("/list-")).map((entry) => entry.content).sort(), [
+  t.assert.deepStrictEqual(results.filter((entry) => entry.url.startsWith("/list-")).map((entry) => entry.content).sort(), [
     "./test/stubs-virtual/post1.njk",
     "./test/stubs-virtual/post2.njk",
   ]);
@@ -572,8 +575,12 @@ test("Computed `pagination` that reads collections throws, Issue #4415", async (
   });
   elev.disableLogger();
 
-  let e = getPaginationError(await t.throwsAsync(() => elev.toJSON()));
-  t.is(e.message, "Computed `pagination` (./test/stubs-virtual/index.njk) reads `collections`, which isn’t available until after pagination.");
+  let e;
+  await t.assert.rejects(() => elev.toJSON(), (err) => {
+    e = getPaginationError(err);
+    return true;
+  });
+  t.assert.strictEqual(e.message, "Computed `pagination` (./test/stubs-virtual/index.njk) reads `collections`, which isn’t available until after pagination.");
 });
 
 test("Computed `pagination` that reads per-page data throws, Issue #4415", async (t) => {
@@ -589,8 +596,12 @@ test("Computed `pagination` that reads per-page data throws, Issue #4415", async
   });
   elev.disableLogger();
 
-  let e = getPaginationError(await t.throwsAsync(() => elev.toJSON()));
-  t.is(e.message, "Computed `pagination.size` (./test/stubs-virtual/index.njk) reads `page.url`, which isn’t available until after pagination.");
+  let e;
+  await t.assert.rejects(() => elev.toJSON(), (err) => {
+    e = getPaginationError(err);
+    return true;
+  });
+  t.assert.strictEqual(e.message, "Computed `pagination.size` (./test/stubs-virtual/index.njk) reads `page.url`, which isn’t available until after pagination.");
 });
 
 test("Paginating over computed data that needs collections throws, Issue #4415", async (t) => {
@@ -607,8 +618,12 @@ test("Paginating over computed data that needs collections throws, Issue #4415",
   });
   elev.disableLogger();
 
-  let e = getPaginationError(await t.throwsAsync(() => elev.toJSON()));
-  t.is(e.message, "Pagination data `postsCopy` can’t use computed data `postsCopy` (./test/stubs-virtual/index.njk) because it reads `collections`, which isn’t available until after pagination.");
+  let e;
+  await t.assert.rejects(() => elev.toJSON(), (err) => {
+    e = getPaginationError(err);
+    return true;
+  });
+  t.assert.strictEqual(e.message, "Pagination data `postsCopy` can’t use computed data `postsCopy` (./test/stubs-virtual/index.njk) because it reads `collections`, which isn’t available until after pagination.");
 });
 
 test("Paginating over computed data that depends on per-page data throws, Issue #4415", async (t) => {
@@ -625,8 +640,12 @@ test("Paginating over computed data that depends on per-page data throws, Issue 
   });
   elev.disableLogger();
 
-  let e = getPaginationError(await t.throwsAsync(() => elev.toJSON()));
-  t.is(e.message, "Pagination data `list` can’t use computed data `list` (./test/stubs-virtual/index.njk) because it reads `page.url`, which isn’t available until after pagination.");
+  let e;
+  await t.assert.rejects(() => elev.toJSON(), (err) => {
+    e = getPaginationError(err);
+    return true;
+  });
+  t.assert.strictEqual(e.message, "Pagination data `list` can’t use computed data `list` (./test/stubs-virtual/index.njk) because it reads `page.url`, which isn’t available until after pagination.");
 });
 
 test("Conditional computed `pagination` (falsy means no pagination), Issue #4415", async (t) => {
@@ -648,7 +667,7 @@ test("Conditional computed `pagination` (falsy means no pagination), Issue #4415
   });
 
   let results = await elev.toJSON();
-  t.deepEqual(results.map((entry) => [entry.url, entry.content]).sort(), [
+  t.assert.deepStrictEqual(results.map((entry) => [entry.url, entry.content]).sort(), [
     ["/paged-a/", "a"],
     ["/paged-b/", "b"],
     ["/single/", "single"],
@@ -664,7 +683,7 @@ for (let value of [undefined, null, false]) {
     });
 
     let results = await elev.toJSON();
-    t.deepEqual(results.map((entry) => entry.url), ["/"]);
+    t.assert.deepStrictEqual(results.map((entry) => entry.url), ["/"]);
   });
 }
 
@@ -683,9 +702,9 @@ test("Computed data renders the permalink once for `page.url` and `page.outputPa
   });
 
   let [result] = await elev.toJSON();
-  t.is(result.url, "/custom/");
-  t.is(result.outputPath, "./_site/custom/index.html");
-  t.is(renders, 1);
+  t.assert.strictEqual(result.url, "/custom/");
+  t.assert.strictEqual(result.outputPath, "./_site/custom/index.html");
+  t.assert.strictEqual(renders, 1);
 });
 
 test("Computed functions see front matter objects on their first run, Issue #2240", async (t) => {
@@ -707,7 +726,7 @@ test("Computed functions see front matter objects on their first run, Issue #224
   });
 
   await elev.toJSON();
-  t.deepEqual(seen, [
+  t.assert.deepStrictEqual(seen, [
     ["sync", { key: "value" }],
     ["async", { key: "value" }],
   ]);
@@ -722,7 +741,7 @@ test("Global eleventyComputed does not override template buildawesomeComputed, I
   });
 
   let results = await elev.toJSON();
-  t.is(results[0].content, "template");
+  t.assert.strictEqual(results[0].content, "template");
 });
 
 test("Global eleventyComputed does not override directory data buildawesomeComputed, Issue #4311", async (t) => {
@@ -733,7 +752,7 @@ test("Global eleventyComputed does not override directory data buildawesomeCompu
   });
 
   let results = await elev.toJSON();
-  t.is(results[0].content.trim(), "dir");
+  t.assert.strictEqual(results[0].content.trim(), "dir");
 });
 
 test("Global buildawesomeComputed does not override template eleventyComputed, Issue #4311", async (t) => {
@@ -745,5 +764,5 @@ test("Global buildawesomeComputed does not override template eleventyComputed, I
   });
 
   let results = await elev.toJSON();
-  t.is(results[0].content, "template");
+  t.assert.strictEqual(results[0].content, "template");
 });

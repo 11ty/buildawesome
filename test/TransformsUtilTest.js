@@ -1,8 +1,8 @@
-import test from "ava";
+import test from "node:test";
 import TransformsUtil from "../src/Util/TransformsUtil.js";
 
 test("TransformsUtil.runall", async (t) => {
-  t.is(await TransformsUtil.runAll("Test content", {}, {
+  t.assert.strictEqual(await TransformsUtil.runAll("Test content", {}, {
     test: function(content) {
       return content + "Overridden!"
     }
@@ -11,7 +11,7 @@ test("TransformsUtil.runall", async (t) => {
 
 test("TransformsUtil.runall empty warning", async (t) => {
   t.plan(2);
-  t.is(await TransformsUtil.runAll("Test content", {
+  t.assert.strictEqual(await TransformsUtil.runAll("Test content", {
     inputPath: "fake input path",
     outputPath: "fake output path",
   }, {
@@ -22,7 +22,7 @@ test("TransformsUtil.runall empty warning", async (t) => {
   {
     logger: {
       warn: (message) => {
-        t.is(message, 'Warning: Transform `test` returned empty when writing fake output path from fake input path.');
+        t.assert.strictEqual(message, 'Warning: Transform `test` returned empty when writing fake output path from fake input path.');
       }
     }
   }), "");

@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 async function getTransformedOutputPaths(items) {
@@ -25,9 +25,9 @@ async function getTransformedOutputPaths(items) {
 }
 
 test("#2806: Paginated computed `permalink: false` (false page last)", async (t) => {
-  t.deepEqual(await getTransformedOutputPaths([{ slug: "a" }, {}]), ["./_site/a/index.html"]);
+  t.assert.deepStrictEqual(await getTransformedOutputPaths([{ slug: "a" }, {}]), ["./_site/a/index.html"]);
 });
 
 test("#2806: Paginated computed `permalink: false` (false page first)", async (t) => {
-  t.deepEqual(await getTransformedOutputPaths([{}, { slug: "a" }]), ["./_site/a/index.html"]);
+  t.assert.deepStrictEqual(await getTransformedOutputPaths([{}, { slug: "a" }]), ["./_site/a/index.html"]);
 });

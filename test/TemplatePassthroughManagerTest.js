@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import fs from "fs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -22,7 +22,7 @@ test("Get paths from Config", async (t) => {
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
 
-  t.deepEqual(mgr.getConfigPaths(), [{ inputPath: "./img", outputPath: true, isDynamicPattern: false, copyOptions: {} }]);
+  t.assert.deepStrictEqual(mgr.getConfigPaths(), [{ inputPath: "./img", outputPath: true, isDynamicPattern: false, copyOptions: {} }]);
 });
 
 test("filterToPassthroughCopyFilesOnly", async (t) => {
@@ -36,23 +36,23 @@ test("filterToPassthroughCopyFilesOnly", async (t) => {
   let mgr = new TemplatePassthroughManager(eleventyConfig);
   mgr.extensionMap = new ExtensionMap(eleventyConfig);
 
-  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([]), []);
-  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], ""), []);
-  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], null), []);
+  t.assert.deepStrictEqual(mgr.filterToPassthroughCopyFilesOnly([]), []);
+  t.assert.deepStrictEqual(mgr.filterToPassthroughCopyFilesOnly([], ""), []);
+  t.assert.deepStrictEqual(mgr.filterToPassthroughCopyFilesOnly([], null), []);
 
   // eligible via config
-  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], "./img/test.png"), [{ copyOptions: {}, inputPath: "./img", isDynamicPattern: false, outputPath: true }]);
-  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], "./fonts/Roboto.woff"), [{ copyOptions: {}, inputPath: "./fonts", isDynamicPattern: false, outputPath: true }]);
+  t.assert.deepStrictEqual(mgr.filterToPassthroughCopyFilesOnly([], "./img/test.png"), [{ copyOptions: {}, inputPath: "./img", isDynamicPattern: false, outputPath: true }]);
+  t.assert.deepStrictEqual(mgr.filterToPassthroughCopyFilesOnly([], "./fonts/Roboto.woff"), [{ copyOptions: {}, inputPath: "./fonts", isDynamicPattern: false, outputPath: true }]);
 
   // when multiple paths are eligible via config, only return one path for both
-  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], ["./img/test.png", "./img/test2.png"]), [{ copyOptions: {}, inputPath: "./img", isDynamicPattern: false, outputPath: true }]);
+  t.assert.deepStrictEqual(mgr.filterToPassthroughCopyFilesOnly([], ["./img/test.png", "./img/test2.png"]), [{ copyOptions: {}, inputPath: "./img", isDynamicPattern: false, outputPath: true }]);
 
   // not eligible via config
-  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], "./docs/test.njk"), []);
-  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly([], "./other-dir/test.png"), []);
+  t.assert.deepStrictEqual(mgr.filterToPassthroughCopyFilesOnly([], "./docs/test.njk"), []);
+  t.assert.deepStrictEqual(mgr.filterToPassthroughCopyFilesOnly([], "./other-dir/test.png"), []);
 
   // not eligible via config, eligible via unknown engine listed in path
-  t.deepEqual(mgr.filterToPassthroughCopyFilesOnly(["hi", "./other-dir/test.png"], "./other-dir/test.png"), ["./other-dir/test.png"]);
+  t.assert.deepStrictEqual(mgr.filterToPassthroughCopyFilesOnly(["hi", "./other-dir/test.png"], "./other-dir/test.png"), ["./other-dir/test.png"]);
 });
 
 test("Get glob paths from config", async (t) => {
@@ -66,7 +66,7 @@ test("Get glob paths from config", async (t) => {
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
 
-  t.deepEqual(mgr.getConfigPathGlobs(), [
+  t.assert.deepStrictEqual(mgr.getConfigPathGlobs(), [
     "./test/stubs/img/**",
     "./test/stubs/img/**",
     "./test/stubs/img/*.js",
@@ -80,7 +80,7 @@ test("Get file paths", async (t) => {
   let mgr = new TemplatePassthroughManager(eleventyConfig);
   mgr.extensionMap = new ExtensionMap(eleventyConfig);
 
-  t.deepEqual(mgr.getNonTemplatePaths(["test.png"]), ["test.png"]);
+  t.assert.deepStrictEqual(mgr.getNonTemplatePaths(["test.png"]), ["test.png"]);
 });
 
 test("Get file paths (filter out real templates)", async (t) => {
@@ -91,7 +91,7 @@ test("Get file paths (filter out real templates)", async (t) => {
   mgr.extensionMap = new ExtensionMap(eleventyConfig);
   mgr.extensionMap.setFormats(["njk"]);
 
-  t.deepEqual(mgr.getNonTemplatePaths(["test.njk"]), []);
+  t.assert.deepStrictEqual(mgr.getNonTemplatePaths(["test.njk"]), []);
 });
 
 test("Get file paths (filter out real templates), multiple", async (t) => {
@@ -102,7 +102,7 @@ test("Get file paths (filter out real templates), multiple", async (t) => {
   mgr.extensionMap = new ExtensionMap(eleventyConfig);
   mgr.extensionMap.setFormats(["njk"]);
 
-  t.deepEqual(mgr.getNonTemplatePaths(["test.njk", "test.png"]), ["test.png"]);
+  t.assert.deepStrictEqual(mgr.getNonTemplatePaths(["test.njk", "test.png"]), ["test.png"]);
 });
 
 test("Get file paths with a js file (filter out real templates), multiple", async (t) => {
@@ -113,7 +113,7 @@ test("Get file paths with a js file (filter out real templates), multiple", asyn
   mgr.extensionMap = new ExtensionMap(eleventyConfig);
   mgr.extensionMap.setFormats(["njk"]);
 
-  t.deepEqual(mgr.getNonTemplatePaths(["test.njk", "test.js"]), ["test.js"]);
+  t.assert.deepStrictEqual(mgr.getNonTemplatePaths(["test.njk", "test.js"]), ["test.js"]);
 });
 
 // This test used to be for passthroughFileCopy: false in config
@@ -124,7 +124,7 @@ test("Get file paths (one image path)", async (t) => {
   let mgr = new TemplatePassthroughManager(eleventyConfig);
   mgr.extensionMap = new ExtensionMap(eleventyConfig);
 
-  t.deepEqual(mgr.getNonTemplatePaths(["test.png"]), ["test.png"]);
+  t.assert.deepStrictEqual(mgr.getNonTemplatePaths(["test.png"]), ["test.png"]);
 });
 
 test("Naughty paths outside of project dir", async (t) => {
@@ -146,7 +146,7 @@ test("Naughty paths outside of project dir", async (t) => {
   let mgr = new TemplatePassthroughManager(eleventyConfig);
   mgr.setFileSystemSearch(new FileSystemSearch());
 
-  await t.throwsAsync(async function () {
+  await t.assert.rejects(async function () {
     for (let path of mgr.getConfigPaths()) {
       let pass = mgr.getTemplatePassthroughForPath(path);
       await mgr.copyPassthrough(pass);
@@ -164,7 +164,7 @@ test("Naughty paths outside of project dir", async (t) => {
   ];
 
   for (let path of output) {
-    t.false(fs.existsSync(path));
+    t.assert.strictEqual(fs.existsSync(path), false);
   }
 });
 
@@ -176,7 +176,7 @@ test("getAllNormalizedPaths", async (t) => {
   await eleventyConfig.init();
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
-  t.deepEqual(mgr.getAllNormalizedPaths(), [
+  t.assert.deepStrictEqual(mgr.getAllNormalizedPaths(), [
     { inputPath: "./img", outputPath: true, isDynamicPattern: false, copyOptions: {} },
   ]);
 });
@@ -191,7 +191,7 @@ test("getAllNormalizedPaths with globs", async (t) => {
   await eleventyConfig.init();
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
-  t.deepEqual(mgr.getAllNormalizedPaths(), [
+  t.assert.deepStrictEqual(mgr.getAllNormalizedPaths(), [
     { inputPath: "./img", outputPath: true, isDynamicPattern: false, copyOptions: {} },
     { inputPath: "./img/**", outputPath: "", isDynamicPattern: true, copyOptions: {} },
     { inputPath: "./img/*.js", outputPath: "", isDynamicPattern: true, copyOptions: {} },
@@ -208,7 +208,7 @@ test("getAliasesFromPassthroughResults with Unicode filenames", async (t) => {
     { map: { "./path/测试.用例": "_site/path/测试.用例" } },
     { map: { "./测试.用例/file": "_site/测试.用例/file" } },
   ]
-  t.deepEqual(mgr.getAliasesFromPassthroughResults(results), {
+  t.assert.deepStrictEqual(mgr.getAliasesFromPassthroughResults(results), {
     "/path/file": "./path/file",
     "/%E6%B5%8B%E8%AF%95.%E7%94%A8%E4%BE%8B/%E2%8C%98": "./测试.用例/⌘",
     "/path/%E6%B5%8B%E8%AF%95.%E7%94%A8%E4%BE%8B": "./path/测试.用例",
@@ -232,7 +232,7 @@ test("Look for uniqueness on template passthrough paths #1677", async (t) => {
 
   let { passthroughManager } = getEleventyFilesInstance(formats, eleventyConfig);
 
-  await t.throwsAsync(async function () {
+  await t.assert.rejects(async function () {
     await passthroughManager.copyAll();
   }, {
     message: `Multiple passthrough copy files are trying to write to the same output file (./test/stubs/template-passthrough-duplicates/_site/avatar.png). ./test/stubs/template-passthrough-duplicates/input/avatar.png and ./test/stubs/template-passthrough-duplicates/input/src/views/avatar.png`
@@ -249,7 +249,7 @@ test("Incremental passthrough, issue #3285", async (t) => {
   let mgr = new TemplatePassthroughManager(eleventyConfig);
   mgr.setIncrementalFiles(["./test/stubs-3285/src/scripts/hello-world.js"]);
 
-  t.deepEqual(mgr.getAllNormalizedPaths([]), [
+  t.assert.deepStrictEqual(mgr.getAllNormalizedPaths([]), [
     { copyOptions: {}, inputPath: "./test/stubs-3285/src/scripts", outputPath: "scripts", isDynamicPattern: false },
   ]);
 });
@@ -276,13 +276,13 @@ test("Emulated passthrough copy sends entries and copies passthroughs that can�
   core.disableLogger();
   await core.write();
 
-  t.deepEqual(payload.entries, [
+  t.assert.deepStrictEqual(payload.entries, [
     { url: "/static", inputPath: "./test/stubs/template-passthrough/static/", dot: true, junk: true },
     { url: "/img.jpg", inputPath: "./test/stubs/template-passthrough/img.jpg", dot: true, junk: false },
   ]);
-  t.true(Object.keys(payload.map).includes("/static"));
-  t.true(fs.existsSync(path.join(outputDir, "views/renamed.png")));
-  t.false(fs.existsSync(path.join(outputDir, "static")));
+  t.assert.strictEqual(Object.keys(payload.map).includes("/static"), true);
+  t.assert.strictEqual(fs.existsSync(path.join(outputDir, "views/renamed.png")), true);
+  t.assert.strictEqual(fs.existsSync(path.join(outputDir, "static")), false);
 });
 
 test("Emulated incremental passthrough only includes what changed", async (t) => {
@@ -297,11 +297,11 @@ test("Emulated incremental passthrough only includes what changed", async (t) =>
 
   // a template changed
   mgr.setIncrementalFiles(["./test/stubs/template-passthrough/index.njk"]);
-  t.deepEqual(mgr.getAllNormalizedPaths([]), []);
+  t.assert.deepStrictEqual(mgr.getAllNormalizedPaths([]), []);
 
   // a passthrough that can’t be emulated changed
   mgr.setIncrementalFiles(["./test/stubs/template-passthrough/static/test.css"]);
-  t.deepEqual(mgr.getAllNormalizedPaths([]).map((p) => p.inputPath), ["./test/stubs/template-passthrough/static"]);
+  t.assert.deepStrictEqual(mgr.getAllNormalizedPaths([]).map((p) => p.inputPath), ["./test/stubs/template-passthrough/static"]);
 });
 
 test("setPassthroughCopyOptions sets defaults that per-call options override", async (t) => {
@@ -312,7 +312,7 @@ test("setPassthroughCopyOptions sets defaults that per-call options override", a
   await eleventyConfig.init();
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
-  t.deepEqual(mgr.getConfigPaths().map((p) => p.copyOptions), [
+  t.assert.deepStrictEqual(mgr.getConfigPaths().map((p) => p.copyOptions), [
     { junk: true, dot: false },
     { junk: true, dot: true },
   ]);
@@ -331,8 +331,8 @@ test("setPassthroughCopyOptions applies to copied files", async (t) => {
   core.disableLogger();
   await core.write();
 
-  t.true(fs.existsSync(path.join(outputDir, "copy/img.jpg")));
-  t.false(fs.existsSync(path.join(outputDir, "copy/.htaccess")));
+  t.assert.strictEqual(fs.existsSync(path.join(outputDir, "copy/img.jpg")), true);
+  t.assert.strictEqual(fs.existsSync(path.join(outputDir, "copy/.htaccess")), false);
 });
 
 test("setPassthroughCopyOptions with `rename` disables dev server emulation", async (t) => {
@@ -343,6 +343,6 @@ test("setPassthroughCopyOptions with `rename` disables dev server emulation", as
   await eleventyConfig.init();
 
   let mgr = new TemplatePassthroughManager(eleventyConfig);
-  t.deepEqual(mgr.getConfigPathGlobs(true), []);
-  t.deepEqual(mgr.getConfigPathGlobs(false), ["./img"]);
+  t.assert.deepStrictEqual(mgr.getConfigPathGlobs(true), []);
+  t.assert.deepStrictEqual(mgr.getConfigPathGlobs(false), ["./img"]);
 });

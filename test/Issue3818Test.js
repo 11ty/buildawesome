@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 import WebCPlugin from "@11ty/eleventy-plugin-webc";
 
@@ -15,7 +15,7 @@ eleventyComputed:
 
 
   let [result] = await elev.toJSON();
-  t.is(result.url, "/page/1/");
+  t.assert.strictEqual(result.url, "/page/1/");
 });
 
 test("#3818 WebC Permalink Pagination JavaScript function", async (t) => {
@@ -46,13 +46,13 @@ function permalink(data) {
   });
 
   let [page1, page2] = await elev.toJSON();
-  t.is(page1.url, "/page/1/");
-  t.is(page1.content, `<a href="/page/1/"></a>
+  t.assert.strictEqual(page1.url, "/page/1/");
+  t.assert.strictEqual(page1.content, `<a href="/page/1/"></a>
 <a></a>
 <a href="/page/2/"></a>
 <a href="/page/2/"></a>`)
-  t.is(page2.url, "/page/2/");
-  t.is(page2.content, `<a href="/page/1/"></a>
+  t.assert.strictEqual(page2.url, "/page/2/");
+  t.assert.strictEqual(page2.content, `<a href="/page/1/"></a>
 <a href="/page/1/"></a>
 <a></a>
 <a href="/page/2/"></a>`)
@@ -84,13 +84,13 @@ eleventyComputed:
   });
 
   let [page1, page2] = await elev.toJSON();
-  t.is(page1.url, "/page/1/");
-  t.is(page1.content, `<a href="/page/1/"></a>
+  t.assert.strictEqual(page1.url, "/page/1/");
+  t.assert.strictEqual(page1.content, `<a href="/page/1/"></a>
 <a></a>
 <a href="/page/2/"></a>
 <a href="/page/2/"></a>`)
-  t.is(page2.url, "/page/2/");
-  t.is(page2.content, `<a href="/page/1/"></a>
+  t.assert.strictEqual(page2.url, "/page/2/");
+  t.assert.strictEqual(page2.content, `<a href="/page/1/"></a>
 <a href="/page/1/"></a>
 <a></a>
 <a href="/page/2/"></a>`)
@@ -121,13 +121,13 @@ permalink: "\`page/$\{pagination.pageNumber + 1}/\`"
   });
 
   let [page1, page2] = await elev.toJSON();
-  t.is(page1.url, "/page/1/");
-  t.is(page1.content, `<a href="/page/1/"></a>
+  t.assert.strictEqual(page1.url, "/page/1/");
+  t.assert.strictEqual(page1.content, `<a href="/page/1/"></a>
 <a></a>
 <a href="/page/2/"></a>
 <a href="/page/2/"></a>`)
-  t.is(page2.url, "/page/2/");
-  t.is(page2.content, `<a href="/page/1/"></a>
+  t.assert.strictEqual(page2.url, "/page/2/");
+  t.assert.strictEqual(page2.content, `<a href="/page/1/"></a>
 <a href="/page/1/"></a>
 <a></a>
 <a href="/page/2/"></a>`)

@@ -1,22 +1,22 @@
-import test from "ava";
+import test from "node:test";
 import { DateTime } from "luxon";
 
 import Sortable from "../src/Util/Objects/Sortable.js";
 
 test("get Sort Function", (t) => {
   let s = new Sortable();
-  t.deepEqual(s.getSortFunction(), Sortable.sortFunctionAlphabeticAscending);
+  t.assert.deepStrictEqual(s.getSortFunction(), Sortable.sortFunctionAlphabeticAscending);
 });
 
 test("Alphabetic Ascending", (t) => {
   let s = new Sortable();
-  t.false(s.isSortNumeric);
-  t.true(s.isSortAscending);
+  t.assert.strictEqual(s.isSortNumeric, false);
+  t.assert.strictEqual(s.isSortAscending, true);
 
   s.add("a");
   s.add("z");
   s.add("m");
-  t.deepEqual(s.sort(), ["a", "m", "z"]);
+  t.assert.deepStrictEqual(s.sort(), ["a", "m", "z"]);
 });
 
 test("Alphabetic Ascending (shortcut)", (t) => {
@@ -24,19 +24,19 @@ test("Alphabetic Ascending (shortcut)", (t) => {
   s.add("a");
   s.add("z");
   s.add("m");
-  t.deepEqual(s.sortAscending(), ["a", "m", "z"]);
+  t.assert.deepStrictEqual(s.sortAscending(), ["a", "m", "z"]);
 });
 
 test("Alphabetic Descending", (t) => {
   let s = new Sortable();
   s.setSortDescending();
-  t.false(s.isSortNumeric);
-  t.false(s.isSortAscending);
+  t.assert.strictEqual(s.isSortNumeric, false);
+  t.assert.strictEqual(s.isSortAscending, false);
 
   s.add("a");
   s.add("z");
   s.add("m");
-  t.deepEqual(s.sort(), ["z", "m", "a"]);
+  t.assert.deepStrictEqual(s.sort(), ["z", "m", "a"]);
 });
 
 test("Alphabetic Descending (shortcut)", (t) => {
@@ -44,50 +44,50 @@ test("Alphabetic Descending (shortcut)", (t) => {
   s.add("a");
   s.add("z");
   s.add("m");
-  t.deepEqual(s.sortDescending(), ["z", "m", "a"]);
+  t.assert.deepStrictEqual(s.sortDescending(), ["z", "m", "a"]);
 });
 
 test("Numeric Ascending", (t) => {
   let s = new Sortable();
   s.setSortNumeric(true);
-  t.true(s.isSortNumeric);
-  t.true(s.isSortAscending);
+  t.assert.strictEqual(s.isSortNumeric, true);
+  t.assert.strictEqual(s.isSortAscending, true);
 
   s.add(1);
   s.add(4);
   s.add(2);
-  t.deepEqual(s.sort(), [1, 2, 4]);
+  t.assert.deepStrictEqual(s.sort(), [1, 2, 4]);
 });
 
 test("Numeric Descending", (t) => {
   let s = new Sortable();
   s.setSortNumeric(true);
   s.setSortDescending();
-  t.true(s.isSortNumeric);
-  t.false(s.isSortAscending);
+  t.assert.strictEqual(s.isSortNumeric, true);
+  t.assert.strictEqual(s.isSortAscending, false);
 
   s.add(1);
   s.add(4);
   s.add(2);
-  t.deepEqual(s.sort(), [4, 2, 1]);
+  t.assert.deepStrictEqual(s.sort(), [4, 2, 1]);
 });
 
 test("Date Assumptions", (t) => {
-  t.is(DateTime.fromISO("2007-10-10") - new Date(2007, 9, 10).getTime(), 0);
-  t.is(DateTime.fromISO("2008-10-10") - new Date(2008, 9, 10).getTime(), 0);
-  t.not(DateTime.fromISO("2008-10-10") - new Date(2007, 9, 10).getTime(), 0);
+  t.assert.strictEqual(DateTime.fromISO("2007-10-10") - new Date(2007, 9, 10).getTime(), 0);
+  t.assert.strictEqual(DateTime.fromISO("2008-10-10") - new Date(2008, 9, 10).getTime(), 0);
+  t.assert.notStrictEqual(DateTime.fromISO("2008-10-10") - new Date(2007, 9, 10).getTime(), 0);
 });
 
 test("Date and Sortable Assumptions", (t) => {
   // Sortable works here without extra code because Luxon’s valueOf works in equality comparison (for alphabetic lists)
-  t.is(
+  t.assert.strictEqual(
     Sortable.sortFunctionAlphabeticAscending(
       DateTime.fromISO("2007-10-10"),
       new Date(2007, 9, 10).getTime()
     ),
     0
   );
-  t.is(
+  t.assert.strictEqual(
     Sortable.sortFunctionAlphabeticDescending(
       DateTime.fromISO("2007-10-10"),
       new Date(2007, 9, 10).getTime()
@@ -95,14 +95,14 @@ test("Date and Sortable Assumptions", (t) => {
     0
   );
 
-  t.is(
+  t.assert.strictEqual(
     Sortable.sortFunctionAlphabeticAscending(
       DateTime.fromISO("2008-10-10"),
       new Date(2007, 9, 10).getTime()
     ),
     1
   );
-  t.is(
+  t.assert.strictEqual(
     Sortable.sortFunctionAlphabeticDescending(
       DateTime.fromISO("2008-10-10"),
       new Date(2007, 9, 10).getTime()
@@ -111,14 +111,14 @@ test("Date and Sortable Assumptions", (t) => {
   );
 
   // Sortable works here without extra code because Luxon’s valueOf works in subtraction (for numeric lists)
-  t.is(
+  t.assert.strictEqual(
     Sortable.sortFunctionNumericAscending(
       DateTime.fromISO("2008-10-10"),
       new Date(2008, 9, 10).getTime()
     ),
     0
   );
-  t.is(
+  t.assert.strictEqual(
     Sortable.sortFunctionNumericDescending(
       DateTime.fromISO("2008-10-10"),
       new Date(2008, 9, 10).getTime()
@@ -126,18 +126,14 @@ test("Date and Sortable Assumptions", (t) => {
     0
   );
 
-  t.true(
-    Sortable.sortFunctionNumericAscending(
+  t.assert.strictEqual(Sortable.sortFunctionNumericAscending(
       DateTime.fromISO("2008-10-10"),
       new Date(2007, 9, 10).getTime()
-    ) > 0
-  );
-  t.true(
-    Sortable.sortFunctionNumericDescending(
+    ) > 0, true);
+  t.assert.strictEqual(Sortable.sortFunctionNumericDescending(
       DateTime.fromISO("2008-10-10"),
       new Date(2007, 9, 10).getTime()
-    ) < 0
-  );
+    ) < 0, true);
 });
 
 test("Date Ascending", (t) => {
@@ -148,7 +144,7 @@ test("Date Ascending", (t) => {
   s.add(date3);
   s.add(date2);
   s.add(date1);
-  t.deepEqual(s.sort(), [date1, date2, date3]);
+  t.assert.deepStrictEqual(s.sort(), [date1, date2, date3]);
 });
 
 test("Date Descending", (t) => {
@@ -160,7 +156,7 @@ test("Date Descending", (t) => {
   s.add(date2);
   s.add(date3);
   s.add(date1);
-  t.deepEqual(s.sort(), [date3, date2, date1]);
+  t.assert.deepStrictEqual(s.sort(), [date3, date2, date1]);
 });
 
 test("Alphabetic Ascending (short str sort arg)", (t) => {
@@ -168,7 +164,7 @@ test("Alphabetic Ascending (short str sort arg)", (t) => {
   s.add("a");
   s.add("z");
   s.add("m");
-  t.deepEqual(s.sort("A-Z"), ["a", "m", "z"]);
+  t.assert.deepStrictEqual(s.sort("A-Z"), ["a", "m", "z"]);
 });
 
 test("Alphabetic Descending (short str sort arg)", (t) => {
@@ -176,52 +172,52 @@ test("Alphabetic Descending (short str sort arg)", (t) => {
   s.add("a");
   s.add("z");
   s.add("m");
-  t.deepEqual(s.sort("Z-A"), ["z", "m", "a"]);
+  t.assert.deepStrictEqual(s.sort("Z-A"), ["z", "m", "a"]);
 });
 
 test("Invalid Sort Function Name", (t) => {
   let s = new Sortable();
-  t.throws(() => s.sort("INVALID SORT STRING"));
+  t.assert.throws(() => s.sort("INVALID SORT STRING"));
 });
 
 test("Ascending / Descending Sorting Setters (asc, no param)", (t) => {
   let s = new Sortable();
   s.isSortAscending = false;
   s.setSortAscending();
-  t.is(s.isSortAscending, true);
+  t.assert.strictEqual(s.isSortAscending, true);
 });
 
 test("Ascending / Descending Sorting Setters (desc, no param)", (t) => {
   let s = new Sortable();
   s.isSortAscending = true;
   s.setSortDescending();
-  t.is(s.isSortAscending, false);
+  t.assert.strictEqual(s.isSortAscending, false);
 });
 
 test("Ascending / Descending Sorting Setters (asc, true)", (t) => {
   let s = new Sortable();
   s.isSortAscending = false;
   s.setSortAscending(true);
-  t.is(s.isSortAscending, true);
+  t.assert.strictEqual(s.isSortAscending, true);
 });
 
 test("Ascending / Descending Sorting Setters (asc, false)", (t) => {
   let s = new Sortable();
   s.isSortAscending = true;
   s.setSortAscending(false);
-  t.is(s.isSortAscending, false);
+  t.assert.strictEqual(s.isSortAscending, false);
 });
 
 test("Ascending / Descending Sorting Setters (desc, true)", (t) => {
   let s = new Sortable();
   s.isSortAscending = true;
   s.setSortDescending(true);
-  t.is(s.isSortAscending, false);
+  t.assert.strictEqual(s.isSortAscending, false);
 });
 
 test("Ascending / Descending Sorting Setters (desc, false)", (t) => {
   let s = new Sortable();
   s.isSortAscending = false;
   s.setSortDescending(false);
-  t.is(s.isSortAscending, true);
+  t.assert.strictEqual(s.isSortAscending, true);
 });

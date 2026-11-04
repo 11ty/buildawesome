@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#2885: Filters called from computed data functions get each page’s `page` and `eleventy`", async (t) => {
@@ -20,7 +20,7 @@ test("#2885: Filters called from computed data functions get each page’s `page
 
 	let results = await elev.toJSON();
 	results.sort((a, b) => a.url.localeCompare(b.url));
-	t.deepEqual(
+	t.assert.deepStrictEqual(
 		results.map(({ content }) => content),
 		["test|a|object", "test|b|object"],
 	);

@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#2131: Markdown computed data finds variables in untaken Liquid branches", async (t) => {
@@ -14,8 +14,8 @@ test("#2131: Markdown computed data finds variables in untaken Liquid branches",
 	});
 
 	let [result] = await elev.toJSON();
-	t.is(result.url, "/foo/page/");
-	t.is(result.content.trim(), "<p>foo</p>");
+	t.assert.strictEqual(result.url, "/foo/page/");
+	t.assert.strictEqual(result.content.trim(), "<p>foo</p>");
 });
 
 test("#2131: Computed data symbols use the templateEngineOverride engine", async (t) => {
@@ -34,6 +34,6 @@ test("#2131: Computed data symbols use the templateEngineOverride engine", async
 	});
 
 	let [result] = await elev.toJSON();
-	t.is(result.url, "/foo/page/");
-	t.is(result.content, "foo");
+	t.assert.strictEqual(result.url, "/foo/page/");
+	t.assert.strictEqual(result.content, "foo");
 });

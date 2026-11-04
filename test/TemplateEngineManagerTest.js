@@ -1,11 +1,11 @@
-import test from "ava";
+import test from "node:test";
 
 import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
 import ExtensionMap from "../src/ExtensionMap.js";
 import TemplateConfig from "../src/TemplateConfig.js";
 
 test("Unsupported engine", async (t) => {
-  await t.throwsAsync(async () => {
+  await t.assert.rejects(async () => {
     let eleventyConfig = new TemplateConfig();
     let tem = new TemplateEngineManager(eleventyConfig);
     await tem.getEngine("doesnotexist");
@@ -17,7 +17,7 @@ test("Supported engine", async (t) => {
   await eleventyConfig.init();
 
   let tem = new TemplateEngineManager(eleventyConfig);
-  t.truthy(tem.hasEngine("11ty.js"));
+  t.assert.ok(tem.hasEngine("11ty.js"));
 });
 
 test("Supported custom engine", async (t) => {
@@ -38,10 +38,10 @@ test("Supported custom engine", async (t) => {
 
   let tem = new TemplateEngineManager(eleventyConfig);
 
-  t.truthy(tem.hasEngine("txt"));
+  t.assert.ok(tem.hasEngine("txt"));
   let engine = await tem.getEngine("txt", extensionMap);
   let fn = await engine.compile("<p>This is plaintext</p>");
-  t.is(await fn({ author: "zach" }), "<p>This is plaintext</p>");
+  t.assert.strictEqual(await fn({ author: "zach" }), "<p>This is plaintext</p>");
 });
 
 test("Custom engine with custom init", async (t) => {
@@ -67,19 +67,19 @@ test("Custom engine with custom init", async (t) => {
   // let config = eleventyConfig.getConfig();
   let tem = new TemplateEngineManager(eleventyConfig);
 
-  t.truthy(tem.hasEngine("custom1"));
+  t.assert.ok(tem.hasEngine("custom1"));
   let engine = await tem.getEngine("custom1", extensionMap);
   let fn = await engine.compile("<p>This is plaintext</p>");
-  t.is(await fn({}), "<p>This is plaintext</p>");
+  t.assert.strictEqual(await fn({}), "<p>This is plaintext</p>");
 
   let engine2 = await tem.getEngine("custom1");
-  t.is(engine, engine2);
+  t.assert.strictEqual(engine, engine2);
 
   let fn2 = await engine2.compile("<p>This is plaintext</p>");
-  t.is(await fn2({}), "<p>This is plaintext</p>");
+  t.assert.strictEqual(await fn2({}), "<p>This is plaintext</p>");
 
-  t.is(initCount, 1, "Should have only run the init callback once");
-  t.is(compileCount, 2, "Should have only run the compile callback twice");
+  t.assert.strictEqual(initCount, 1, "Should have only run the init callback once");
+  t.assert.strictEqual(compileCount, 2, "Should have only run the compile callback twice");
 });
 
 test("getEngineLib", async (t) => {
@@ -89,5 +89,5 @@ test("getEngineLib", async (t) => {
 
   let tem = new TemplateEngineManager(eleventyConfig);
   let engine = await tem.getEngine("md", extensionMap);
-  t.truthy(engine.getEngineLib());
+  t.assert.ok(engine.getEngineLib());
 });

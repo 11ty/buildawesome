@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import getCollectionItemIndex from "../src/Filters/GetCollectionItemIndex.js";
 
 test("getCollectionItemIndex", (t) => {
@@ -16,11 +16,11 @@ test("getCollectionItemIndex", (t) => {
   };
   let collections = [first, second, third];
 
-  t.deepEqual(getCollectionItemIndex(collections, first), 0);
-  t.deepEqual(getCollectionItemIndex(collections, second), 1);
-  t.deepEqual(getCollectionItemIndex(collections, third), 2);
+  t.assert.deepStrictEqual(getCollectionItemIndex(collections, first), 0);
+  t.assert.deepStrictEqual(getCollectionItemIndex(collections, second), 1);
+  t.assert.deepStrictEqual(getCollectionItemIndex(collections, third), 2);
 
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     getCollectionItemIndex(collections, {
       inputPath: "unknown.md",
       outputPath: "/unknown/",

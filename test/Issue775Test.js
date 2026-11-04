@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#775 Using data cascade in Collection API", async (t) => {
@@ -19,5 +19,5 @@ test("#775 Using data cascade in Collection API", async (t) => {
 
 	let results = await elev.toJSON();
 	let result = results.find(entry => entry.inputPath === "./test/noop/index.njk");
-	t.is(result.content, "1");
+	t.assert.strictEqual(result.content, "1");
 });

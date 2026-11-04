@@ -4,8 +4,8 @@ class TestWithPage {
   }
 
   render(data) {
-    data.avaTest.is(this.page, "this-is-my-page");
-    data.avaTest.is(data.page.url, "/hi/");
+    data.assert.strictEqual(this.page, "this-is-my-page");
+    data.assert.strictEqual(data.page.url, "/hi/");
   }
 }
 

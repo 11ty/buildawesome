@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import ComputedData from "../src/Data/ComputedData.js";
 import TemplateConfig from "../src/TemplateConfig.js";
 
@@ -15,9 +15,9 @@ test("Basic get/set", async (t) => {
   };
   await cd.setupData(data);
 
-  t.is(data.key1, "this is a test inject methis is a str");
-  t.is(data.key2, "inject me");
-  t.is(data.keystr, "this is a str");
+  t.assert.strictEqual(data.key1, "this is a test inject methis is a str");
+  t.assert.strictEqual(data.key2, "inject me");
+  t.assert.strictEqual(data.keystr, "this is a str");
 });
 
 test("Basic get/set (reverse order of adds)", async (t) => {
@@ -33,9 +33,9 @@ test("Basic get/set (reverse order of adds)", async (t) => {
   };
   await cd.setupData(data);
 
-  t.is(data.key1, "this is a test inject methis is a str");
-  t.is(data.key2, "inject me");
-  t.is(data.keystr, "this is a str");
+  t.assert.strictEqual(data.key1, "this is a test inject methis is a str");
+  t.assert.strictEqual(data.key2, "inject me");
+  t.assert.strictEqual(data.keystr, "this is a str");
 });
 
 test("Basic get/set (reverse order of adds) nested two deep", async (t) => {
@@ -54,10 +54,10 @@ test("Basic get/set (reverse order of adds) nested two deep", async (t) => {
   };
   await cd.setupData(data);
 
-  t.is(data.key1.key3, "this is a test inject methis is a str");
-  t.is(data.key1.key4, "this is a test this is a test inject methis is a str");
-  t.is(data.key2, "inject me");
-  t.is(data.keystr, "this is a str");
+  t.assert.strictEqual(data.key1.key3, "this is a test inject methis is a str");
+  t.assert.strictEqual(data.key1.key4, "this is a test this is a test inject methis is a str");
+  t.assert.strictEqual(data.key2, "inject me");
+  t.assert.strictEqual(data.keystr, "this is a str");
 });
 
 test("use a computed value in another computed", async (t) => {
@@ -74,7 +74,7 @@ test("use a computed value in another computed", async (t) => {
   };
   await cd.setupData(data);
 
-  t.is(data.keyComputed2nd, "using computed this is a test inject me");
+  t.assert.strictEqual(data.keyComputed2nd, "using computed this is a test inject me");
 });
 
 test("use a computed value in another computed (out of order)", async (t) => {
@@ -91,7 +91,7 @@ test("use a computed value in another computed (out of order)", async (t) => {
   };
   await cd.setupData(data);
 
-  t.is(data.keyComputed2nd, "using computed this is a test inject me");
+  t.assert.strictEqual(data.keyComputed2nd, "using computed this is a test inject me");
 });
 
 test("use a computed value in another computed (out of order), async callbacks", async (t) => {
@@ -110,7 +110,7 @@ test("use a computed value in another computed (out of order), async callbacks",
   };
   await cd.setupData(data);
 
-  t.is(data.keyComputed2nd, "using computed this is a test inject me");
+  t.assert.strictEqual(data.keyComputed2nd, "using computed this is a test inject me");
 });
 
 test("Basic get/set nested", async (t) => {
@@ -126,9 +126,9 @@ test("Basic get/set nested", async (t) => {
   };
   await cd.setupData(data);
 
-  t.deepEqual(data.key1, { nested: "hi" });
-  t.is(data.key1.nested, "hi");
-  t.is(data.key2, "hi");
+  t.assert.deepStrictEqual(data.key1, { nested: "hi" });
+  t.assert.strictEqual(data.key1.nested, "hi");
+  t.assert.strictEqual(data.key2, "hi");
 });
 
 test("Basic get/set nested deeper", async (t) => {
@@ -153,7 +153,7 @@ test("Basic get/set nested deeper", async (t) => {
   };
   await cd.setupData(data);
 
-  t.deepEqual(data.key1, {
+  t.assert.deepStrictEqual(data.key1, {
     nonComputed: "hi",
     nested: {
       deeperA: "hi",
@@ -164,11 +164,11 @@ test("Basic get/set nested deeper", async (t) => {
     },
   });
 
-  t.is(data.key1.nested.deeperA, "hi");
-  t.is(data.key1.nested.deeperB, "hi");
-  t.is(data.key1.nested.deeperC.wow, "hi");
-  t.is(data.key1.nonComputed, "hi");
-  t.is(data.key2, "hi");
+  t.assert.strictEqual(data.key1.nested.deeperA, "hi");
+  t.assert.strictEqual(data.key1.nested.deeperB, "hi");
+  t.assert.strictEqual(data.key1.nested.deeperC.wow, "hi");
+  t.assert.strictEqual(data.key1.nonComputed, "hi");
+  t.assert.strictEqual(data.key2, "hi");
 });
 
 test("template string versus function types", async (t) => {
@@ -187,7 +187,7 @@ test("template string versus function types", async (t) => {
   };
   await cd.setupData(data);
 
-  t.deepEqual(data.key1, {
+  t.assert.deepStrictEqual(data.key1, {
     nonComputed: "hi",
     nested: {
       deeperA: "hi",
@@ -208,9 +208,9 @@ test("Basic get/set with template string", async (t) => {
   };
   await cd.setupData(data);
 
-  t.is(data.key1, "this is a test inject methis is a str");
-  t.is(data.key2, "inject me");
-  t.is(data.keystr, "this is a str");
+  t.assert.strictEqual(data.key1, "this is a test inject methis is a str");
+  t.assert.strictEqual(data.key2, "inject me");
+  t.assert.strictEqual(data.keystr, "this is a str");
 });
 
 test("Basic get/set using array data", async (t) => {
@@ -219,7 +219,7 @@ test("Basic get/set using array data", async (t) => {
 
   cd.add("keystr", "this is a str");
   cd.add("key1", (data) => {
-    t.is(Array.isArray(data.arr), true);
+    t.assert.strictEqual(Array.isArray(data.arr), true);
     return `this is a test ${data.arr[0]}${data.keystr}`;
   });
 
@@ -232,9 +232,9 @@ test("Basic get/set using array data", async (t) => {
   };
   await cd.setupData(data);
 
-  t.is(data.key1, "this is a test inject methis is a str");
-  t.is(data.arr[0], "inject me");
-  t.is(data.keystr, "this is a str");
+  t.assert.strictEqual(data.key1, "this is a test inject methis is a str");
+  t.assert.strictEqual(data.arr[0], "inject me");
+  t.assert.strictEqual(data.keystr, "this is a str");
 });
 
 test("Computed returns deep object", async (t) => {
@@ -259,8 +259,8 @@ test("Computed returns deep object", async (t) => {
   };
   await cd.setupData(data);
 
-  t.is(data.returnobj.key1, "value1");
-  t.is(data.returnobj.nest.key2, "value2");
+  t.assert.strictEqual(data.returnobj.key1, "value1");
+  t.assert.strictEqual(data.returnobj.nest.key2, "value2");
 });
 
 test("Boolean computed value Issue #1114", async (t) => {
@@ -273,8 +273,8 @@ test("Boolean computed value Issue #1114", async (t) => {
   };
   await cd.setupData(data);
 
-  t.is(data.bool1, true);
-  t.is(data.key2, "inject me");
+  t.assert.strictEqual(data.bool1, true);
+  t.assert.strictEqual(data.key2, "inject me");
 });
 
 test("Reading an unavailable path stops the function and defers it", async (t) => {
@@ -290,13 +290,13 @@ test("Reading an unavailable path stops the function and defers it", async (t) =
     collections: {},
   };
   await cd.setupData(data, { unavailable: ["collections"] });
-  t.is(runs, 1);
-  t.false("key1" in data);
+  t.assert.strictEqual(runs, 1);
+  t.assert.strictEqual("key1" in data, false);
 
   data.collections.first = [1, 2];
   await cd.processRemainingData(data);
-  t.is(runs, 2);
-  t.is(data.key1, 2);
+  t.assert.strictEqual(runs, 2);
+  t.assert.strictEqual(data.key1, 2);
 });
 
 test("Swallowed reads of an unavailable path still defer", async (t) => {
@@ -312,7 +312,7 @@ test("Swallowed reads of an unavailable path still defer", async (t) => {
 
   let data = { page: {} };
   await cd.setupData(data, { unavailable: ["page.rawInput"] });
-  t.false("key1" in data);
+  t.assert.strictEqual("key1" in data, false);
 });
 
 test("Enumerating a parent object reads its unavailable children", async (t) => {
@@ -322,11 +322,11 @@ test("Enumerating a parent object reads its unavailable children", async (t) => 
 
   let data = { page: { inputPath: "./in.md" } };
   await cd.setupData(data, { unavailable: ["page.rawInput"] });
-  t.false("key1" in data);
+  t.assert.strictEqual("key1" in data, false);
 
   data.page.rawInput = "raw";
   await cd.processRemainingData(data);
-  t.is(data.key1, `{"inputPath":"./in.md","rawInput":"raw"}`);
+  t.assert.strictEqual(data.key1, `{"inputPath":"./in.md","rawInput":"raw"}`);
 });
 
 test("Template strings that use an unavailable path are deferred (placeholder rendering)", async (t) => {
@@ -336,7 +336,7 @@ test("Template strings that use an unavailable path are deferred (placeholder re
 
   let data = {};
   await cd.setupData(data, { unavailable: ["collections"] });
-  t.false("key1" in data);
+  t.assert.strictEqual("key1" in data, false);
 });
 
 test("Template strings that use an unavailable path are deferred (symbol parsing)", async (t) => {
@@ -347,12 +347,12 @@ test("Template strings that use an unavailable path are deferred (symbol parsing
 
   let data = { page: {} };
   await cd.setupData(data, { unavailable: ["page.rawInput"] });
-  t.false("key1" in data);
-  t.false("key2" in data);
+  t.assert.strictEqual("key1" in data, false);
+  t.assert.strictEqual("key2" in data, false);
 
   data.page.rawInput = "raw";
   await cd.processRemainingData(data);
-  t.is(data.key2, "raw!");
+  t.assert.strictEqual(data.key2, "raw!");
 });
 
 test("Inherits resolved signals from another data object", async (t) => {
@@ -363,8 +363,8 @@ test("Inherits resolved signals from another data object", async (t) => {
 
   let parentData = {};
   await parent.setupData(parentData, { unavailable: ["item"] });
-  t.is(parentData.a, 1);
-  t.false("b" in parentData);
+  t.assert.strictEqual(parentData.a, 1);
+  t.assert.strictEqual("b" in parentData, false);
 
   let child = new ComputedData();
   child.add("a", () => ++runs.a);
@@ -374,9 +374,9 @@ test("Inherits resolved signals from another data object", async (t) => {
   child.inherit(childData, parent, parentData);
   await child.setupData(childData);
 
-  t.is(childData.a, 1);
-  t.is(runs.a, 1);
-  t.is(childData.b, "x:1");
+  t.assert.strictEqual(childData.a, 1);
+  t.assert.strictEqual(runs.a, 1);
+  t.assert.strictEqual(childData.b, "x:1");
 });
 
 test("Expect collections to be arrays in data callback #1114", async (t) => {
@@ -385,8 +385,8 @@ test("Expect collections to be arrays in data callback #1114", async (t) => {
 
   cd.add("key1", (data) => {
     if (data.collections.first.length) {
-      t.is(data.collections.first[0], 1);
-      t.is(data.collections.second[0], 2);
+      t.assert.strictEqual(data.collections.first[0], 1);
+      t.assert.strictEqual(data.collections.second[0], 2);
     }
     return ``;
   });
@@ -414,9 +414,9 @@ test("Tracks dependencies", async (t) => {
   };
 
   await cd.setupData(data);
-  t.deepEqual(cd.getDependencies("key1", data), []);
-  t.deepEqual(cd.getDependencies("key2", data), ["key1", "key3"]);
-  t.deepEqual(cd.getDependencies("key3", data), []);
+  t.assert.deepStrictEqual(cd.getDependencies("key1", data), []);
+  t.assert.deepStrictEqual(cd.getDependencies("key2", data), ["key1", "key3"]);
+  t.assert.deepStrictEqual(cd.getDependencies("key3", data), []);
 });
 
 test("Process in two stages (deferring collections)", async (t) => {
@@ -438,7 +438,7 @@ test("Process in two stages (deferring collections)", async (t) => {
 
   await cd.setupData(data, { unavailable: ["collections"] });
 
-  t.deepEqual(data, {
+  t.assert.deepStrictEqual(data, {
     collections: {
       dog: [2],
     },
@@ -452,7 +452,7 @@ test("Process in two stages (deferring collections)", async (t) => {
 
   await cd.processRemainingData(data);
 
-  t.deepEqual(data, {
+  t.assert.deepStrictEqual(data, {
     collections: {
       dog: [2],
       processed: "hi",
@@ -474,7 +474,7 @@ test("Circular dependencies throw", async (t) => {
   cd.add("a", (data) => data.b);
   cd.add("b", (data) => data.a);
 
-  await t.throwsAsync(() => cd.setupData({}), {
+  await t.assert.rejects(() => cd.setupData({}), {
     message: "Circular computed data dependency: a -> b -> a",
   });
 });
@@ -485,7 +485,7 @@ test("Circular dependencies throw (template strings, symbol parsing)", async (t)
   cd.addTemplateString("a", async (data) => `${data.b}`, [], () => ["b"]);
   cd.addTemplateString("b", async (data) => `${data.a}`, [], () => ["a"]);
 
-  await t.throwsAsync(() => cd.setupData({}), {
+  await t.assert.rejects(() => cd.setupData({}), {
     message: "Circular computed data dependency: a -> b -> a",
   });
 });
@@ -496,7 +496,7 @@ test("Circular dependencies throw (template strings, placeholder rendering)", as
   cd.addTemplateString("a", async (data) => `${data.b}`);
   cd.addTemplateString("b", async (data) => `${data.a}`);
 
-  await t.throwsAsync(() => cd.setupData({}), {
+  await t.assert.rejects(() => cd.setupData({}), {
     message: "Circular computed data dependency: a -> b -> a",
   });
 });
@@ -507,7 +507,7 @@ test("Circular dependencies throw (function and template string)", async (t) => 
   cd.add("a", (data) => data.b);
   cd.addTemplateString("b", async (data) => `${data.a}`, [], () => ["a"]);
 
-  await t.throwsAsync(() => cd.setupData({}), {
+  await t.assert.rejects(() => cd.setupData({}), {
     message: "Circular computed data dependency: a -> b -> a",
   });
 });
@@ -519,7 +519,7 @@ test("Template string reads its own upstream value", async (t) => {
 
   let data = { title: "hi" };
   await cd.setupData(data);
-  t.is(data.title, "(hi)");
+  t.assert.strictEqual(data.title, "(hi)");
 });
 
 test("Reads its own upstream value", async (t) => {
@@ -529,7 +529,7 @@ test("Reads its own upstream value", async (t) => {
 
   let data = { title: "hi" };
   await cd.setupData(data);
-  t.is(data.title, "(hi)");
+  t.assert.strictEqual(data.title, "(hi)");
 });
 
 test("Swallowed reads of pending computed data still re-run", async (t) => {
@@ -546,7 +546,7 @@ test("Swallowed reads of pending computed data still re-run", async (t) => {
 
   let data = {};
   await cd.setupData(data);
-  t.is(data.a, "B");
+  t.assert.strictEqual(data.a, "B");
 });
 
 test("Reads nested computed data through a parent object", async (t) => {
@@ -557,7 +557,7 @@ test("Reads nested computed data through a parent object", async (t) => {
 
   let data = { page: { inputPath: "./in.md" } };
   await cd.setupData(data);
-  t.is(data.summary, `{"inputPath":"./in.md","url":"/url/"}`);
+  t.assert.strictEqual(data.summary, `{"inputPath":"./in.md","url":"/url/"}`);
 });
 
 test("Use JavaScript functions (filters) in computed data functions", async (t) => {
@@ -577,7 +577,7 @@ test("Use JavaScript functions (filters) in computed data functions", async (t) 
   let data = {};
   await cd.setupData(data);
 
-  t.is(data.key1, "this is a test is blue");
+  t.assert.strictEqual(data.key1, "this is a test is blue");
 });
 
 test("Computed functions without dependencies run once, Issue #2771", async (t) => {
@@ -592,7 +592,7 @@ test("Computed functions without dependencies run once, Issue #2771", async (t) 
   await cd.setupData(data, { unavailable: ["collections"] });
   await cd.processRemainingData(data);
 
-  t.deepEqual(calls, ["./in.md"]);
+  t.assert.deepStrictEqual(calls, ["./in.md"]);
 });
 
 test.skip("Enumerating data doesn’t create false cycles", async (t) => {
@@ -604,5 +604,5 @@ test.skip("Enumerating data doesn’t create false cycles", async (t) => {
   let data = {};
   await cd.setupData(data);
 
-  t.is(data.other, `${data.keys}`);
+  t.assert.strictEqual(data.other, `${data.keys}`);
 });

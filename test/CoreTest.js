@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import lodash from "@11ty/lodash-custom";
@@ -29,12 +29,12 @@ test("Eleventy, defaults inherit from config", async (t) => {
   await elev.initializeConfig();
   let config = $config.getConfig();
 
-  t.truthy(elev.input);
-  t.truthy(elev.outputDir);
-  t.is(config.dir.input, ".");
-  t.is(elev.input, "./");
-  t.is(config.dir.output, "_site");
-  t.is(elev.outputDir, "./_site/");
+  t.assert.ok(elev.input);
+  t.assert.ok(elev.outputDir);
+  t.assert.strictEqual(config.dir.input, ".");
+  t.assert.strictEqual(elev.input, "./");
+  t.assert.strictEqual(config.dir.output, "_site");
+  t.assert.strictEqual(elev.outputDir, "./_site/");
 });
 
 test("Eleventy, null output directory should default to _site", async (t) => {
@@ -46,22 +46,22 @@ test("Eleventy, null output directory should default to _site", async (t) => {
   await elev.initializeConfig();
   let config = $config.getConfig();
 
-  t.is(config.dir.input, ".");
-  t.is(elev.input, "./");
-  t.is(config.dir.output, "_site");
-  t.is(elev.outputDir, "./_site/");
+  t.assert.strictEqual(config.dir.input, ".");
+  t.assert.strictEqual(elev.input, "./");
+  t.assert.strictEqual(config.dir.output, "_site");
+  t.assert.strictEqual(elev.outputDir, "./_site/");
 });
 
 test("Eleventy, get version", (t) => {
   let elev = new Eleventy();
 
-  t.truthy(elev.getVersion());
+  t.assert.ok(elev.getVersion());
 });
 
 test("Eleventy, get help", (t) => {
   let elev = new Eleventy();
 
-  t.truthy(elev.getHelp());
+  t.assert.ok(elev.getHelp());
 });
 
 test("Eleventy, set is verbose (before config init)", async (t) => {
@@ -70,7 +70,7 @@ test("Eleventy, set is verbose (before config init)", async (t) => {
 
   await elev.initializeConfig();
 
-  t.true(elev.verboseMode);
+  t.assert.strictEqual(elev.verboseMode, true);
 });
 
 test("Eleventy, set is verbose (after config init)", async (t) => {
@@ -79,44 +79,44 @@ test("Eleventy, set is verbose (after config init)", async (t) => {
   await elev.initializeConfig();
   elev.setIsVerbose(true);
 
-  t.true(elev.verboseMode);
+  t.assert.strictEqual(elev.verboseMode, true);
 });
 
 test("Eleventy set input/output", async (t) => {
   let elev = new Eleventy("./test/stubs", "./test/stubs/_site");
 
-  t.is(elev.input, "./test/stubs/");
-  t.is(elev.outputDir, "./test/stubs/_site/");
+  t.assert.strictEqual(elev.input, "./test/stubs/");
+  t.assert.strictEqual(elev.outputDir, "./test/stubs/_site/");
 
   await elev.init();
-  t.truthy(elev.templateData);
-  t.truthy(elev.writer);
+  t.assert.ok(elev.templateData);
+  t.assert.ok(elev.writer);
 });
 
 test("process.env.ELEVENTY_*", async (t) => {
   delete process.env.ELEVENTY_ROOT;
-  t.falsy(process.env.ELEVENTY_ROOT);
+  t.assert.ok(!process.env.ELEVENTY_ROOT);
 
   let elev = new Eleventy("./test/stubs", "./test/stubs/_site");
   await elev.init();
-  t.truthy(process.env.ELEVENTY_ROOT);
+  t.assert.ok(process.env.ELEVENTY_ROOT);
 
   // all ELEVENTY_ env variables are also available on eleventy.env
   let globals = await elev.templateData.getInitialGlobalData();
-  t.truthy(globals.eleventy.env.root);
+  t.assert.ok(globals.eleventy.env.root);
 });
 
 test("process.env.BUILDAWESOME_*", async (t) => {
   delete process.env.BUILDAWESOME_ROOT;
-  t.falsy(process.env.BUILDAWESOME_ROOT);
+  t.assert.ok(!process.env.BUILDAWESOME_ROOT);
 
   let elev = new Eleventy("./test/stubs", "./test/stubs/_site");
   await elev.init();
-  t.truthy(process.env.BUILDAWESOME_ROOT);
+  t.assert.ok(process.env.BUILDAWESOME_ROOT);
 
   // all BUILDAWESOME_ env variables are also available on eleventy.env
   let globals = await elev.templateData.getInitialGlobalData();
-  t.truthy(globals.eleventy.env.root);
+  t.assert.ok(globals.eleventy.env.root);
 });
 
 test("Eleventy file watching", async (t) => {
@@ -135,7 +135,7 @@ test("Eleventy file watching", async (t) => {
   let { targets, ignores } = await elev.getWatchedTargets();
   await elev.stopWatch();
 
-  t.deepEqual(targets, [
+  t.assert.deepStrictEqual(targets, [
     "./package.json",
     "./test/stubs/**/*.njk",
     "./test/stubs/_includes/**",
@@ -148,11 +148,11 @@ test("Eleventy file watching", async (t) => {
     "./test/stubs/deps/dep2.cjs",
   ]);
 
-  t.true(ignores.includes("node_modules/**"));
-  t.true(ignores.includes("**/node_modules/**"));
-  t.true(ignores.includes("test/stubs/_site/**"));
-  t.true(ignores.includes("./.git/**"));
-  t.true(ignores.includes(".cache"));
+  t.assert.strictEqual(ignores.includes("node_modules/**"), true);
+  t.assert.strictEqual(ignores.includes("**/node_modules/**"), true);
+  t.assert.strictEqual(ignores.includes("test/stubs/_site/**"), true);
+  t.assert.strictEqual(ignores.includes("./.git/**"), true);
+  t.assert.strictEqual(ignores.includes(".cache"), true);
 });
 
 test("Eleventy file watching (don’t watch deps of passthrough copy .js files)", async (t) => {
@@ -167,7 +167,7 @@ test("Eleventy file watching (don’t watch deps of passthrough copy .js files)"
   let paths = await elev.eleventyFiles.getWatchPathCache();
   await elev.stopWatch();
 
-  t.deepEqual(paths, ["./test/stubs-1325/test.11ty.js"]);
+  t.assert.deepStrictEqual(paths, ["./test/stubs-1325/test.11ty.js"]);
 });
 
 test("Eleventy file watching (no JS dependencies)", async (t) => {
@@ -186,7 +186,7 @@ test("Eleventy file watching (no JS dependencies)", async (t) => {
 
   await elev.stopWatch();
 
-  t.deepEqual(targets, [
+  t.assert.deepStrictEqual(targets, [
     "./package.json",
     "./test/stubs/**/*.njk",
     "./test/stubs/_includes/**",
@@ -197,20 +197,20 @@ test("Eleventy file watching (no JS dependencies)", async (t) => {
     `./test/stubs/**/*.{json,data.mjs,data.cjs,data.js,data.mts,data.cts,data.ts,11tydata.mjs,11tydata.cjs,11tydata.js,11tydata.mts,11tydata.cts,11tydata.ts}`,
   ]);
 
-  t.true(ignores.includes("node_modules/**"));
-  t.true(ignores.includes("**/node_modules/**"));
-  t.true(ignores.includes("test/stubs/_site/**"));
-  t.true(ignores.includes("./.git/**"));
-  t.true(ignores.includes(".cache"));
+  t.assert.strictEqual(ignores.includes("node_modules/**"), true);
+  t.assert.strictEqual(ignores.includes("**/node_modules/**"), true);
+  t.assert.strictEqual(ignores.includes("test/stubs/_site/**"), true);
+  t.assert.strictEqual(ignores.includes("./.git/**"), true);
+  t.assert.strictEqual(ignores.includes(".cache"), true);
 });
 
 test("Eleventy set input/output, one file input", async (t) => {
   let elev = new Eleventy("./test/stubs/index.html", "./test/stubs/_site");
 
-  t.is(elev.input, "./test/stubs/index.html");
-  t.is(elev.inputFile, "./test/stubs/index.html");
-  t.is(elev.inputDir, "./test/stubs/");
-  t.is(elev.outputDir, "./test/stubs/_site/");
+  t.assert.strictEqual(elev.input, "./test/stubs/index.html");
+  t.assert.strictEqual(elev.inputFile, "./test/stubs/index.html");
+  t.assert.strictEqual(elev.inputDir, "./test/stubs/");
+  t.assert.strictEqual(elev.outputDir, "./test/stubs/_site/");
 });
 
 test("Eleventy set input/output, one file input, deeper subdirectory", async (t) => {
@@ -218,27 +218,27 @@ test("Eleventy set input/output, one file input, deeper subdirectory", async (t)
 		inputDir: "./test/stubs"
 	});
 
-  t.is(elev.input, "./test/stubs/subdir/index.html");
-  t.is(elev.inputFile, "./test/stubs/subdir/index.html");
-  t.is(elev.inputDir, "./test/stubs/");
-  t.is(elev.outputDir, "./test/stubs/_site/");
+  t.assert.strictEqual(elev.input, "./test/stubs/subdir/index.html");
+  t.assert.strictEqual(elev.inputFile, "./test/stubs/subdir/index.html");
+  t.assert.strictEqual(elev.inputDir, "./test/stubs/");
+  t.assert.strictEqual(elev.outputDir, "./test/stubs/_site/");
 });
 
 test("Eleventy set input/output, one file input root dir", async (t) => {
   let elev = new Eleventy("./README.md", "./test/stubs/_site");
 
-  t.is(elev.input, "./README.md");
-  t.is(elev.inputFile, "./README.md");
-  t.is(elev.inputDir, "./");
-  t.is(elev.outputDir, "./test/stubs/_site/");
+  t.assert.strictEqual(elev.input, "./README.md");
+  t.assert.strictEqual(elev.inputFile, "./README.md");
+  t.assert.strictEqual(elev.inputDir, "./");
+  t.assert.strictEqual(elev.outputDir, "./test/stubs/_site/");
 });
 
 test("Eleventy set input/output, one file input root dir without leading dot/slash", async (t) => {
   let elev = new Eleventy("README.md", "./test/stubs/_site");
 
-  t.is(elev.input, "./README.md");
-  t.is(elev.inputDir, "./");
-  t.is(elev.outputDir, "./test/stubs/_site/");
+  t.assert.strictEqual(elev.input, "./README.md");
+  t.assert.strictEqual(elev.inputDir, "./");
+  t.assert.strictEqual(elev.outputDir, "./test/stubs/_site/");
 });
 
 test("Eleventy set input/output, one file input exitCode (script)", async (t) => {
@@ -248,12 +248,12 @@ test("Eleventy set input/output, one file input exitCode (script)", async (t) =>
   });
   elev.disableLogger();
 
-  await t.throwsAsync(async () => {
+  await t.assert.rejects(async () => {
     await elev.write();
   });
 
   // no change to the exit code when running script
-  t.is(process.exitCode, previousExitCode);
+  t.assert.strictEqual(process.exitCode, previousExitCode);
 });
 
 test("Eleventy set input/output, one file input exitCode (cli)", async (t) => {
@@ -263,11 +263,15 @@ test("Eleventy set input/output, one file input exitCode (cli)", async (t) => {
   });
   elev.disableLogger();
 
-  let e = await t.throwsAsync(() => elev.write());
+  let e;
+  await t.assert.rejects(() => elev.write(), (err) => {
+  	e = err;
+  	return true;
+  });
 
-  t.is(e.message, "Having trouble rendering njk template ./test/stubs/exitCode/failure.njk");
+  t.assert.strictEqual(e.message, "Having trouble rendering njk template ./test/stubs/exitCode/failure.njk");
 
-  t.is(process.exitCode, 1);
+  t.assert.strictEqual(process.exitCode, 1);
 
   process.exitCode = previousExitCode;
 });
@@ -282,12 +286,12 @@ test("setReporter config re-runs for each new user config", async (t) => {
   });
 
   await elev.init();
-  t.is(configs.length, 1);
+  t.assert.strictEqual(configs.length, 1);
 
   await elev.resetConfig();
   await elev.init();
-  t.is(configs.length, 2);
-  t.not(configs[0], configs[1]);
+  t.assert.strictEqual(configs.length, 2);
+  t.assert.notStrictEqual(configs[0], configs[1]);
 });
 
 test("Throwing buildawesome.aftererror listener does not mask the original error", async (t) => {
@@ -301,9 +305,13 @@ test("Throwing buildawesome.aftererror listener does not mask the original error
   });
   elev.disableLogger();
 
-  let e = await t.throwsAsync(() => elev.toJSON());
+  let e;
+  await t.assert.rejects(() => elev.toJSON(), (err) => {
+  	e = err;
+  	return true;
+  });
 
-  t.is(e.message, "Having trouble rendering njk template ./test/stubs/exitCode/failure.njk");
+  t.assert.strictEqual(e.message, "Having trouble rendering njk template ./test/stubs/exitCode/failure.njk");
 });
 
 test("Eleventy to json", async (t) => {
@@ -312,7 +320,7 @@ test("Eleventy to json", async (t) => {
 
   let result = await elev.toJSON();
 
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     result.filter((entry) => entry.url === "/test/"),
     [
       {
@@ -324,7 +332,7 @@ test("Eleventy to json", async (t) => {
       },
     ]
   );
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     result.filter((entry) => entry.url === "/test2/"),
     [
       {
@@ -342,31 +350,31 @@ test("Two Eleventies, two configs!!! (config used to be a global)", async (t) =>
   let elev1 = new Eleventy();
   await elev1.initializeConfig();
 
-  t.is(elev1.eleventyConfig, elev1.eleventyConfig);
-  t.is(elev1.config, elev1.config);
+  t.assert.strictEqual(elev1.eleventyConfig, elev1.eleventyConfig);
+  t.assert.strictEqual(elev1.config, elev1.config);
   delete elev1.config.uses;
-  t.is(JSON.stringify(elev1.config), JSON.stringify(elev1.config));
+  t.assert.strictEqual(JSON.stringify(elev1.config), JSON.stringify(elev1.config));
 
   let elev2 = new Eleventy();
   await elev2.initializeConfig();
-  t.not(elev1.eleventyConfig, elev2.eleventyConfig);
+  t.assert.notStrictEqual(elev1.eleventyConfig, elev2.eleventyConfig);
   elev1.config.benchmarkManager = null;
   elev2.config.benchmarkManager = null;
   delete elev2.config.uses;
-  t.is(JSON.stringify(elev1.config), JSON.stringify(elev2.config));
+  t.assert.strictEqual(JSON.stringify(elev1.config), JSON.stringify(elev2.config));
 });
 
 test("Config propagates to other instances correctly", async (t) => {
   let elev = new Eleventy();
   await elev.init();
 
-  t.is(elev.eleventyServe.config, elev.config);
+  t.assert.strictEqual(elev.eleventyServe.config, elev.config);
 
-  t.is(elev.extensionMap.templateConfig, elev.eleventyConfig);
-  t.is(elev.passthroughManager.templateConfig, elev.eleventyConfig);
-  t.is(elev.eleventyFiles.templateConfig, elev.eleventyConfig);
-  t.is(elev.templateData.templateConfig, elev.eleventyConfig);
-  t.is(elev.writer.templateConfig, elev.eleventyConfig);
+  t.assert.strictEqual(elev.extensionMap.templateConfig, elev.eleventyConfig);
+  t.assert.strictEqual(elev.passthroughManager.templateConfig, elev.eleventyConfig);
+  t.assert.strictEqual(elev.eleventyFiles.templateConfig, elev.eleventyConfig);
+  t.assert.strictEqual(elev.templateData.templateConfig, elev.eleventyConfig);
+  t.assert.strictEqual(elev.writer.templateConfig, elev.eleventyConfig);
 });
 
 test("Eleventy programmatic API without init", async (t) => {
@@ -375,7 +383,7 @@ test("Eleventy programmatic API without init", async (t) => {
 
   let result = await elev.toJSON();
 
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     result.filter((entry) => entry.url === "/test/"),
     [
       {
@@ -387,7 +395,7 @@ test("Eleventy programmatic API without init", async (t) => {
       },
     ]
   );
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     result.filter((entry) => entry.url === "/test2/"),
     [
       {
@@ -429,20 +437,20 @@ test("Can Eleventy run two executeBuilds in parallel?", async (t) => {
     },
   ];
 
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     result1.filter((entry) => entry.url === "/test/"),
     test1Result
   );
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     result1.filter((entry) => entry.url === "/test2/"),
     test2Result
   );
 
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     result2.filter((entry) => entry.url === "/test/"),
     test1Result
   );
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     result2.filter((entry) => entry.url === "/test2/"),
     test2Result
   );
@@ -459,7 +467,7 @@ test("Unicode in front matter `tags`, issue #670", async (t) => {
     return 1;
   });
 
-  t.is(results[0].content.trim(), "2,Cañon City,all,");
+  t.assert.strictEqual(results[0].content.trim(), "2,Cañon City,all,");
 });
 
 test("#142: date 'git Last Modified' populates page.date", async (t) => {
@@ -470,13 +478,13 @@ test("#142: date 'git Last Modified' populates page.date", async (t) => {
 
   // Warning: this doesn’t test the validity of the function, only that it populates page.date.
   let timestamp = await getUpdatedTimestamp("./test/stubs-142/index.njk");
-  t.truthy(result.content.trim());
-  t.truthy(timestamp);
-  t.is(result.content.trim(), "" + timestamp);
+  t.assert.ok(result.content.trim());
+  t.assert.ok(timestamp);
+  t.assert.strictEqual(result.content.trim(), "" + timestamp);
 });
 
 test("git getUpdatedTimestamp returns undefined on nonexistent path", async (t) => {
-  t.is(await getUpdatedTimestamp("./test/invalid.invalid"), undefined);
+  t.assert.strictEqual(await getUpdatedTimestamp("./test/invalid.invalid"), undefined);
 });
 
 test("#2167: Pagination with permalink: false", async (t) => {
@@ -485,10 +493,10 @@ test("#2167: Pagination with permalink: false", async (t) => {
   elev.setDryRun(true);
 
   let [,pages] = await elev.write();
-  t.is(pages.length, 0);
+  t.assert.strictEqual(pages.length, 0);
 
   let results = await elev.toJSON();
-  t.is(results.length, 5);
+  t.assert.strictEqual(results.length, 5);
 });
 
 test("Pagination over collection using eleventyComputed (liquid)", async (t) => {
@@ -499,8 +507,8 @@ test("Pagination over collection using eleventyComputed (liquid)", async (t) => 
     {
       config: function ($config) {
         $config.addFilter("selectRandomFromArray", (arr) => {
-          t.true(Array.isArray(arr));
-          t.deepEqual(arr, ["The person that shared this is awesome"]);
+          t.assert.strictEqual(Array.isArray(arr), true);
+          t.assert.deepStrictEqual(arr, ["The person that shared this is awesome"]);
           return arr[0];
         });
       },
@@ -508,10 +516,10 @@ test("Pagination over collection using eleventyComputed (liquid)", async (t) => 
   );
 
   let results = await elev.toJSON();
-  t.is(results.length, 2);
+  t.assert.strictEqual(results.length, 2);
   let content = results.map((entry) => entry.content).sort();
-  t.is(content[0], "No");
-  t.is(content[1], "The person that shared this is awesome");
+  t.assert.strictEqual(content[0], "No");
+  t.assert.strictEqual(content[1], "The person that shared this is awesome");
 });
 
 test("Pagination over collection using eleventyComputed (njk)", async (t) => {
@@ -522,8 +530,8 @@ test("Pagination over collection using eleventyComputed (njk)", async (t) => {
     {
       config: function ($config) {
         $config.addFilter("selectRandomFromArray", (arr) => {
-          t.true(Array.isArray(arr));
-          t.deepEqual(arr, ["The person that shared this is awesome"]);
+          t.assert.strictEqual(Array.isArray(arr), true);
+          t.assert.deepStrictEqual(arr, ["The person that shared this is awesome"]);
           return arr[0];
         });
       },
@@ -531,10 +539,10 @@ test("Pagination over collection using eleventyComputed (njk)", async (t) => {
   );
 
   let results = await elev.toJSON();
-  t.is(results.length, 2);
+  t.assert.strictEqual(results.length, 2);
   let content = results.map((entry) => entry.content).sort();
-  t.is(content[0], "No");
-  t.is(content[1], "The person that shared this is awesome");
+  t.assert.strictEqual(content[0], "No");
+  t.assert.strictEqual(content[1], "The person that shared this is awesome");
 });
 
 test("Paginated template uses proxy and global data", async (t) => {
@@ -550,7 +558,7 @@ test("Paginated template uses proxy and global data", async (t) => {
   let allContentMatches = results.filter((entry) => {
     return entry.content.trim() === "BANNER TEXT";
   });
-  t.is(results.length, allContentMatches.length);
+  t.assert.strictEqual(results.length, allContentMatches.length);
 });
 
 test("Liquid shortcode with multiple arguments(issue #2348)", async (t) => {
@@ -568,10 +576,10 @@ test("Liquid shortcode with multiple arguments(issue #2348)", async (t) => {
   let str = normalizeNewLines(`${JSON.stringify(arr)}
 ${JSON.stringify(arr)}`);
   let results = await elev.toJSON();
-  t.is(results.length, 2);
+  t.assert.strictEqual(results.length, 2);
   let content = results.map((entry) => entry.content).sort();
-  t.is(normalizeNewLines(content[0]), str);
-  t.is(normalizeNewLines(content[1]), str);
+  t.assert.strictEqual(normalizeNewLines(content[0]), str);
+  t.assert.strictEqual(normalizeNewLines(content[1]), str);
 });
 
 test("#2224: date 'git created' populates page.date", async (t) => {
@@ -582,13 +590,13 @@ test("#2224: date 'git created' populates page.date", async (t) => {
 
   // This doesn’t test the validity of the function, only that it populates page.date.
   let timestamp = await getCreatedTimestamp("./test/stubs-2224/index.njk");
-  t.truthy(result.content.trim());
-  t.truthy(timestamp);
-  t.is(result.content.trim(), "" + timestamp);
+  t.assert.ok(result.content.trim());
+  t.assert.ok(timestamp);
+  t.assert.strictEqual(result.content.trim(), "" + timestamp);
 });
 
 test("git getCreatedTimestamp returns undefined on nonexistent path", async (t) => {
-  t.is(await getCreatedTimestamp("./test/invalid.invalid"), undefined);
+  t.assert.strictEqual(await getCreatedTimestamp("./test/invalid.invalid"), undefined);
 });
 
 test("Does pathPrefix affect page URLs", async (t) => {
@@ -602,7 +610,7 @@ test("Does pathPrefix affect page URLs", async (t) => {
 
   let results = await elev.toJSON();
   let [result] = results;
-  t.is(result.url, "/README/");
+  t.assert.strictEqual(result.url, "/README/");
 });
 
 test("Improvements to custom template syntax APIs (includes a layout file) #2258", async (t) => {
@@ -624,8 +632,8 @@ test("Improvements to custom template syntax APIs (includes a layout file) #2258
 
   let results = await elev.toJSON();
 
-  t.is(results.length, 1);
-  t.is(
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(
     normalizeNewLines(results[0].content),
     `/* Banner */
 ${previousContents}
@@ -633,12 +641,13 @@ ${previousContents}
 /* Comment */`
   );
 
-  // Cache sizes are now one bigger
-  t.is(sizes[0] + 1, 1);
-  t.is(sizes[1] + 1, 1);
+  // Cache sizes are now bigger
+  let sizesAfterBuild = [TemplateContent._inputCache.size, TemplateContent._compileCache.size];
+  t.assert.ok(sizesAfterBuild[0] > sizes[0]);
+  t.assert.ok(sizesAfterBuild[1] > sizes[1]);
 
   let results2 = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     normalizeNewLines(results2[0].content),
     `/* Banner */
 ${previousContents}
@@ -647,8 +656,7 @@ ${previousContents}
   );
 
   // Cache sizes are unchanged from last build
-  t.is(sizes[0] + 1, 1);
-  t.is(sizes[1] + 1, 1);
+  t.assert.deepStrictEqual([TemplateContent._inputCache.size, TemplateContent._compileCache.size], sizesAfterBuild);
 
   fs.writeFileSync(includeFilePath, newContents, "utf8");
 
@@ -656,7 +664,7 @@ ${previousContents}
   elev.setIncrementalFiles(includeFilePath);
 
   let results3 = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     normalizeNewLines(results3[0].content),
     `/* Banner */
 ${newContents}
@@ -674,8 +682,8 @@ test("`useLayouts: false` custom engine property #2830", async (t) => {
 
   let results = await elev.toJSON();
 
-  t.is(results.length, 1);
-  t.is(
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(
     normalizeNewLines(results[0].content),
     `code {
   padding: 0.25em;
@@ -690,15 +698,15 @@ test("Lodash get (for pagination data target) object key with spaces, issue #285
       "tag with spaces": 2,
     },
   };
-  t.is(2, lodashGet(data, "collections['tag with spaces']"));
+  t.assert.strictEqual(2, lodashGet(data, "collections['tag with spaces']"));
 
   // wow, this works huh?
-  t.is(2, lodashGet(data, "collections.tag with spaces"));
+  t.assert.strictEqual(2, lodashGet(data, "collections.tag with spaces"));
 
   let tm = new TemplateMap(new TemplateConfig());
-  t.is(tm.getTagTarget("collections.tag with spaces"), "tag with spaces");
-  t.is(tm.getTagTarget("collections['tag with spaces']"), "tag with spaces");
-  t.is(tm.getTagTarget('collections["tag with spaces"]'), "tag with spaces");
+  t.assert.strictEqual(tm.getTagTarget("collections.tag with spaces"), "tag with spaces");
+  t.assert.strictEqual(tm.getTagTarget("collections['tag with spaces']"), "tag with spaces");
+  t.assert.strictEqual(tm.getTagTarget('collections["tag with spaces"]'), "tag with spaces");
 });
 
 test("Eleventy tag collection with spaces in the tag name, issue #2851", async (t) => {
@@ -710,9 +718,9 @@ test("Eleventy tag collection with spaces in the tag name, issue #2851", async (
   elev.setIsVerbose(false);
 
   let result = await elev.toJSON();
-  t.deepEqual(result.length, 2);
-  t.deepEqual(result.length, result[0].data.collections.all.length);
-  t.deepEqual(result[0].data.collections["tag with spaces"].length, 1);
+  t.assert.deepStrictEqual(result.length, 2);
+  t.assert.deepStrictEqual(result.length, result[0].data.collections.all.length);
+  t.assert.deepStrictEqual(result[0].data.collections["tag with spaces"].length, 1);
 });
 
 test("this.eleventy on JavaScript template functions, issue #2790", async (t) => {
@@ -721,14 +729,14 @@ test("this.eleventy on JavaScript template functions, issue #2790", async (t) =>
   let elev = new Eleventy("./test/stubs-2790", "./test/stubs-2790/_site", {
     config: function ($config) {
       $config.addJavaScriptFunction("jsfunction", function () {
-        t.truthy(this.eleventy);
+        t.assert.ok(this.eleventy);
         return this.eleventy.generator.split(" ")[0];
       });
     },
   });
   let result = await elev.toJSON();
-  t.deepEqual(result.length, 1);
-  t.deepEqual(result[0].content, `<p>Eleventy</p>`);
+  t.assert.deepStrictEqual(result.length, 1);
+  t.assert.deepStrictEqual(result[0].content, `<p>Eleventy</p>`);
 });
 
 test("Global data JS files should only execute once, issue #2753", async (t) => {
@@ -736,9 +744,9 @@ test("Global data JS files should only execute once, issue #2753", async (t) => 
     config: function ($config) {},
   });
   let result = await elev.toJSON();
-  t.deepEqual(result.length, 2);
-  t.deepEqual(result[0].content, `1`);
-  t.deepEqual(result[0].content, `1`);
+  t.assert.deepStrictEqual(result.length, 2);
+  t.assert.deepStrictEqual(result[0].content, `1`);
+  t.assert.deepStrictEqual(result[0].content, `1`);
 });
 
 function sortResultsBy(results, key = "content") {
@@ -760,11 +768,11 @@ test("Access to raw input of file (toJSON), issue #1206", async (t) => {
   let results = await elev.toJSON();
   sortResultsBy(results, "content");
 
-  t.deepEqual(results.length, 2);
-  t.deepEqual(results[0].content, `This is the first template.This is the first template.{{ page.rawInput }}`);
-  t.deepEqual(results[0].rawInput, `This is the first template.{{ page.rawInput }}`);
-  t.deepEqual(results[1].content, `This is the second template.This is the first template.{{ page.rawInput }}`);
-  t.deepEqual(results[1].rawInput, `This is the second template.{{ collections.tag1[0].rawInput }}`);
+  t.assert.deepStrictEqual(results.length, 2);
+  t.assert.deepStrictEqual(results[0].content, `This is the first template.This is the first template.{{ page.rawInput }}`);
+  t.assert.deepStrictEqual(results[0].rawInput, `This is the first template.{{ page.rawInput }}`);
+  t.assert.deepStrictEqual(results[1].content, `This is the second template.This is the first template.{{ page.rawInput }}`);
+  t.assert.deepStrictEqual(results[1].rawInput, `This is the second template.{{ collections.tag1[0].rawInput }}`);
 });
 
 // Warning: this test writes to the file system
@@ -777,11 +785,11 @@ test("Access to raw input of file (dryRun), issue #1206", async (t) => {
   let [,results] = await elev.write();
   sortResultsBy(results, "content");
 
-  t.deepEqual(results.length, 2);
-  t.deepEqual(results[0].content, `This is the first template.This is the first template.{{ page.rawInput }}`);
-  t.deepEqual(results[0].rawInput, `This is the first template.{{ page.rawInput }}`);
-  t.deepEqual(results[1].content, `This is the second template.This is the first template.{{ page.rawInput }}`);
-  t.deepEqual(results[1].rawInput, `This is the second template.{{ collections.tag1[0].rawInput }}`);
+  t.assert.deepStrictEqual(results.length, 2);
+  t.assert.deepStrictEqual(results[0].content, `This is the first template.This is the first template.{{ page.rawInput }}`);
+  t.assert.deepStrictEqual(results[0].rawInput, `This is the first template.{{ page.rawInput }}`);
+  t.assert.deepStrictEqual(results[1].content, `This is the second template.This is the first template.{{ page.rawInput }}`);
+  t.assert.deepStrictEqual(results[1].rawInput, `This is the second template.{{ collections.tag1[0].rawInput }}`);
 
 	deleteDirectory("./test/stubs-1206/_site/");
 });
@@ -791,24 +799,24 @@ test("{eleventy,buildawesome}.before and {eleventy,buildawesome}.after Event Arg
   let elev = new Eleventy("./test/noop/", "./test/noop/_site", {
     config: function ($config) {
       $config.on("eleventy.before", arg => {
-        t.is(arg.inputDir, "./test/noop/");
-        t.is(arg.directories.input, "./test/noop/");
-        t.is(arg.directories.includes, "./test/noop/_includes/");
+        t.assert.strictEqual(arg.inputDir, "./test/noop/");
+        t.assert.strictEqual(arg.directories.input, "./test/noop/");
+        t.assert.strictEqual(arg.directories.includes, "./test/noop/_includes/");
       })
       $config.on("buildawesome.before", arg => {
-        t.is(arg.inputDir, "./test/noop/");
-        t.is(arg.directories.input, "./test/noop/");
-        t.is(arg.directories.includes, "./test/noop/_includes/");
+        t.assert.strictEqual(arg.inputDir, "./test/noop/");
+        t.assert.strictEqual(arg.directories.input, "./test/noop/");
+        t.assert.strictEqual(arg.directories.includes, "./test/noop/_includes/");
       })
       $config.on("eleventy.after", arg => {
-        t.is(arg.inputDir, "./test/noop/");
-        t.is(arg.directories.input, "./test/noop/");
-        t.is(arg.directories.includes, "./test/noop/_includes/");
+        t.assert.strictEqual(arg.inputDir, "./test/noop/");
+        t.assert.strictEqual(arg.directories.input, "./test/noop/");
+        t.assert.strictEqual(arg.directories.includes, "./test/noop/_includes/");
       })
       $config.on("buildawesome.after", arg => {
-        t.is(arg.inputDir, "./test/noop/");
-        t.is(arg.directories.input, "./test/noop/");
-        t.is(arg.directories.includes, "./test/noop/_includes/");
+        t.assert.strictEqual(arg.inputDir, "./test/noop/");
+        t.assert.strictEqual(arg.directories.input, "./test/noop/");
+        t.assert.strictEqual(arg.directories.includes, "./test/noop/_includes/");
       })
     },
   });
@@ -821,16 +829,16 @@ test("{eleventy,buildawesome}.before and {eleventy,buildawesome}.after Event Arg
   let elev = new Eleventy("./test/noop/", "./test/noop/_site", {
     config: function ($config) {
       $config.on("eleventy.before", arg => {
-        t.is(arg.dryRun, false);
+        t.assert.strictEqual(arg.dryRun, false);
       })
       $config.on("buildawesome.before", arg => {
-        t.is(arg.dryRun, false);
+        t.assert.strictEqual(arg.dryRun, false);
       })
       $config.on("eleventy.after", arg => {
-        t.is(arg.dryRun, false);
+        t.assert.strictEqual(arg.dryRun, false);
       })
       $config.on("buildawesome.after", arg => {
-        t.is(arg.dryRun, false);
+        t.assert.strictEqual(arg.dryRun, false);
       })
     },
   });
@@ -844,16 +852,16 @@ test("{eleventy,buildawesome}.before and {eleventy,buildawesome}.after Event Arg
     dryRun: true,
     config: function ($config) {
       $config.on("eleventy.before", arg => {
-        t.is(arg.dryRun, true);
+        t.assert.strictEqual(arg.dryRun, true);
       })
       $config.on("buildawesome.before", arg => {
-        t.is(arg.dryRun, true);
+        t.assert.strictEqual(arg.dryRun, true);
       })
       $config.on("eleventy.after", arg => {
-        t.is(arg.dryRun, true);
+        t.assert.strictEqual(arg.dryRun, true);
       })
       $config.on("buildawesome.after", arg => {
-        t.is(arg.dryRun, true);
+        t.assert.strictEqual(arg.dryRun, true);
       })
     },
   });
@@ -881,10 +889,10 @@ test("buildawesome.after fires sequentially setting eventEmitterMode 'sequential
   });
   const resultPromise = elev.toJSON();
   await firstReached;
-  t.is(secondCalled, false)
+  t.assert.strictEqual(secondCalled, false)
   next()
   await 'microtask'
-  t.is(secondCalled, true)
+  t.assert.strictEqual(secondCalled, true)
   await resultPromise;
 })
 
@@ -895,11 +903,11 @@ test("setInputDirectory config method #1503", async (t) => {
       $config.setInputDirectory("./test/noop2/");
 
       $config.on("buildawesome.before", arg => {
-        t.is(arg.directories.input, "./test/noop2/");
-        t.is(arg.directories.includes, "./test/noop2/_includes/");
-        t.is(arg.directories.data, "./test/noop2/_data/");
-        t.is(arg.directories.layouts, undefined);
-        t.is(arg.directories.output, "./test/noop/_site/");
+        t.assert.strictEqual(arg.directories.input, "./test/noop2/");
+        t.assert.strictEqual(arg.directories.includes, "./test/noop2/_includes/");
+        t.assert.strictEqual(arg.directories.data, "./test/noop2/_data/");
+        t.assert.strictEqual(arg.directories.layouts, undefined);
+        t.assert.strictEqual(arg.directories.output, "./test/noop/_site/");
       })
     },
   });
@@ -914,11 +922,11 @@ test("setIncludesDirectory config method #1503", async (t) => {
       $config.setIncludesDirectory("myincludes");
 
       $config.on("buildawesome.before", arg => {
-        t.is(arg.directories.input, "./test/noop/");
-        t.is(arg.directories.includes, "./test/noop/myincludes/");
-        t.is(arg.directories.data, "./test/noop/_data/");
-        t.is(arg.directories.layouts, undefined);
-        t.is(arg.directories.output, "./test/noop/_site/");
+        t.assert.strictEqual(arg.directories.input, "./test/noop/");
+        t.assert.strictEqual(arg.directories.includes, "./test/noop/myincludes/");
+        t.assert.strictEqual(arg.directories.data, "./test/noop/_data/");
+        t.assert.strictEqual(arg.directories.layouts, undefined);
+        t.assert.strictEqual(arg.directories.output, "./test/noop/_site/");
       })
     },
   });
@@ -933,11 +941,11 @@ test("setDataDirectory config method #1503", async (t) => {
       $config.setDataDirectory("data");
 
       $config.on("buildawesome.before", arg => {
-        t.is(arg.directories.input, "./test/noop/");
-        t.is(arg.directories.includes, "./test/noop/_includes/");
-        t.is(arg.directories.data, "./test/noop/data/");
-        t.is(arg.directories.layouts, undefined);
-        t.is(arg.directories.output, "./test/noop/_site/");
+        t.assert.strictEqual(arg.directories.input, "./test/noop/");
+        t.assert.strictEqual(arg.directories.includes, "./test/noop/_includes/");
+        t.assert.strictEqual(arg.directories.data, "./test/noop/data/");
+        t.assert.strictEqual(arg.directories.layouts, undefined);
+        t.assert.strictEqual(arg.directories.output, "./test/noop/_site/");
       })
     },
   });
@@ -952,11 +960,11 @@ test("setLayoutsDirectory config method #1503", async (t) => {
       $config.setLayoutsDirectory("layouts");
 
       $config.on("buildawesome.before", arg => {
-        t.is(arg.directories.input, "./test/noop/");
-        t.is(arg.directories.includes, "./test/noop/_includes/");
-        t.is(arg.directories.data, "./test/noop/_data/");
-        t.is(arg.directories.layouts, "./test/noop/layouts/");
-        t.is(arg.directories.output, "./test/noop/_site/");
+        t.assert.strictEqual(arg.directories.input, "./test/noop/");
+        t.assert.strictEqual(arg.directories.includes, "./test/noop/_includes/");
+        t.assert.strictEqual(arg.directories.data, "./test/noop/_data/");
+        t.assert.strictEqual(arg.directories.layouts, "./test/noop/layouts/");
+        t.assert.strictEqual(arg.directories.output, "./test/noop/_site/");
       })
     },
   });
@@ -973,7 +981,7 @@ test("setInputDirectory config method #1503 in a plugin throws error", async (t)
     },
   });
 
-  await t.throwsAsync(() => elev.toJSON(), {
+  await t.assert.rejects(() => elev.toJSON(), {
     // The `set*Directory` configuration API methods are not yet allowed in plugins.
     message: "Error processing a plugin",
   });
@@ -988,11 +996,11 @@ test("Accepts absolute paths for input and output", async (t) => {
   let results = await elev.toJSON();
 
   // trailing slashes are expected
-  t.is(PathNormalizer.normalizeSeperator(elev.directories.input), PathNormalizer.normalizeSeperator("./test/noop/"));
-  t.is(PathNormalizer.normalizeSeperator(elev.directories.includes), PathNormalizer.normalizeSeperator("./test/noop/_includes/"));
-  t.is(PathNormalizer.normalizeSeperator(elev.directories.data), PathNormalizer.normalizeSeperator("./test/noop/_data/"));
-  t.is(elev.directories.layouts, undefined);
-  t.is(PathNormalizer.normalizeSeperator(elev.directories.output), PathNormalizer.normalizeSeperator("./test/noop/_site/"));
+  t.assert.strictEqual(PathNormalizer.normalizeSeperator(elev.directories.input), PathNormalizer.normalizeSeperator("./test/noop/"));
+  t.assert.strictEqual(PathNormalizer.normalizeSeperator(elev.directories.includes), PathNormalizer.normalizeSeperator("./test/noop/_includes/"));
+  t.assert.strictEqual(PathNormalizer.normalizeSeperator(elev.directories.data), PathNormalizer.normalizeSeperator("./test/noop/_data/"));
+  t.assert.strictEqual(elev.directories.layouts, undefined);
+  t.assert.strictEqual(PathNormalizer.normalizeSeperator(elev.directories.output), PathNormalizer.normalizeSeperator("./test/noop/_site/"));
 });
 
 test("Accepts absolute paths urls for input and output, results output #3805", async (t) => {
@@ -1001,7 +1009,7 @@ test("Accepts absolute paths urls for input and output, results output #3805", a
   let elev = new Eleventy(input, output);
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
+  t.assert.strictEqual(results.length, 1);
 });
 
 test("Accepts absolute paths urls for input and output and a virtual template, results output #3805", async (t) => {
@@ -1014,7 +1022,7 @@ test("Accepts absolute paths urls for input and output and a virtual template, r
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
+  t.assert.strictEqual(results.length, 1);
 });
 
 test("Eleventy config export (ESM)", async (t) => {
@@ -1023,11 +1031,11 @@ test("Eleventy config export (ESM)", async (t) => {
     configPath: "./test/stubs/cfg-directories-export/eleventy.config.js",
     config: function (configApi) {
       configApi.on("buildawesome.after", arg => {
-        t.is(arg.directories.input, "./src/");
-        t.is(arg.directories.includes, "./src/myincludes/");
-        t.is(arg.directories.data, "./src/mydata/");
-        t.is(arg.directories.layouts, undefined);
-        t.is(arg.directories.output, "./dist/");
+        t.assert.strictEqual(arg.directories.input, "./src/");
+        t.assert.strictEqual(arg.directories.includes, "./src/myincludes/");
+        t.assert.strictEqual(arg.directories.data, "./src/mydata/");
+        t.assert.strictEqual(arg.directories.layouts, undefined);
+        t.assert.strictEqual(arg.directories.output, "./dist/");
       })
     },
   });
@@ -1041,11 +1049,11 @@ test("Eleventy config export (CommonJS)", async (t) => {
     configPath: "./test/stubs/cfg-directories-export-cjs/eleventy.config.cjs",
     config: function (configApi) {
       configApi.on("buildawesome.after", arg => {
-        t.is(arg.directories.input, "./src/");
-        t.is(arg.directories.includes, "./src/myincludes2/");
-        t.is(arg.directories.data, "./src/mydata2/");
-        t.is(arg.directories.layouts, undefined);
-        t.is(arg.directories.output, "./dist2/");
+        t.assert.strictEqual(arg.directories.input, "./src/");
+        t.assert.strictEqual(arg.directories.includes, "./src/myincludes2/");
+        t.assert.strictEqual(arg.directories.data, "./src/mydata2/");
+        t.assert.strictEqual(arg.directories.layouts, undefined);
+        t.assert.strictEqual(arg.directories.output, "./dist2/");
       })
     },
   });
@@ -1064,11 +1072,14 @@ eleventy:
   });
   elev.disableLogger();
 
-  let e = await t.throwsAsync(() => elev.toJSON(), {
-    message: 'You attempted to set one of Build Awesome’s reserved data property names. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
+  let e;
+  await t.assert.rejects(() => elev.toJSON(), (err) => {
+  	e = err;
+  	return true;
   });
+  t.assert.strictEqual(e.message, 'You attempted to set one of Build Awesome’s reserved data property names. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/');
 
-  t.is(e.cause.toString(), "TypeError: Cannot add property key1, object is not extensible");
+  t.assert.strictEqual(e.cause.toString(), "TypeError: Cannot add property key1, object is not extensible");
 });
 
 test("Eleventy setting reserved data throws error (pkg)", async (t) => {
@@ -1082,11 +1093,14 @@ pkg:
   });
   elev.disableLogger();
 
-  let e = await t.throwsAsync(() => elev.toJSON(), {
-    message: 'You attempted to set one of Build Awesome’s reserved data property names. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
+  let e;
+  await t.assert.rejects(() => elev.toJSON(), (err) => {
+  	e = err;
+  	return true;
   });
+  t.assert.strictEqual(e.message, 'You attempted to set one of Build Awesome’s reserved data property names. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/');
 
-  t.is(e.cause.toString(), "TypeError: Cannot add property myOwn, object is not extensible");
+  t.assert.strictEqual(e.cause.toString(), "TypeError: Cannot add property myOwn, object is not extensible");
 });
 
 test("Eleventy pagination works okay with reserved data throws (eleventy) Issue #3262", async (t) => {
@@ -1107,7 +1121,7 @@ test:
   elev.disableLogger();
 
   let result = await elev.toJSON();
-  t.is(result.length, 3);
+  t.assert.strictEqual(result.length, 3);
 });
 
 test("Eleventy setting reserved data throws error (page)", async (t) => {
@@ -1120,9 +1134,12 @@ page: "My page value"
   });
   elev.disableLogger();
 
-  let e = await t.throwsAsync(() => elev.toJSON(), {
-    message: 'You attempted to set one of Build Awesome’s reserved data property names: page. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
+  let e;
+  await t.assert.rejects(() => elev.toJSON(), (err) => {
+  	e = err;
+  	return true;
   });
+  t.assert.strictEqual(e.message, 'You attempted to set one of Build Awesome’s reserved data property names: page. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/');
 });
 
 test("Eleventy setting reserved data throws error (content)", async (t) => {
@@ -1135,7 +1152,7 @@ content: "My page value"
   });
   elev.disableLogger();
 
-  await t.throwsAsync(() => elev.toJSON(), {
+  await t.assert.rejects(() => elev.toJSON(), {
     message: 'You attempted to set one of Build Awesome’s reserved data property names: content. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
   });
 });
@@ -1150,7 +1167,7 @@ collections: []
   });
   elev.disableLogger();
 
-  await t.throwsAsync(() => elev.toJSON(), {
+  await t.assert.rejects(() => elev.toJSON(), {
     message: 'You attempted to set one of Build Awesome’s reserved data property names: collections. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
   });
 });
@@ -1173,10 +1190,10 @@ pkg:
   });
 
   // Remap successful
-  t.is(elev.eleventyConfig.config.keys.package, "parkour");
+  t.assert.strictEqual(elev.eleventyConfig.config.keys.package, "parkour");
 
   let [result] = await elev.toJSON();
-  t.deepEqual(result, {
+  t.assert.deepStrictEqual(result, {
     content: "",
     inputPath: "./test/stubs-virtual/index.html",
     outputPath: "./_site/index.html",
@@ -1204,10 +1221,10 @@ pkg:
   });
 
   // Remap successful
-  t.is(elev.eleventyConfig.config.keys.package, false);
+  t.assert.strictEqual(elev.eleventyConfig.config.keys.package, false);
 
   let [result] = await elev.toJSON();
-  t.deepEqual(result, {
+  t.assert.deepStrictEqual(result, {
     content: "OVERRIDE",
     inputPath: "./test/stubs-virtual/index.html",
     outputPath: "./_site/index.html",
@@ -1234,13 +1251,16 @@ parkour:
   });
 
   // Remap successful
-  t.is(elev.eleventyConfig.config.keys.package, "parkour");
+  t.assert.strictEqual(elev.eleventyConfig.config.keys.package, "parkour");
 
-  let e = await t.throwsAsync(() => elev.toJSON(), {
-    message: 'You attempted to set one of Build Awesome’s reserved data property names. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
+  let e;
+  await t.assert.rejects(() => elev.toJSON(), (err) => {
+  	e = err;
+  	return true;
   });
+  t.assert.strictEqual(e.message, 'You attempted to set one of Build Awesome’s reserved data property names. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/');
 
-  t.is(e.cause.toString(), "TypeError: Cannot add property myOwn, object is not extensible");
+  t.assert.strictEqual(e.cause.toString(), "TypeError: Cannot add property myOwn, object is not extensible");
 });
 
 test("Eleventy data schema (success) #879", async (t) => {
@@ -1268,7 +1288,7 @@ test("Eleventy data schema (success) #879", async (t) => {
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(results.length, 2);
+  t.assert.strictEqual(results.length, 2);
 });
 
 test("Eleventy data schema (fails) #879", async (t) => {
@@ -1286,11 +1306,14 @@ test("Eleventy data schema (fails) #879", async (t) => {
   });
   elev.disableLogger();
 
-  let e = await t.throwsAsync(() => elev.toJSON(), {
-    message: 'Error in the data schema for: ./test/stubs-virtual/index1.html (via `buildawesomeDataSchema` or `eleventyDataSchema`)'
+  let e;
+  await t.assert.rejects(() => elev.toJSON(), (err) => {
+  	e = err;
+  	return true;
   });
+  t.assert.strictEqual(e.message, 'Error in the data schema for: ./test/stubs-virtual/index1.html (via `buildawesomeDataSchema` or `eleventyDataSchema`)');
 
-  t.is(e.cause.toString(), "Error: Invalid data type for draft.");
+  t.assert.strictEqual(e.cause.toString(), "Error: Invalid data type for draft.");
 });
 
 test("Eleventy data schema (fails, using zod) #879", async (t) => {
@@ -1312,11 +1335,14 @@ test("Eleventy data schema (fails, using zod) #879", async (t) => {
   });
   elev.disableLogger();
 
-  let e = await t.throwsAsync(() => elev.toJSON(), {
-    message: 'Error in the data schema for: ./test/stubs-virtual/index1.html (via `buildawesomeDataSchema` or `eleventyDataSchema`)'
+  let e;
+  await t.assert.rejects(() => elev.toJSON(), (err) => {
+  	e = err;
+  	return true;
   });
+  t.assert.strictEqual(e.message, 'Error in the data schema for: ./test/stubs-virtual/index1.html (via `buildawesomeDataSchema` or `eleventyDataSchema`)');
 
-  t.is(e.cause.toString(), 'Validation error: Invalid input: expected boolean, received number at "draft" or Invalid input: expected undefined, received number at "draft"');
+  t.assert.strictEqual(e.cause.toString(), 'Validation error: Invalid input: expected boolean, received number at "draft" or Invalid input: expected undefined, received number at "draft"');
 });
 
 test("Eleventy data schema has access to custom collections created via API #879", async (t) => {
@@ -1329,7 +1355,7 @@ test("Eleventy data schema has access to custom collections created via API #879
 
       configApi.addTemplate("index1.html", "", {
         eleventyDataSchema: function(data) {
-          t.is(data.collections.userCollection.length, 1);
+          t.assert.strictEqual(data.collections.userCollection.length, 1);
         }
       });
     }
@@ -1337,7 +1363,7 @@ test("Eleventy data schema has access to custom collections created via API #879
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
+  t.assert.strictEqual(results.length, 1);
 });
 
 test("Eleventy transforms filter (using collections and page override data)", async (t) => {
@@ -1355,10 +1381,10 @@ test("Eleventy transforms filter (using collections and page override data)", as
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(results.length, 2);
+  t.assert.strictEqual(results.length, 2);
 
-  t.is(results.filter(({inputPath}) => inputPath.endsWith("index.html"))[0].content, `<img src="/hi/test.png" alt="abc">`);
-  t.is(results.filter(({inputPath}) => inputPath.endsWith("feed.njk"))[0].content, `<img src="/hi/test.png" alt="abc">`);
+  t.assert.strictEqual(results.filter(({inputPath}) => inputPath.endsWith("index.html"))[0].content, `<img src="/hi/test.png" alt="abc">`);
+  t.assert.strictEqual(results.filter(({inputPath}) => inputPath.endsWith("feed.njk"))[0].content, `<img src="/hi/test.png" alt="abc">`);
 });
 
 test("Custom Markdown Render with permalink, Issue #2780", async (t) => {
@@ -1375,9 +1401,9 @@ test("Custom Markdown Render with permalink, Issue #2780", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].url, `/permalink.html`);
-  t.is(results[0].content.trim(), `<h1>Markdown?</h1>`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].url, `/permalink.html`);
+  t.assert.strictEqual(results[0].content.trim(), `<h1>Markdown?</h1>`);
 });
 
 test("Custom Markdown Render with permalink, Issue #2780 #3339", async (t) => {
@@ -1393,9 +1419,9 @@ test("Custom Markdown Render with permalink, Issue #2780 #3339", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].url, `/filename-hi.html`);
-  t.is(results[0].content.trim(), `<h1>Markdown?</h1>`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].url, `/filename-hi.html`);
+  t.assert.strictEqual(results[0].content.trim(), `<h1>Markdown?</h1>`);
 });
 
 test("Test input/output conflicts (input overwrites output), Issue #3327", async (t) => {
@@ -1406,10 +1432,14 @@ test("Test input/output conflicts (input overwrites output), Issue #3327", async
   });
   elev.disableLogger();
 
-  let e = await t.throwsAsync(async () => {
+  let e;
+  await t.assert.rejects(async () => {
     await elev.toJSON();
+  }, (err) => {
+  	e = err;
+  	return true;
   });
-  t.true(e.toString().startsWith("DuplicatePermalinkOutputError:"));
+  t.assert.strictEqual(e.toString().startsWith("DuplicatePermalinkOutputError:"), true);
 });
 
 test("Test input/output conflicts (output overwrites another input), Issue #3327", async (t) => {
@@ -1421,10 +1451,14 @@ test("Test input/output conflicts (output overwrites another input), Issue #3327
   });
   elev.disableLogger();
 
-  let e = await t.throwsAsync(async () => {
+  let e;
+  await t.assert.rejects(async () => {
     await elev.toJSON();
+  }, (err) => {
+  	e = err;
+  	return true;
   });
-  t.true(e.toString().startsWith("DuplicatePermalinkOutputError:"));
+  t.assert.strictEqual(e.toString().startsWith("DuplicatePermalinkOutputError:"), true);
 });
 
 test("Eleventy data schema has access to custom collections created via API #613 #3345", async (t) => {
@@ -1449,8 +1483,8 @@ test("Eleventy data schema has access to custom collections created via API #613
 
   let results = await elev.toJSON();
   let [home] = results.filter(item => item.url.endsWith("/home/"));
-  t.truthy(home);
-  t.is(home.content, "test");
+  t.assert.ok(home);
+  t.assert.strictEqual(home.content, "test");
 });
 
 test("Custom Nunjucks syntax has shortcode with access to `this`, Issue #3310", async (t) => {
@@ -1516,8 +1550,8 @@ test("Custom Nunjucks syntax has shortcode with access to `this`, Issue #3310", 
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content.trim(), `<h1>goodbye:/template/:passed in:Custom Shortcode</h1>`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content.trim(), `<h1>goodbye:/template/:passed in:Custom Shortcode</h1>`);
 });
 
 test("Related to issue 3206: Does Nunjucks throwOnUndefined variables require normalizeContext to be a lazy get", async (t) => {
@@ -1536,8 +1570,8 @@ test("Related to issue 3206: Does Nunjucks throwOnUndefined variables require no
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content.trim(), `HELLO/:Custom Shortcode:/`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content.trim(), `HELLO/:Custom Shortcode:/`);
 });
 
 test("#727: Error messaging when trying to use a missing layout", async (t) => {
@@ -1550,7 +1584,7 @@ test("#727: Error messaging when trying to use a missing layout", async (t) => {
   });
   elev.disableLogger();
 
-  await t.throwsAsync(() => elev.toJSON(), {
+  await t.assert.rejects(() => elev.toJSON(), {
     message: `Problem creating an Eleventy Layout for the "./test/stubs-virtual/index.html" template file.`
   });
 });
@@ -1566,8 +1600,8 @@ test("#1419: Shortcode in a permalink", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].url, `/url-slug/`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].url, `/url-slug/`);
 });
 
 test("#3373: Throw an error when explicit config path is not found.", async (t) => {
@@ -1575,8 +1609,12 @@ test("#3373: Throw an error when explicit config path is not found.", async (t) 
     configPath: "this-file-is-not-found.js"
   });
 
-  let e = await t.throwsAsync(() => elev.toJSON());
-  t.is(e.message, "A configuration file was specified but not found: this-file-is-not-found.js");
+  let e;
+  await t.assert.rejects(() => elev.toJSON(), (err) => {
+  	e = err;
+  	return true;
+  });
+  t.assert.strictEqual(e.message, "A configuration file was specified but not found: this-file-is-not-found.js");
 });
 
 test("Eleventy loader can force ESM mode", async (t) => {
@@ -1584,7 +1622,7 @@ test("Eleventy loader can force ESM mode", async (t) => {
     loader: "esm",
   });
 
-  t.is(elev.isEsm, true);
+  t.assert.strictEqual(elev.isEsm, true);
 });
 
 test("Eleventy loader can force CommonJS mode", async (t) => {
@@ -1592,7 +1630,7 @@ test("Eleventy loader can force CommonJS mode", async (t) => {
     loader: "cjs",
   });
 
-  t.is(elev.isEsm, false);
+  t.assert.strictEqual(elev.isEsm, false);
 });
 
 test("Truthy outputPath without a file extension now throws an error, issue #3399", async (t) => {
@@ -1604,7 +1642,7 @@ test("Truthy outputPath without a file extension now throws an error, issue #339
   });
   elev.disableLogger();
 
-  await t.throwsAsync(() => elev.toJSON(), {
+  await t.assert.rejects(() => elev.toJSON(), {
     // The `set*Directory` configuration API methods are not yet allowed in plugins.
     message: `The template at './test/stubs-virtual/index.html' attempted to write to './_site/foo' (via \`permalink\` value: 'foo'), which is a target on the file system that does not include a file extension.
 
@@ -1626,8 +1664,8 @@ test("Truthy outputPath without a file extension can be ignored, issue #3399", a
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].url, "/foo");
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].url, "/foo");
 });
 
 
@@ -1640,8 +1678,8 @@ test("Allow list for some file types without a file extension, issue #3399", asy
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].url, "/test/_redirects");
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].url, "/test/_redirects");
 });
 
 test("Truthy outputPath without a file extension error message is disabled, issue #3399", async (t) => {
@@ -1654,7 +1692,7 @@ test("Truthy outputPath without a file extension error message is disabled, issu
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
+  t.assert.strictEqual(results.length, 1);
 });
 
 test("permalink: false outputPath new error message won’t throw an error, issue #3399", async (t) => {
@@ -1666,7 +1704,7 @@ test("permalink: false outputPath new error message won’t throw an error, issu
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
+  t.assert.strictEqual(results.length, 1);
 });
 
 test("permalink on custom template lang, issue #3619", async (t) => {
@@ -1718,8 +1756,8 @@ test("permalink on custom template lang, issue #3619", async (t) => {
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(results[0].url, "/testing/rewrite/index.css");
-  t.is(results[0].content, `html {
+  t.assert.strictEqual(results[0].url, "/testing/rewrite/index.css");
+  t.assert.strictEqual(results[0].content, `html {
   color: red;
 }`);
 });
@@ -1734,7 +1772,7 @@ test("Template data throws error when tags is not an Array or String #1791", asy
   });
   elev.disableLogger();
 
-  await t.throwsAsync(() => elev.toJSON(), {
+  await t.assert.rejects(() => elev.toJSON(), {
     // The `set*Directory` configuration API methods are not yet allowed in plugins.
     message: "String or Array expected for `tags` in virtual template: ./test/noop/index.html. Received: { one: 1, two: 2 }",
   });
@@ -1776,15 +1814,15 @@ test("sass docs on 11ty.dev, issue #408", async (t) => {
   elev.disableLogger();
 
    let results = await elev.toJSON();
-   t.is(results.length, 2);
+   t.assert.strictEqual(results.length, 2);
 
    let code = results.filter(entry => entry.inputPath.endsWith("_code.scss"))[0];
-   t.is(code.url, "/_code.css");
-   t.is(code.content, undefined);
+   t.assert.strictEqual(code.url, "/_code.css");
+   t.assert.strictEqual(code.content, undefined);
 
    let main = results.filter(entry => entry.inputPath.endsWith("style.scss"))[0];
-   t.is(main.url, "/style.css");
-   t.is(
+   t.assert.strictEqual(main.url, "/style.css");
+   t.assert.strictEqual(
     normalizeNewLines(main.content),
     `code {
   padding: 0.25em;
@@ -1804,8 +1842,8 @@ test("Use a date object for `date`, issue #3022", async (t) => {
   elev.disableLogger();
 
  let results = await elev.toJSON();
- t.is(results.length, 1);
- t.truthy(results[0].data.page.date instanceof Date);
+ t.assert.strictEqual(results.length, 1);
+ t.assert.ok(results[0].data.page.date instanceof Date);
 });
 
 test("Use a date object for `date` (js object front matter), issue #3022", async (t) => {
@@ -1822,8 +1860,8 @@ test("Use a date object for `date` (js object front matter), issue #3022", async
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.truthy(results[0].data.page.date instanceof Date);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.ok(results[0].data.page.date instanceof Date);
 });
 
 test("Use a date object for `date` (js front matter), issue #3022", async (t) => {
@@ -1838,8 +1876,8 @@ let date = new Date();
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.truthy(results[0].data.page.date instanceof Date);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.ok(results[0].data.page.date instanceof Date);
 });
 
 test("Cleaner constructor args #3880", async (t) => {
@@ -1851,6 +1889,6 @@ test("Cleaner constructor args #3880", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content.trim(), `<h1>Title</h1>`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content.trim(), `<h1>Title</h1>`);
 });

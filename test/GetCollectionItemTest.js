@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 
 import getCollectionItem from "../src/Filters/GetCollectionItem.js";
 
@@ -17,15 +17,15 @@ test("getCollectionItem", (t) => {
   };
   let collections = [first, second, third];
 
-  t.deepEqual(getCollectionItem(collections, first), first);
-  t.deepEqual(getCollectionItem(collections, second), second);
-  t.deepEqual(getCollectionItem(collections, third), third);
+  t.assert.deepStrictEqual(getCollectionItem(collections, first), first);
+  t.assert.deepStrictEqual(getCollectionItem(collections, second), second);
+  t.assert.deepStrictEqual(getCollectionItem(collections, third), third);
 
-  t.deepEqual(getCollectionItem(collections, first, -1), undefined);
-  t.deepEqual(getCollectionItem(collections, second, -1), first);
-  t.deepEqual(getCollectionItem(collections, third, -1), second);
+  t.assert.deepStrictEqual(getCollectionItem(collections, first, -1), undefined);
+  t.assert.deepStrictEqual(getCollectionItem(collections, second, -1), first);
+  t.assert.deepStrictEqual(getCollectionItem(collections, third, -1), second);
 
-  t.deepEqual(getCollectionItem(collections, first, 1), second);
-  t.deepEqual(getCollectionItem(collections, second, 1), third);
-  t.deepEqual(getCollectionItem(collections, third, 1), undefined);
+  t.assert.deepStrictEqual(getCollectionItem(collections, first, 1), second);
+  t.assert.deepStrictEqual(getCollectionItem(collections, second, 1), third);
+  t.assert.deepStrictEqual(getCollectionItem(collections, third, 1), undefined);
 });

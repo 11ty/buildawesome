@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import BuildAwesome from "../src/Core.js";
 
 function captureWarnings(elev) {
@@ -42,8 +42,8 @@ test("#1952: Computed `tags` from pagination data create collections", async (t)
 	let warnings = captureWarnings(elev);
 
 	let results = await elev.toJSON();
-	t.is(results.find((entry) => entry.url === "/list/").content, "/static/,/work/a/,|");
-	t.deepEqual(warnings, []);
+	t.assert.strictEqual(results.find((entry) => entry.url === "/list/").content, "/static/,/work/a/,|");
+	t.assert.deepStrictEqual(warnings, []);
 });
 
 test("#1952: Computed `tags` from pagination data create collections (addAllPagesToCollections)", async (t) => {
@@ -51,9 +51,9 @@ test("#1952: Computed `tags` from pagination data create collections (addAllPage
 	let warnings = captureWarnings(elev);
 
 	let results = await elev.toJSON();
-	t.is(
+	t.assert.strictEqual(
 		results.find((entry) => entry.url === "/list/").content,
 		"/static/,/work/a/,/work/b/,|/work/b/,",
 	);
-	t.deepEqual(warnings, []);
+	t.assert.deepStrictEqual(warnings, []);
 });
