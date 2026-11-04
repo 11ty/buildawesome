@@ -44,6 +44,10 @@ export default class TemplateCollection extends Sortable {
 		return this.#cache.tags;
 	}
 
+	getTagNames() {
+		return Array.from(this.#getTagIndex().keys());
+	}
+
 	getAllSorted() {
 		// Callers sort and reverse the result in place, so hand out a copy
 		return this.#getAllSorted().slice();

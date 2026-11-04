@@ -8,6 +8,7 @@ import DuplicatePermalinkOutputError from "./Errors/DuplicatePermalinkOutputErro
 import TemplateData from "./Data/TemplateData.js";
 import GlobalDependencyMap from "./GlobalDependencyMap.js";
 import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
+import { withoutTracking } from "./Data/InternalReads.js";
 import { createDebug } from "./Util/DebugLogUtil.js";
 import { isGlobMatch } from "./Util/GlobMatcher.js";
 
@@ -142,7 +143,8 @@ class TemplateMap {
 
 		// TODO it’d be nice to set the dependency relationship for addCollection here
 		// But collections are not yet populated (they populate after template order)
-		let publishes = TemplateData.getIncludedCollectionNames(entry.data);
+		// Computed `tags` reading pagination data resolve per page, so this read is expected to miss them, Issue #1952
+		let publishes = withoutTracking(() => TemplateData.getIncludedCollectionNames(entry.data));
 
 		this.config.uses.addNewNodeRelationships(entry.inputPath, consumes, publishes);
 	}
@@ -224,6 +226,13 @@ class TemplateMap {
 			// is a template entry
 			let map = this.getMapEntryForInputPath(depEntry);
 			await this.#initDependencyMapEntry(map);
+		}
+
+		// Per-page tags (e.g. computed from pagination data) aren’t in the dependency graph, Issue #1952
+		for (let tagName of this.collection.getTagNames()) {
+			if (!this.isUserConfigCollectionName(tagName)) {
+				await this.setCollectionByTagName(tagName);
+			}
 		}
 	}
 

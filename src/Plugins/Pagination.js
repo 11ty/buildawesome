@@ -51,7 +51,8 @@ class Pagination {
 
 	circularReferenceCheck(data) {
 		let key = data.pagination.data;
-		let includedTags = TemplateData.getIncludedTagNames(data);
+		// Computed `tags` reading pagination data aren’t resolved yet, Issue #1952
+		let includedTags = withoutTracking(() => TemplateData.getIncludedTagNames(data));
 
 		for (let tag of includedTags) {
 			if (`collections.${tag}` === key) {
