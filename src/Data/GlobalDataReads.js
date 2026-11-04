@@ -1,21 +1,11 @@
 import { isPlainObject } from "@11ty/eleventy-utils";
 
+import { isInternalRead } from "./InternalReads.js";
+
 // Records which global data keys a template reads, so a global data file change
 // only re-renders the templates that read it (incremental builds).
 
 const TrackedSymbol = Symbol.for("11ty.GlobalDataReads");
-
-let paused = 0;
-
-// e.g. a deep copy that reads every key but isn’t a real use of the data
-export function withoutTracking(callback) {
-	paused++;
-	try {
-		return callback();
-	} finally {
-		paused--;
-	}
-}
 
 function isTracked(value) {
 	return Boolean(value?.[TrackedSymbol]);
@@ -46,7 +36,7 @@ export function trackGlobalDataReads(data, filesByKey, onRead) {
 
 		let isRead = false;
 		let record = () => {
-			if (!isRead && !paused) {
+			if (!isRead && !isInternalRead()) {
 				isRead = true;
 				onRead(files);
 			}

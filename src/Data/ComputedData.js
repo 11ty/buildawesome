@@ -3,6 +3,7 @@ import lodash from "@11ty/lodash-custom";
 import { createDebug } from "../Util/DebugLogUtil.js";
 import ComputedDataTemplateString from "./ComputedDataTemplateString.js";
 import Signals from "./Signals.js";
+import { isInternalRead, withoutTracking } from "./InternalReads.js";
 
 const { set: lodashSet } = lodash;
 const debug = createDebug("ComputedData");
@@ -24,7 +25,7 @@ export default class ComputedData {
 	#signals = new WeakMap();
 	// tracking proxy => original object
 	#proxyTargets = new WeakMap();
-	// data => Map(key => restore function) for deferred keys guarded against early reads
+	// root data => Map(path => restore function) for unresolved keys guarded against early reads
 	#guards = new WeakMap();
 	#onEarlyRead;
 
@@ -70,8 +71,8 @@ export default class ComputedData {
 	}
 
 	// Resolves what it can (of `keys`, default all), deferring anything that reads an `unavailable` path (retried on the next call).
-	// `guard` warns when a still-deferred top-level key is read before the next call resolves it (e.g. by another page), Issue #2448
-	async setupData(data, { unavailable = [], keys = this.#entries.keys(), guard = false } = {}) {
+	// Unresolved keys are guarded afterwards, reading one before it resolves calls `onEarlyRead`, Issue #2448
+	async setupData(data, { unavailable = [], keys = this.#entries.keys() } = {}) {
 		let signals = this.#getSignals(data);
 		signals.resetDeferred();
 		signals.unavailable = unavailable;
@@ -80,11 +81,15 @@ export default class ComputedData {
 			await this.#pull(key, data, signals, []);
 		}
 
-		if (guard && this.#onEarlyRead) {
+		if (this.#onEarlyRead) {
 			for (let key of signals.keys()) {
 				let signal = signals.get(key);
 				if (signal.isDeferred) {
-					this.#addGuard(data, key, this.#getDeferredPath(key, signals));
+					let deferredPath = this.#getDeferredPath(key, signals);
+					this.#addGuard(data, key, () => this.#onEarlyRead(deferredPath));
+				} else if (signal.isIdle) {
+					// Not yet run (lazy), e.g. read by a preprocessor
+					this.#addGuard(data, key, () => this.#onEarlyRead([key]));
 				}
 			}
 		}
@@ -119,7 +124,8 @@ export default class ComputedData {
 		return {};
 	}
 
-	#addGuard(rootData, path, deferredPath) {
+	#addGuard(rootData, path, onRead) {
+		this.#removeGuard(rootData, path);
 		let { data, key } = this.#getGuardTarget(rootData, path);
 		if (!data) {
 			return;
@@ -135,22 +141,23 @@ export default class ComputedData {
 			configurable: true,
 			enumerable: original?.enumerable ?? false,
 			get: () => {
-				if (!warned) {
+				if (!warned && !isInternalRead()) {
 					warned = true;
-					this.#onEarlyRead(deferredPath);
+					onRead();
 				}
 				return original?.get ? original.get.call(data) : original?.value;
 			},
 			set: (value) => {
-				this.#removeGuard(data, key);
+				this.#removeGuard(rootData, path);
 				data[key] = value;
 			},
 		});
 
-		if (!this.#guards.has(data)) {
-			this.#guards.set(data, new Map());
+		// Keyed by root data and path, nested objects may be a new proxy on each read (e.g. paginated `page`)
+		if (!this.#guards.has(rootData)) {
+			this.#guards.set(rootData, new Map());
 		}
-		this.#guards.get(data).set(key, () => {
+		this.#guards.get(rootData).set(path, () => {
 			if (original) {
 				Object.defineProperty(data, key, original);
 			} else {
@@ -160,11 +167,10 @@ export default class ComputedData {
 	}
 
 	#removeGuard(rootData, path) {
-		let { data, key } = this.#getGuardTarget(rootData, path);
-		let guards = data && this.#guards.get(data);
-		let restore = guards?.get(key);
+		let guards = this.#guards.get(rootData);
+		let restore = guards?.get(path);
 		if (restore) {
-			guards.delete(key);
+			guards.delete(path);
 			restore();
 		}
 	}
@@ -236,9 +242,9 @@ export default class ComputedData {
 			return;
 		}
 
-		// lodash `set` reads the previous value
+		// lodash `set` reads the previous value (possibly through a paginated page’s parent data)
 		this.#removeGuard(data, key);
-		lodashSet(data, key, result);
+		withoutTracking(() => lodashSet(data, key, result));
 		signal.done();
 	}
 

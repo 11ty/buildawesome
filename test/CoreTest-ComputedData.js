@@ -149,7 +149,7 @@ test("Computed `date` passes through custom date parsing, Issue #4415", async (t
   t.is(result.content, "2001-02-03T00:00:00.000Z");
 });
 
-test("Preprocessors see computed data (including `page.date`), Issue #4415", async (t) => {
+test("Preprocessors see computed `page.date` but other computed data stays lazy, Issue #4415", async (t) => {
   let seen;
   let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
     config: configApi => {
@@ -166,7 +166,7 @@ test("Preprocessors see computed data (including `page.date`), Issue #4415", asy
   });
 
   await elev.toJSON();
-  t.deepEqual(seen, { title: "/index!", date: "2001-02-03T00:00:00.000Z" });
+  t.deepEqual(seen, { title: undefined, date: "2001-02-03T00:00:00.000Z" });
 });
 
 test("Preprocessors can skip a template using a computed `date`, Issue #4415", async (t) => {

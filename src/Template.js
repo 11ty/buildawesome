@@ -32,6 +32,8 @@ const debug = createDebug("Template");
 
 // logger => Set of computed data paths already warned about
 const earlyReadWarnings = new WeakMap();
+// data => layout key whose front matter is merged into that data
+const mergedLayoutKeys = new WeakMap();
 
 function assertContentReady(entry, propName) {
 	if (entry.needsCheck && entry._templateContent === undefined) {
@@ -454,7 +456,7 @@ class Template extends TemplateContent {
 		return {};
 	}
 
-	async #getData() {
+	async #getCascadeSources() {
 		let localData = {};
 		let globalData = {};
 
@@ -465,20 +467,27 @@ class Template extends TemplateContent {
 
 		let { data: frontMatterData } = await this.getFrontMatterData();
 
+		let key = this.config.keys.layout;
+		let layoutKey = frontMatterData[key] || localData[key] || globalData[key];
+
+		return { localData, globalData, frontMatterData, layoutKey };
+	}
+
+	async #getLayoutData(layoutKey) {
+		if (!layoutKey) {
+			return {};
+		}
+		return this.getLayout(layoutKey).getData();
+	}
+
+	async #getData() {
+		let { localData, globalData, frontMatterData, layoutKey } = await this.#getCascadeSources();
+
 		let mergedLayoutData = {};
 		let tr = await this.getTemplateRender();
 		if (tr.engine.useLayouts()) {
-			let layoutKey =
-				frontMatterData[this.config.keys.layout] ||
-				localData[this.config.keys.layout] ||
-				globalData[this.config.keys.layout];
-
 			// Layout front matter data
-			if (layoutKey) {
-				let layout = this.getLayout(layoutKey);
-
-				mergedLayoutData = await layout.getData();
-			}
+			mergedLayoutData = await this.#getLayoutData(layoutKey);
 		}
 
 		try {
@@ -702,22 +711,7 @@ class Template extends TemplateContent {
 
 		let cd = new ComputedData(this.config, {
 			// e.g. ./articles/first.md › populatedCategories › collections
-			onEarlyRead: (deferredPath) => {
-				// One warning per path (not per page), per logger (Eleventy instance)
-				if (!earlyReadWarnings.has(this.logger)) {
-					earlyReadWarnings.set(this.logger, new Set());
-				}
-				let warned = earlyReadWarnings.get(this.logger);
-				let id = deferredPath.join(" › ");
-				if (warned.has(id)) {
-					return;
-				}
-				warned.add(id);
-
-				this.logger.warn(
-					`Warning: computed data was read (likely from another page) before it resolved, so the read got its previous value (often \`undefined\`): ${[this.inputPath, ...deferredPath].join(" › ")}. You can work around this issue by reading the value at render time, or by reading \`collections\` directly in the computed data that reads this value (e.g. \`data.${deferredPath.at(-1)}\` instead of \`….data.${deferredPath[0]}\`).`,
-				);
-			},
+			onEarlyRead: (path) => this.#warnEarlyRead(path),
 		});
 
 		// `permalink` is consumed (not added to data) so computed entries can use page.url/page.outputPath
@@ -762,6 +756,36 @@ class Template extends TemplateContent {
 		return cd;
 	}
 
+	// One warning per path (not per page), per logger (Eleventy instance)
+	#warnOnce(id, message) {
+		if (!earlyReadWarnings.has(this.logger)) {
+			earlyReadWarnings.set(this.logger, new Set());
+		}
+		let warned = earlyReadWarnings.get(this.logger);
+		if (warned.has(id)) {
+			return;
+		}
+		warned.add(id);
+		this.logger.warn(message);
+	}
+
+	// e.g. ./articles/first.md › populatedCategories › collections (deferred) or ./index.md › title (not yet run)
+	#warnEarlyRead(path) {
+		let prefix = `Warning: computed data was read before it resolved, so the read got its previous value (often \`undefined\`): ${[this.inputPath, ...path].join(" › ")}.`;
+		if (path.length === 1) {
+			this.#warnOnce(
+				path.join(" › "),
+				`${prefix} Computed data resolves after preprocessors (except \`date\`, \`layout\`, \`${this.config.keys.import}\`, and paginated data), so read this value at render time instead.`,
+			);
+			return;
+		}
+
+		this.#warnOnce(
+			path.join(" › "),
+			`${prefix} This is likely a read from another page. You can work around this issue by reading the value at render time, or by reading \`collections\` directly in the computed data that reads this value (e.g. \`data.${path.at(-1)}\` instead of \`….data.${path[0]}\`).`,
+		);
+	}
+
 	// Stage 1: before preprocessors and pagination, resolves computed data that doesn’t need either.
 	async #setupComputedData(data) {
 		this.computedData = this.#createComputedData(data);
@@ -771,16 +795,73 @@ class Template extends TemplateContent {
 
 		await this.#setupComputedPagination(data);
 
-		let unavailable = ["page.rawInput", "collections"];
+		let unavailable = ["page.rawInput", ...this.#getUnavailableBeforePagination(data)];
+
+		await this.#setupComputedLayout(data, unavailable, (await this.#getCascadeSources()).layoutKey);
+
+		// Other computed data stays lazy (and guarded against early reads) until stage 2
+		debug("First round of computed data for %o", this.inputPath);
+		await this.computedData.setupData(data, {
+			unavailable,
+			keys: this.#getEarlyComputedKeys(data),
+		});
+	}
+
+	#getUnavailableBeforePagination(data) {
+		let unavailable = ["collections"];
 		if (Pagination.hasPagination(data)) {
 			unavailable.push("pagination", "page.url", "page.outputPath");
 			if (data.pagination?.alias) {
 				unavailable.push(data.pagination.alias);
 			}
 		}
+		return unavailable;
+	}
 
-		debug("First round of computed data for %o", this.inputPath);
-		await this.computedData.setupData(data, { unavailable });
+	// Computed keys consumed before stage 2 (preprocessors, pagination, the collections dependency graph), Issue #4415
+	#getEarlyComputedKeys(data) {
+		let early = [
+			"page.date",
+			...ResolveConfigurationData.getEligibleLocations(this.config.keys.import),
+		];
+		if (typeof data.pagination?.data === "string") {
+			early.push(data.pagination.data);
+		}
+		return Array.from(this.computedData.computedKeys).filter((key) =>
+			early.some(
+				(name) => key === name || key.startsWith(name + ".") || name.startsWith(key + "."),
+			),
+		);
+	}
+
+	// Computed `layout` resolves before other computed data so they see its front matter, Issues #2236 #1528
+	async #setupComputedLayout(data, unavailable, mergedLayoutKey) {
+		let key = this.config.keys.layout;
+		if (!this.computedData.computedKeys.has(key) || !this.engine.useLayouts()) {
+			return;
+		}
+
+		await this.computedData.setupData(data, { unavailable, keys: [key] });
+		if (this.computedData.getDeferred(key, data)) {
+			return;
+		}
+
+		let layoutKey = data[key];
+		if (layoutKey !== mergedLayoutKey) {
+			let { localData, globalData, frontMatterData } = await this.#getCascadeSources();
+			let previousLayoutData = await this.#getLayoutData(mergedLayoutKey);
+			let layoutData = await this.#getLayoutData(layoutKey);
+			let merged = Merge({}, globalData, layoutData, localData, frontMatterData);
+			let computedKeys = this.computedData.computedKeys;
+
+			for (let name of new Set([...Object.keys(previousLayoutData), ...Object.keys(layoutData)])) {
+				if (!computedKeys.has(name)) {
+					data[name] = merged[name];
+				}
+			}
+		}
+
+		mergedLayoutKeys.set(data, layoutKey);
 	}
 
 	// Computed `pagination` resolves first, it decides which data is per page, Issue #4415
@@ -826,9 +907,16 @@ class Template extends TemplateContent {
 		}
 
 		if (this.computedData) {
+			let mergedLayoutKey = mergedLayoutKeys.has(data)
+				? mergedLayoutKeys.get(data)
+				: mergedLayoutKeys.has(parent?.data)
+					? mergedLayoutKeys.get(parent.data)
+					: (await this.#getCascadeSources()).layoutKey;
+			await this.#setupComputedLayout(data, ["collections"], mergedLayoutKey);
+
 			// Collections aren’t built yet, see resolveRemainingComputedData
 			debug("Second round of computed data for %o", this.inputPath);
-			await this.computedData.setupData(data, { unavailable: ["collections"], guard: true });
+			await this.computedData.setupData(data, { unavailable: ["collections"] });
 		} else {
 			if (!("page" in data)) {
 				data.page = {};
@@ -857,8 +945,33 @@ class Template extends TemplateContent {
 		// If it doesn’t exist, computed data is not used for this template
 		if (this.computedData) {
 			debug("Last round of computed data for %o", this.inputPath);
-			return this.computedData.processRemainingData(data);
+			await this.computedData.processRemainingData(data);
+			await this.#warnComputedLayoutData(data);
 		}
+	}
+
+	// A computed `layout` that reads `collections` resolves after other computed data, so its front matter is skipped, Issue #2236
+	async #warnComputedLayoutData(data) {
+		let key = this.config.keys.layout;
+		let layoutKey = data[key];
+		if (
+			!this.computedData.computedKeys.has(key) ||
+			!layoutKey ||
+			layoutKey === mergedLayoutKeys.get(data) ||
+			!this.engine.useLayouts()
+		) {
+			return;
+		}
+
+		let layoutData = await this.getLayout(layoutKey).getData();
+		if (Object.keys(layoutData).length === 0) {
+			return;
+		}
+
+		this.#warnOnce(
+			`${key} › ${layoutKey}`,
+			`Warning: computed data set \`${key}\` to \`${layoutKey}\` after the rest of computed data resolved (likely because it reads \`collections\`), so that layout’s front matter data was not applied: ${this.inputPath} › ${key}. You can work around this issue by computing \`${key}\` without reading \`collections\`, or by setting it outside of computed data (e.g. front matter or a directory data file).`,
+		);
 	}
 
 	static augmentWithTemplateContentProperty(obj) {
@@ -919,6 +1032,13 @@ class Template extends TemplateContent {
 			return [obj];
 		} else {
 			this.#checkComputedPaginationData(data);
+
+			// Resolved once on the paginated template (not per page) when it doesn’t read per-page data
+			if (this.computedData) {
+				await this.computedData.setupData(data, {
+					unavailable: this.#getUnavailableBeforePagination(data),
+				});
+			}
 
 			// needs collections for pagination items
 			// but individual pagination entries won’t be part of a collection

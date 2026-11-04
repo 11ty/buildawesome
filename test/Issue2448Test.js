@@ -56,3 +56,44 @@ test("#2448: No warning when another page’s computed data is read after it res
 	t.is(results.find((entry) => entry.url === "/page/0/").content, "|1 categories");
 	t.is(warnings.length, 0);
 });
+
+test("#2448: Warns when a preprocessor reads computed data before it resolves", async (t) => {
+	let seen;
+	let elev = new Eleventy("test/noop", false, {
+		config(eleventyConfig) {
+			eleventyConfig.addPreprocessor("check", "njk", (data) => {
+				seen = data.title;
+			});
+			eleventyConfig.addTemplate("lazy.njk", "{{ title }}", {
+				title: "front matter",
+				eleventyComputed: { title: () => "computed" },
+			});
+		},
+	});
+	let warnings = captureWarnings(elev);
+
+	let results = await elev.toJSON();
+	t.is(seen, "front matter");
+	t.is(results[0].content, "computed");
+	t.is(warnings.length, 1);
+	t.true(warnings[0].includes(": ./test/noop/lazy.njk › title. Computed data resolves after preprocessors"));
+});
+
+test("#2448: No warning when a preprocessor reads computed data resolved before preprocessors", async (t) => {
+	let elev = new Eleventy("test/noop", false, {
+		config(eleventyConfig) {
+			eleventyConfig.addPreprocessor("check", "njk", (data) => {
+				data.page.date;
+				data.layout;
+			});
+			eleventyConfig.addTemplate("_includes/early.njk", "{{ content | safe }}");
+			eleventyConfig.addTemplate("early.njk", "", {
+				eleventyComputed: { date: () => "2001-02-03", layout: () => "early.njk" },
+			});
+		},
+	});
+	let warnings = captureWarnings(elev);
+
+	await elev.toJSON();
+	t.is(warnings.length, 0);
+});
