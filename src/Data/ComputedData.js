@@ -24,9 +24,13 @@ export default class ComputedData {
 	#signals = new WeakMap();
 	// tracking proxy => original object
 	#proxyTargets = new WeakMap();
+	// data => Map(key => restore function) for deferred keys guarded against early reads
+	#guards = new WeakMap();
+	#onEarlyRead;
 
-	constructor(config) {
+	constructor(config, { onEarlyRead } = {}) {
 		this.config = config;
+		this.#onEarlyRead = onEarlyRead;
 	}
 
 	get computedKeys() {
@@ -66,13 +70,85 @@ export default class ComputedData {
 	}
 
 	// Resolves what it can (of `keys`, default all), deferring anything that reads an `unavailable` path (retried on the next call).
-	async setupData(data, { unavailable = [], keys = this.#entries.keys() } = {}) {
+	// `guard` warns when a still-deferred top-level key is read before the next call resolves it (e.g. by another page), Issue #2448
+	async setupData(data, { unavailable = [], keys = this.#entries.keys(), guard = false } = {}) {
 		let signals = this.#getSignals(data);
 		signals.resetDeferred();
 		signals.unavailable = unavailable;
 
 		for (let key of keys) {
 			await this.#pull(key, data, signals, []);
+		}
+
+		if (guard && this.#onEarlyRead) {
+			for (let key of signals.keys()) {
+				let signal = signals.get(key);
+				if (signal.isDeferred) {
+					this.#addGuard(data, key, this.#getDeferredPath(key, signals));
+				}
+			}
+		}
+	}
+
+	// e.g. ["populatedCategories", "collections"], following deferred dependencies to the unavailable path
+	#getDeferredPath(key, signals) {
+		let path = [key];
+		let signal = signals.get(key);
+		while (true) {
+			let dep = Array.from(signal.deps).find(
+				(name) => !path.includes(name) && signals.get(name)?.isDeferred,
+			);
+			if (!dep) {
+				break;
+			}
+			path.push(dep);
+			signal = signals.get(dep);
+		}
+		path.push(signal.reason);
+		return path;
+	}
+
+	#addGuard(data, key, deferredPath) {
+		let original = Reflect.getOwnPropertyDescriptor(data, key);
+		if (key.includes(".") || original?.configurable === false) {
+			return;
+		}
+
+		let warned = false;
+		Object.defineProperty(data, key, {
+			configurable: true,
+			enumerable: original?.enumerable ?? false,
+			get: () => {
+				if (!warned) {
+					warned = true;
+					this.#onEarlyRead(deferredPath);
+				}
+				return original?.get ? original.get.call(data) : original?.value;
+			},
+			set: (value) => {
+				this.#removeGuard(data, key);
+				data[key] = value;
+			},
+		});
+
+		if (!this.#guards.has(data)) {
+			this.#guards.set(data, new Map());
+		}
+		this.#guards.get(data).set(key, () => {
+			if (original) {
+				Object.defineProperty(data, key, original);
+			} else {
+				delete data[key];
+			}
+		});
+	}
+
+	#removeGuard(data, key) {
+		let guards = this.#guards.get(data);
+		let restore = guards?.get(key);
+		if (restore) {
+			guards.delete(key);
+			restore();
 		}
 	}
 
@@ -118,6 +194,9 @@ export default class ComputedData {
 				`Circular computed data dependency: ${[...stack, key].join(" -> ")}`,
 			);
 		}
+
+		// Its own resolution may read the previous value (e.g. overriding front matter)
+		this.#removeGuard(data, key);
 
 		let entry = this.#entries.get(key);
 		let childStack = [...stack, key];

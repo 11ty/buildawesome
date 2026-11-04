@@ -30,6 +30,9 @@ const { set: lodashSet, get: lodashGet } = lodash;
 
 const debug = createDebug("Template");
 
+// logger => Set of computed data paths already warned about
+const earlyReadWarnings = new WeakMap();
+
 function assertContentReady(entry, propName) {
 	if (entry.needsCheck && entry._templateContent === undefined) {
 		let suffix = `${entry.inputPath}${entry.pageNumber ? ` (page ${entry.pageNumber})` : ""}`;
@@ -661,7 +664,25 @@ class Template extends TemplateContent {
 			return;
 		}
 
-		let cd = new ComputedData(this.config);
+		let cd = new ComputedData(this.config, {
+			// e.g. ./articles/first.md › populatedCategories › collections
+			onEarlyRead: (deferredPath) => {
+				// One warning per path (not per page), per logger (Eleventy instance)
+				if (!earlyReadWarnings.has(this.logger)) {
+					earlyReadWarnings.set(this.logger, new Set());
+				}
+				let warned = earlyReadWarnings.get(this.logger);
+				let id = deferredPath.join(" › ");
+				if (warned.has(id)) {
+					return;
+				}
+				warned.add(id);
+
+				this.logger.warn(
+					`Warning: computed data was read (likely from another page) before it resolved, so the read got its previous value (often \`undefined\`): ${[this.inputPath, ...deferredPath].join(" › ")}. You can work around this issue by reading the value at render time, or by reading \`collections\` directly in the computed data that reads this value (e.g. \`data.${deferredPath.at(-1)}\` instead of \`….data.${deferredPath[0]}\`).`,
+				);
+			},
+		});
 
 		// `permalink` is consumed (not added to data) so computed entries can use page.url/page.outputPath
 		// One permalink render per data object, shared by `page.url` and `page.outputPath`
@@ -771,7 +792,7 @@ class Template extends TemplateContent {
 		if (this.computedData) {
 			// Collections aren’t built yet, see resolveRemainingComputedData
 			debug("Second round of computed data for %o", this.inputPath);
-			await this.computedData.setupData(data, { unavailable: ["collections"] });
+			await this.computedData.setupData(data, { unavailable: ["collections"], guard: true });
 		} else {
 			if (!("page" in data)) {
 				data.page = {};
