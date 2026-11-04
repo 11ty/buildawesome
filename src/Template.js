@@ -1209,7 +1209,8 @@ class Template extends TemplateContent {
 					continue;
 				}
 
-				if (!page.template.behavior.isWriteable()) {
+				// Per page, since paginated clones share one `behavior` (permalink can vary by page), Issue #2806
+				if (page.outputPath === false) {
 					debug(
 						"Template not written %o from %o (via permalink: false).",
 						page.outputPath,
