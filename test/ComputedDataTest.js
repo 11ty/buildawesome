@@ -579,3 +579,30 @@ test("Use JavaScript functions (filters) in computed data functions", async (t) 
 
   t.is(data.key1, "this is a test is blue");
 });
+
+test("Computed functions without dependencies run once, Issue #2771", async (t) => {
+  let cd = new ComputedData();
+  let calls = [];
+
+  cd.add("test", (data) => {
+    calls.push(data.page.inputPath);
+  });
+
+  let data = { page: { inputPath: "./in.md" } };
+  await cd.setupData(data, { unavailable: ["collections"] });
+  await cd.processRemainingData(data);
+
+  t.deepEqual(calls, ["./in.md"]);
+});
+
+test.skip("Enumerating data doesn’t create false cycles", async (t) => {
+  let cd = new ComputedData();
+
+  cd.add("keys", (data) => Object.keys(data).length);
+  cd.add("other", (data) => `${data.keys}`);
+
+  let data = {};
+  await cd.setupData(data);
+
+  t.is(data.other, `${data.keys}`);
+});
