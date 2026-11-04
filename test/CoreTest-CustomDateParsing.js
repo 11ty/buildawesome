@@ -4,6 +4,7 @@ import { DateTime } from "luxon";
 import Eleventy from "../src/Core.js";
 
 const require = createRequire(import.meta.url);
+const HAS_TEMPORAL = typeof globalThis.Temporal !== "undefined";
 
 test("Custom date parsing callback (return string), Issue #867", async (t) => {
   t.plan(3);
@@ -278,4 +279,140 @@ test("Custom date parsing callback runs once for a computed `date` shared by pag
   let results = await elev.toJSON();
   t.assert.deepStrictEqual(seen, ["2001-01-01T12:00:00Z"]);
   t.assert.deepStrictEqual(results.map((entry) => entry.content), Array(3).fill("2001-01-01T12:00:00.000Z"));
+});
+
+test("setDateTimeZone: date-only string is midnight in project time zone, Issue #3668", { skip: !HAS_TEMPORAL }, async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", "./test/stubs-virtual/", {
+    config: $config => {
+      $config.setDateTimeZone("America/Chicago");
+      $config.addTemplate("test.html", `---
+date: "2025-03-01"
+---
+# Markdown`);
+      $config.dataFilterSelectors.add("page.date");
+    }
+  });
+  elev.disableLogger();
+
+  let [result] = await elev.toJSON();
+  t.assert.deepStrictEqual(result.data.page.date, new Date("2025-03-01T06:00:00Z"));
+});
+
+test("setDateTimeZone: datetime string without offset (DST), Issue #3668", { skip: !HAS_TEMPORAL }, async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", "./test/stubs-virtual/", {
+    config: $config => {
+      $config.setDateTimeZone("Europe/Berlin");
+      $config.addTemplate("test.html", `---
+date: "2025-07-01T10:30:00"
+---
+# Markdown`);
+      $config.dataFilterSelectors.add("page.date");
+    }
+  });
+  elev.disableLogger();
+
+  let [result] = await elev.toJSON();
+  t.assert.deepStrictEqual(result.data.page.date, new Date("2025-07-01T08:30:00Z"));
+});
+
+test("setDateTimeZone: explicit offset is unchanged, Issue #3668", { skip: !HAS_TEMPORAL }, async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", "./test/stubs-virtual/", {
+    config: $config => {
+      $config.setDateTimeZone("America/Chicago");
+      $config.addTemplate("test.html", `---
+date: "2025-03-01T10:00:00Z"
+---
+# Markdown`);
+      $config.dataFilterSelectors.add("page.date");
+    }
+  });
+  elev.disableLogger();
+
+  let [result] = await elev.toJSON();
+  t.assert.deepStrictEqual(result.data.page.date, new Date("2025-03-01T10:00:00Z"));
+});
+
+test("setDateTimeZone: file name date, Issue #3668", { skip: !HAS_TEMPORAL }, async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", "./test/stubs-virtual/", {
+    config: $config => {
+      $config.setDateTimeZone("Asia/Tokyo");
+      $config.addTemplate("2025-03-01-post.html", `# Markdown`);
+      $config.dataFilterSelectors.add("page.date");
+    }
+  });
+  elev.disableLogger();
+
+  let [result] = await elev.toJSON();
+  t.assert.deepStrictEqual(result.data.page.date, new Date("2025-02-28T15:00:00Z"));
+});
+
+test("setDateTimeZone: invalid time zone throws, Issue #3668", { skip: !HAS_TEMPORAL }, async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", "./test/stubs-virtual/", {
+    config: $config => {
+      $config.setDateTimeZone("Not/AZone");
+    }
+  });
+  elev.disableLogger();
+
+  await t.assert.rejects(elev.toJSON(), /Invalid time zone/);
+});
+
+for (let [label, options] of [["Temporal", undefined], ["Luxon", { adapter: (parts, zone) => DateTime.fromObject(parts, { zone }).toJSDate() }]]) {
+  test(`setDateTimeZone (${label} adapter): date-only, datetime, DST gap, file name, Issue #3668`, { skip: !options && !HAS_TEMPORAL }, async (t) => {
+    let elev = new Eleventy("./test/stubs-virtual/", "./test/stubs-virtual/", {
+      config: $config => {
+        $config.setDateTimeZone("America/Chicago", options);
+        $config.addTemplate("date-only.html", `---\ndate: "2025-03-01"\n---\n`);
+        $config.addTemplate("datetime.html", `---\ndate: "2025-07-01T10:30:00"\n---\n`);
+        $config.addTemplate("dst-gap.html", `---\ndate: "2025-03-09T02:30:00"\n---\n`);
+        $config.addTemplate("offset.html", `---\ndate: "2025-03-01T10:00:00Z"\n---\n`);
+        $config.addTemplate("2025-12-01-post.html", ``);
+        $config.dataFilterSelectors.add("page.date");
+      }
+    });
+    elev.disableLogger();
+
+    let results = await elev.toJSON();
+    let dates = Object.fromEntries(results.map(r => [r.inputPath.split("/").pop(), r.data.page.date.toISOString()]));
+    t.assert.deepStrictEqual(dates, {
+      "date-only.html": "2025-03-01T06:00:00.000Z",
+      "datetime.html": "2025-07-01T15:30:00.000Z",
+      "dst-gap.html": "2025-03-09T08:30:00.000Z",
+      "offset.html": "2025-03-01T10:00:00.000Z",
+      "2025-12-01-post.html": "2025-12-01T06:00:00.000Z",
+    });
+  });
+}
+
+test("setDateTimeZone (Luxon adapter): invalid time zone throws, Issue #3668", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", "./test/stubs-virtual/", {
+    config: $config => {
+      $config.setDateTimeZone("Not/AZone", { adapter: (parts, zone) => DateTime.fromObject(parts, { zone }).toJSDate() });
+    }
+  });
+  elev.disableLogger();
+
+  await t.assert.rejects(elev.toJSON(), /Invalid time zone/);
+});
+
+test("setDateTimeZone: non-function adapter throws, Issue #3668", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", "./test/stubs-virtual/", {
+    config: $config => {
+      $config.setDateTimeZone("America/Chicago", { adapter: "luxon" });
+    }
+  });
+  elev.disableLogger();
+
+  await t.assert.rejects(elev.toJSON(), /`adapter` option to be a function/);
+});
+
+test("setDateTimeZone: missing Temporal without an adapter throws, Issue #3668", { skip: HAS_TEMPORAL }, async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", "./test/stubs-virtual/", {
+    config: $config => {
+      $config.setDateTimeZone("America/Chicago");
+    }
+  });
+  elev.disableLogger();
+
+  await t.assert.rejects(elev.toJSON(), /requires a JavaScript runtime with Temporal support/);
 });

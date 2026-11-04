@@ -1397,14 +1397,14 @@ class Template extends TemplateContent {
 			}
 
 			// try to parse with Luxon
-			return fromISOtoDateUTC(dateValue, this.inputPath);
+			return fromISOtoDateUTC(dateValue, this.inputPath, this.config.dateTimeZone);
 		}
 
 		// No Date supplied in the Data Cascade, try to find the date in the file name
 		let filepathRegex = this.inputPath.match(/(\d{4}-\d{2}-\d{2})/);
 		if (filepathRegex !== null) {
 			// if multiple are found in the path, use the first one for the date
-			let dateObj = fromISOtoDateUTC(filepathRegex[1], this.inputPath);
+			let dateObj = fromISOtoDateUTC(filepathRegex[1], this.inputPath, this.config.dateTimeZone);
 			debug(
 				"getMappedDate: using filename regex time for %o of %o: %o",
 				this.inputPath,

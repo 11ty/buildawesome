@@ -9,6 +9,7 @@ import Compatibility from "./Util/Compatibility.js";
 import BaseError from "./Errors/BaseError.js";
 import BenchmarkManager from "./Benchmark/BenchmarkManager.js";
 import { augmentFunction } from "./Engines/Util/ContextAugmenter.js";
+import { getTimeZoneParser } from "./Util/DateParse.js";
 
 const debug = createDebug("UserConfig");
 
@@ -46,6 +47,7 @@ export default class UserConfig {
 		this.dataExtensions = new Map();
 		this.urlTransforms = [];
 		this.customDateParsingCallbacks = new Set();
+		this.dateTimeZone = undefined;
 		this.ignores = new Set();
 		this.events = new EventEmitter();
 
@@ -214,6 +216,7 @@ export default class UserConfig {
 		this.virtualTemplates = {};
 		this.freezeReservedData = true;
 		this.customDateParsingCallbacks = new Set();
+		this.dateTimeZone = undefined;
 
 		/** @type {Record<string, any>} */
 		this.errorReporting = {};
@@ -1103,6 +1106,11 @@ export default class UserConfig {
 		}
 	}
 
+	// IANA time zone used for `date` strings without an offset (Temporal by default, or an `adapter` function).
+	setDateTimeZone(zone, options) {
+		this.dateTimeZone = getTimeZoneParser(zone, options);
+	}
+
 	// 3.0.0-alpha.18 started merging conflicts here (when possible), issue #3389
 	addGlobalData(name, data) {
 		name = this.getNamespacedName(name);
@@ -1304,6 +1312,7 @@ export default class UserConfig {
 			// `directories` and `directoryAssignments` are merged manually prior to plugin processing
 			freezeReservedData: this.freezeReservedData,
 			customDateParsing: this.customDateParsingCallbacks,
+			dateTimeZone: this.dateTimeZone,
 			errorReporting: this.errorReporting,
 			experimentalFlags: this.#experimentalFlags,
 		};
