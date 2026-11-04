@@ -40,6 +40,7 @@ export default class Serve {
 	#passthroughEntries;
 	#initOptionsFetched = false;
 	#chokidar;
+	#passthroughCopyChangeCallback;
 	// these are *not* normalized
 	#watchTargets = new Set();
 	#logger;
@@ -71,6 +72,23 @@ export default class Serve {
 			this._server.setAliases(
 				Object.fromEntries(entries.map(({ url, inputPath }) => [url, inputPath])),
 			);
+		}
+	}
+
+	// Emulated passthrough copy files added or deleted after the build: `callback(operation, path)`
+	onPassthroughCopyChange(callback) {
+		this.#passthroughCopyChangeCallback = callback;
+	}
+
+	#removePassthroughEntriesForFile(filePath) {
+		if (!this.#passthroughEntries) {
+			return;
+		}
+
+		let inputPath = TemplatePath.addLeadingDotSlash(TemplatePath.standardizeFilePath(filePath));
+		let entries = this.#passthroughEntries.filter((entry) => entry.inputPath !== inputPath);
+		if (entries.length !== this.#passthroughEntries.length) {
+			this.setPassthroughCopies(entries);
 		}
 	}
 
@@ -255,6 +273,13 @@ export default class Serve {
 			copyWatch.addIgnores(this.eleventyConfig?.userConfig?.watchIgnores ?? []);
 
 			await copyWatch.start();
+
+			// Registered before the dev server’s own listeners so entries update before the reload
+			copyWatch.on("add", (path) => this.#passthroughCopyChangeCallback?.("add", path));
+			copyWatch.on("unlink", (path) => {
+				this.#removePassthroughEntriesForFile(path);
+				this.#passthroughCopyChangeCallback?.("delete", path);
+			});
 
 			this.#chokidar = copyWatch;
 			this.options.chokidar = copyWatch;

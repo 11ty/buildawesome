@@ -404,6 +404,29 @@ class TemplatePassthroughManager {
 		this.#queue.set(key, this.#copy(passthrough));
 	}
 
+	// Sends dev server entries for a file added after the build, e.g. by another process (#3007)
+	async addEmulatedPassthroughFile(filePath) {
+		let paths = this.filterToPassthroughCopyFilesOnly([], [filePath]).filter((path) =>
+			TemplatePassthrough.isEmulatable(path.copyOptions),
+		);
+
+		// Non-template file extensions (via templateFormats)
+		if (paths.length === 0 && !this.extensionMap.hasEngine(filePath)) {
+			paths.push(this.#normalizePath(filePath));
+		}
+
+		let results = await Promise.all(
+			paths.map((path) => this.#copy(this.getTemplatePassthroughForPath(path))),
+		);
+		let entries = this.getEmulatedEntriesFromPassthroughResults(results);
+		if (entries.length > 0) {
+			await this.config.events.emit("buildawesome.passthroughentries", {
+				entries,
+				incremental: true,
+			});
+		}
+	}
+
 	async copyAll(templateExtensionPaths) {
 		debug("TemplatePassthrough copy started.");
 		let normalizedPaths = this.getAllNormalizedPaths(templateExtensionPaths);

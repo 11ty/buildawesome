@@ -54,6 +54,9 @@ export default class Core extends CoreFs {
 		if (!this.eleventyServe) {
 			/** @type {object} */
 			this.eleventyServe = new Serve();
+			this.eleventyServe.onPassthroughCopyChange((operation, path) =>
+				this.#updateEmulatedPassthroughCopy(operation, path),
+			);
 		}
 
 		this.eleventyServe.logger = this.logger;
@@ -92,6 +95,20 @@ export default class Core extends CoreFs {
 			this.eleventyServe.watchPassthroughCopy(
 				this.eleventyFiles.getGlobWatcherFilesForPassthroughCopy(),
 			);
+		}
+	}
+
+	// The dev server watches emulated passthrough copy files without triggering a build (#3007)
+	async #updateEmulatedPassthroughCopy(operation, path) {
+		this.fileSystemSearch[operation](path);
+		this.eleventyConfig.existsCache.delete(path);
+
+		if (operation === "add") {
+			try {
+				await this.passthroughManager.addEmulatedPassthroughFile(path);
+			} catch (e) {
+				this.reportError(e);
+			}
 		}
 	}
 
