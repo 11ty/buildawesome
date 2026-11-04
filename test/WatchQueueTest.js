@@ -1,99 +1,99 @@
-import test from "ava";
+import test from "node:test";
 import WatchQueue from "../src/WatchQueue.js";
 
 test("Standard", (t) => {
   let watch = new WatchQueue();
-  t.is(watch.isBuildRunning(), false);
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 
   watch.startBuild();
-  t.is(watch.isBuildRunning(), false); // nothing in the queue
+  t.assert.strictEqual(watch.isBuildRunning(), false); // nothing in the queue
 
   watch.finishBuild(); // still nothing in the queue
-  t.is(watch.isBuildRunning(), false);
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 });
 
 test("Queue 1", (t) => {
   let watch = new WatchQueue();
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getPendingQueueSize(), 0);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 
   watch.addToPendingQueue("test.md");
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 1);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 
   watch.startBuild();
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 1);
-  t.deepEqual(watch.getActiveQueue(), ["./test.md"]);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 1);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), ["./test.md"]);
 
   watch.finishBuild();
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 });
 
 test("Queue 2", (t) => {
   let watch = new WatchQueue();
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getPendingQueueSize(), 0);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 
   watch.addToPendingQueue("test.md");
   watch.addToPendingQueue("test2.md");
-  t.is(watch.getPendingQueueSize(), 2);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 2);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 
-  t.is(watch.isBuildRunning(), false);
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 
   watch.startBuild();
-  t.is(watch.isBuildRunning(), true);
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 2);
-  t.deepEqual(watch.getActiveQueue(), ["./test.md", "./test2.md"]);
+  t.assert.strictEqual(watch.isBuildRunning(), true);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 2);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), ["./test.md", "./test2.md"]);
 
-  t.is(watch.isBuildRunning(), true);
+  t.assert.strictEqual(watch.isBuildRunning(), true);
   watch.finishBuild();
-  t.is(watch.isBuildRunning(), false);
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.deepEqual(watch.getPendingQueue(), []);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.isBuildRunning(), false);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getPendingQueue(), []);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 });
 
 test("Add while active", (t) => {
   let watch = new WatchQueue();
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
 
   watch.addToPendingQueue("test.md");
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 1);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 
-  t.is(watch.isBuildRunning(), false);
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 
   watch.startBuild();
-  t.is(watch.isBuildRunning(), true);
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 1);
-  t.deepEqual(watch.getActiveQueue(), ["./test.md"]);
+  t.assert.strictEqual(watch.isBuildRunning(), true);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 1);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), ["./test.md"]);
 
   watch.addToPendingQueue("test.md");
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 1);
-  t.deepEqual(watch.getActiveQueue(), ["./test.md"]);
-  t.is(watch.isBuildRunning(), true);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 1);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 1);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), ["./test.md"]);
+  t.assert.strictEqual(watch.isBuildRunning(), true);
 
   watch.finishBuild();
-  t.is(watch.isBuildRunning(), false);
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.deepEqual(watch.getPendingQueue(), ["./test.md"]);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.isBuildRunning(), false);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 1);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getPendingQueue(), ["./test.md"]);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 });
 
 test("Active queue tests", (t) => {
@@ -102,31 +102,31 @@ test("Active queue tests", (t) => {
   watch.addToPendingQueue("test2.md");
   watch.addToPendingQueue("test.css");
 
-  t.is(
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.startsWith("./test")),
     false
   );
 
-  t.is(watch.isBuildRunning(), false);
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 
   watch.startBuild();
-  t.is(watch.hasAllQueueFiles("slkdjflkjsdlkfj"), false);
-  t.is(
+  t.assert.strictEqual(watch.hasAllQueueFiles("slkdjflkjsdlkfj"), false);
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.startsWith("./test")),
     true
   );
-  t.is(
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.endsWith(".css")),
     false
   );
 
-  t.is(watch.hasQueuedFile("./test.md"), true);
-  t.is(watch.hasQueuedFile("./testsdkljfklja.md"), false);
-  t.is(watch.isBuildRunning(), true);
+  t.assert.strictEqual(watch.hasQueuedFile("./test.md"), true);
+  t.assert.strictEqual(watch.hasQueuedFile("./testsdkljfklja.md"), false);
+  t.assert.strictEqual(watch.isBuildRunning(), true);
   watch.finishBuild();
-  t.is(watch.isBuildRunning(), false);
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 
-  t.is(
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.startsWith("./test")),
     false
   );
@@ -138,24 +138,24 @@ test("Active queue tests, all CSS files", (t) => {
   watch.addToPendingQueue("test2.css");
   watch.addToPendingQueue("test3.css");
 
-  t.is(
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.endsWith(".css")),
     false
   );
 
-  t.is(watch.isBuildRunning(), false);
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 
   watch.startBuild();
-  t.is(watch.isBuildRunning(), true);
-  t.is(
+  t.assert.strictEqual(watch.isBuildRunning(), true);
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.endsWith(".css")),
     true
   );
-  t.is(watch.isBuildRunning(), true);
+  t.assert.strictEqual(watch.isBuildRunning(), true);
   watch.finishBuild();
-  t.is(watch.isBuildRunning(), false);
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 
-  t.is(
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.endsWith(".css")),
     false
   );
@@ -164,23 +164,23 @@ test("Active queue tests, all CSS files", (t) => {
 test("De-duplicate the entries in pending queue", (t) => {
   let watch = new WatchQueue();
 
-  t.is(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
 
   watch.addToPendingQueue("test.md");
   watch.addToPendingQueue("test.md");
   watch.addToPendingQueue("test.md");
 
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 1);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 
   watch.startBuild();
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 1);
-  t.deepEqual(watch.getActiveQueue(), ["./test.md"]);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 1);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), ["./test.md"]);
 
   watch.finishBuild();
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 });

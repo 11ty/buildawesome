@@ -36,8 +36,7 @@ npm test
 
 We have a few test suites, for various reasons:
 
-- [ava JavaScript test runner](https://github.com/avajs/ava) ([assertions docs](https://github.com/avajs/ava/blob/main/docs/03-assertions.md)) (primary test suite in `test/`)
-- [Node.js Test runner](https://nodejs.org/api/test.html) (secondary test suite in `test_node/`)
+- [Node.js Test runner](https://nodejs.org/api/test.html) (primary test suite in `test/`, plus `test_node/` for tests that need `tsx` loaders)
 - [Vitest (in Browser Mode)](https://vitest.dev/guide/browser/) (browser tests in `packages/browser/test/`)
 - [Benchmark for Performance Regressions](https://github.com/11ty/buildbenchmark)
 

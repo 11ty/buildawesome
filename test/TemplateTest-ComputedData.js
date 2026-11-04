@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 
 import Eleventy from "../src/Core.js";
 import TemplateData from "../src/Data/TemplateData.js";
@@ -21,7 +21,7 @@ test("eleventyComputed", async (t) => {
     "./dist"
   );
   let data = await getRenderedData(tmpl);
-  t.is((await renderTemplate(tmpl, data)).trim(), "hi:value2-value1.css");
+  t.assert.strictEqual((await renderTemplate(tmpl, data)).trim(), "hi:value2-value1.css");
 });
 
 test("eleventyComputed overrides existing value.", async (t) => {
@@ -31,8 +31,8 @@ test("eleventyComputed overrides existing value.", async (t) => {
     "./dist"
   );
   let data = await getRenderedData(tmpl);
-  t.is(data.key1, "override");
-  t.is((await renderTemplate(tmpl, data)).trim(), "hi:override");
+  t.assert.strictEqual(data.key1, "override");
+  t.assert.strictEqual((await renderTemplate(tmpl, data)).trim(), "hi:override");
 });
 
 test("eleventyComputed overrides existing value and reuses that upstream value", async (t) => {
@@ -42,8 +42,8 @@ test("eleventyComputed overrides existing value and reuses that upstream value",
     "./dist"
   );
   let data = await getRenderedData(tmpl);
-  t.is(data.key1, "over(value1)ride");
-  t.is((await renderTemplate(tmpl, data)).trim(), "hi:over(value1)ride");
+  t.assert.strictEqual(data.key1, "over(value1)ride");
+  t.assert.strictEqual((await renderTemplate(tmpl, data)).trim(), "hi:over(value1)ride");
 });
 
 test("eleventyComputed permalink", async (t) => {
@@ -54,12 +54,12 @@ test("eleventyComputed permalink", async (t) => {
   );
   let templates = await tmpl.getTemplates(await tmpl.getData());
   let data = templates[0].data;
-  t.is(data.page.url, "/haha-value1.html");
-  t.is(data.page.outputPath, "./dist/haha-value1.html");
-  t.is(data.permalink, "haha-value1.html");
-  t.is(data.nested.key3, "value1");
-  t.is(data.nested.key4, "depends on computed value1");
-  t.is(data.dependsOnPage, "depends:/haha-value1.html");
+  t.assert.strictEqual(data.page.url, "/haha-value1.html");
+  t.assert.strictEqual(data.page.outputPath, "./dist/haha-value1.html");
+  t.assert.strictEqual(data.permalink, "haha-value1.html");
+  t.assert.strictEqual(data.nested.key3, "value1");
+  t.assert.strictEqual(data.nested.key4, "depends on computed value1");
+  t.assert.strictEqual(data.dependsOnPage, "depends:/haha-value1.html");
 });
 
 test("eleventyComputed simple permalink", async (t) => {
@@ -70,9 +70,9 @@ test("eleventyComputed simple permalink", async (t) => {
   );
   let templates = await tmpl.getTemplates(await tmpl.getData());
   let data = templates[0].data;
-  t.is(data.page.url, "/haha-value1.html");
-  t.is(data.page.outputPath, "./dist/haha-value1.html");
-  t.is(data.permalink, "haha-value1.html");
+  t.assert.strictEqual(data.page.url, "/haha-value1.html");
+  t.assert.strictEqual(data.page.outputPath, "./dist/haha-value1.html");
+  t.assert.strictEqual(data.permalink, "haha-value1.html");
 });
 
 test("eleventyComputed permalink using slug", async (t) => {
@@ -83,9 +83,9 @@ test("eleventyComputed permalink using slug", async (t) => {
   );
   let templates = await tmpl.getTemplates(await tmpl.getData());
   let data = templates[0].data;
-  t.is(data.page.url, "/haha-this-is-a-string.html");
-  t.is(data.page.outputPath, "./dist/haha-this-is-a-string.html");
-  t.is(data.permalink, "haha-this-is-a-string.html");
+  t.assert.strictEqual(data.page.url, "/haha-this-is-a-string.html");
+  t.assert.strictEqual(data.page.outputPath, "./dist/haha-this-is-a-string.html");
+  t.assert.strictEqual(data.permalink, "haha-this-is-a-string.html");
 });
 
 test("eleventyComputed js front matter (function)", async (t) => {
@@ -95,8 +95,8 @@ test("eleventyComputed js front matter (function)", async (t) => {
     "./dist"
   );
   let data = await getRenderedData(tmpl);
-  t.is(data.key3, "value3-value2-value1.css");
-  t.is((await renderTemplate(tmpl, data)).trim(), "hi:value2-value1.css");
+  t.assert.strictEqual(data.key3, "value3-value2-value1.css");
+  t.assert.strictEqual((await renderTemplate(tmpl, data)).trim(), "hi:value2-value1.css");
 });
 
 test("eleventyComputed js front matter key reuses and overrides", async (t) => {
@@ -106,8 +106,8 @@ test("eleventyComputed js front matter key reuses and overrides", async (t) => {
     "./dist"
   );
   let data = await getRenderedData(tmpl);
-  t.is(data.key1, "value2-value1");
-  t.is((await renderTemplate(tmpl, data)).trim(), "hi:value2-value1");
+  t.assert.strictEqual(data.key1, "value2-value1");
+  t.assert.strictEqual((await renderTemplate(tmpl, data)).trim(), "hi:value2-value1");
 });
 
 test("eleventyComputed true primitive", async (t) => {
@@ -117,10 +117,10 @@ test("eleventyComputed true primitive", async (t) => {
     "./dist"
   );
   let data = await getRenderedData(tmpl);
-  t.is(data.key1, "value1");
-  t.is(data.key2, true);
-  t.is(data.key3, false);
-  t.is(data.key4, 324);
+  t.assert.strictEqual(data.key1, "value1");
+  t.assert.strictEqual(data.key2, true);
+  t.assert.strictEqual(data.key3, false);
+  t.assert.strictEqual(data.key4, 324);
 });
 
 test("eleventyComputed relies on global data", async (t) => {
@@ -146,7 +146,7 @@ test("eleventyComputed relies on global data", async (t) => {
   let fetchedData = await tmpl.getData();
   let templates = await tmpl.getTemplates(fetchedData);
   let data = templates[0].data;
-  t.is(data.image, "datavalue1");
+  t.assert.strictEqual(data.image, "datavalue1");
 });
 
 test("eleventyComputed intermixes with global data", async (t) => {
@@ -172,17 +172,17 @@ test("eleventyComputed intermixes with global data", async (t) => {
   );
 
   let fetchedData = await tmpl.getData();
-  t.truthy(fetchedData.buildawesomeComputed.image);
-  t.truthy(fetchedData.buildawesomeComputed.image2);
-  t.truthy(fetchedData.buildawesomeComputed.image3);
-  t.truthy(fetchedData.buildawesomeComputed.eleventyNavigation.key);
+  t.assert.ok(fetchedData.buildawesomeComputed.image);
+  t.assert.ok(fetchedData.buildawesomeComputed.image2);
+  t.assert.ok(fetchedData.buildawesomeComputed.image3);
+  t.assert.ok(fetchedData.buildawesomeComputed.eleventyNavigation.key);
 
   let templates = await tmpl.getTemplates(fetchedData);
   let data = templates[0].data;
-  t.is(data.image, "first");
-  t.is(data.image2, "second");
-  t.is(data.image3, "third-global");
-  t.is(data.eleventyNavigation.key, "nested-first-global");
+  t.assert.strictEqual(data.image, "first");
+  t.assert.strictEqual(data.image2, "second");
+  t.assert.strictEqual(data.image3, "third-global");
+  t.assert.strictEqual(data.eleventyNavigation.key, "nested-first-global");
 });
 
 test("eleventyComputed using symbol parsing on template strings (nunjucks)", async (t) => {
@@ -209,9 +209,9 @@ test("eleventyComputed using symbol parsing on template strings (nunjucks)", asy
   );
 
   let data = await getRenderedData(tmpl);
-  t.is(data.a, "a");
-  t.is(data.b, "b");
-  t.is(data.c, "ab");
+  t.assert.strictEqual(data.a, "a");
+  t.assert.strictEqual(data.b, "b");
+  t.assert.strictEqual(data.c, "ab");
 });
 
 test("eleventyComputed using symbol parsing on template strings (liquid)", async (t) => {
@@ -238,9 +238,9 @@ test("eleventyComputed using symbol parsing on template strings (liquid)", async
   );
 
   let data = await getRenderedData(tmpl);
-  t.is(data.a, "a");
-  t.is(data.b, "b");
-  t.is(data.c, "ab");
+  t.assert.strictEqual(data.a, "a");
+  t.assert.strictEqual(data.b, "b");
+  t.assert.strictEqual(data.c, "ab");
 });
 
 test("eleventyComputed render strings in arrays", async (t) => {
@@ -251,8 +251,8 @@ test("eleventyComputed render strings in arrays", async (t) => {
   );
 
   let data = await getRenderedData(tmpl);
-  t.deepEqual(data.array, ["static value", "test"]);
-  t.is(data.notArray, "test");
+  t.assert.deepStrictEqual(data.array, ["static value", "test"]);
+  t.assert.strictEqual(data.notArray, "test");
 });
 
 test("Issue #3728 Computed data with arrays of different sizes, arrays are treated as a single unit", async (t) => {
@@ -270,8 +270,8 @@ const eleventyComputed = {
   elev.disableLogger();
 
   let result = await elev.toJSON();
-  t.is(result.length, 1);
-  t.is(result[0].content, `a,b,c`);
+  t.assert.strictEqual(result.length, 1);
+  t.assert.strictEqual(result[0].content, `a,b,c`);
 });
 
 test("Issue #3827 with Computed data with arrays and layouts (×2 eleventyComputed)", async (t) => {
@@ -305,14 +305,14 @@ const eleventyComputed = {
   let result = await elev.toJSON();
   result.sort(sortEleventyResults);
 
-  t.is(result.length, 2);
+  t.assert.strictEqual(result.length, 2);
 
-  t.is(result[0].inputPath, `./test/stubs-virtual/page2.njk`);
+  t.assert.strictEqual(result[0].inputPath, `./test/stubs-virtual/page2.njk`);
   // A merge happened here because it was eleventyComputed -> eleventyComputed array merge before computed data
-  t.is(result[0].content, `base,base2,override,override2`);
+  t.assert.strictEqual(result[0].content, `base,base2,override,override2`);
 
-  t.is(result[1].inputPath, `./test/stubs-virtual/page1.njk`);
-  t.is(result[1].content, `base,base2`);
+  t.assert.strictEqual(result[1].inputPath, `./test/stubs-virtual/page1.njk`);
+  t.assert.strictEqual(result[1].content, `base,base2`);
 });
 
 test("Issue #3728 with Computed data with arrays and layouts (×1 eleventyComputed)", async (t) => {
@@ -343,8 +343,8 @@ const eleventyComputed = {
   let result = await elev.toJSON();
   result.sort(sortEleventyResults);
 
-  t.is(result.length, 2);
+  t.assert.strictEqual(result.length, 2);
 
-  t.is(result[0].content, `override,2`);
-  t.is(result[1].content, `base,1`);
+  t.assert.strictEqual(result[0].content, `override,2`);
+  t.assert.strictEqual(result[1].content, `base,1`);
 });

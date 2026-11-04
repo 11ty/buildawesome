@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import Eleventy from "../src/Core.js";
@@ -80,99 +80,99 @@ async function getWatchInstance(dir, options = {}) {
   };
 }
 
-test.after.always(() => {
+test.after(() => {
   fs.rmSync(ROOT, { recursive: true, force: true });
 });
 
 test("Nunjucks include change only renders templates that include it", async (t) => {
   let { trigger, read } = await getWatchInstance(createProject("njk-include"));
-  t.deepEqual(await trigger("_includes/header.njk", "Header 2 {% include 'nested/logo.njk' %}"), [
+  t.assert.deepStrictEqual(await trigger("_includes/header.njk", "Header 2 {% include 'nested/logo.njk' %}"), [
     "header.njk",
   ]);
-  t.is(read("header/index.html"), "Header 2 Logo");
+  t.assert.strictEqual(read("header/index.html"), "Header 2 Logo");
 });
 
 test("Nested Nunjucks include change renders templates that include it transitively", async (t) => {
   let { trigger, read } = await getWatchInstance(createProject("njk-nested"));
-  t.deepEqual(await trigger("_includes/nested/logo.njk", "Logo 2"), ["header.njk"]);
-  t.is(read("header/index.html"), "Header Logo 2");
+  t.assert.deepStrictEqual(await trigger("_includes/nested/logo.njk", "Logo 2"), ["header.njk"]);
+  t.assert.strictEqual(read("header/index.html"), "Header Logo 2");
 });
 
 test("Nunjucks import and extends are tracked", async (t) => {
   let { trigger, read } = await getWatchInstance(createProject("njk-import-extends"));
-  t.deepEqual(await trigger("_includes/macros.njk", "{% macro hi() %}Hey{% endmacro %}"), [
+  t.assert.deepStrictEqual(await trigger("_includes/macros.njk", "{% macro hi() %}Hey{% endmacro %}"), [
     "macros.njk",
   ]);
-  t.is(read("macros/index.html"), "Hey");
+  t.assert.strictEqual(read("macros/index.html"), "Hey");
 
-  t.deepEqual(await trigger("_includes/base.njk", "Base 2 {% block body %}{% endblock %}"), [
+  t.assert.deepStrictEqual(await trigger("_includes/base.njk", "Base 2 {% block body %}{% endblock %}"), [
     "extends.njk",
   ]);
-  t.is(read("extends/index.html"), "Base 2 Body");
+  t.assert.strictEqual(read("extends/index.html"), "Base 2 Body");
 });
 
 test("Liquid include and render are tracked, including from Markdown", async (t) => {
   let { trigger, read } = await getWatchInstance(createProject("liquid"));
-  t.deepEqual(await trigger("_includes/footer.liquid", "Footer 2"), [
+  t.assert.deepStrictEqual(await trigger("_includes/footer.liquid", "Footer 2"), [
     "footer.liquid",
     "markdown.md",
   ]);
-  t.is(read("footer/index.html"), "Footer 2");
+  t.assert.strictEqual(read("footer/index.html"), "Footer 2");
 
-  t.deepEqual(await trigger("_includes/card.liquid", "Card 2 {{ name }}"), ["card.liquid"]);
-  t.is(read("card/index.html"), "Card 2 A");
+  t.assert.deepStrictEqual(await trigger("_includes/card.liquid", "Card 2 {{ name }}"), ["card.liquid"]);
+  t.assert.strictEqual(read("card/index.html"), "Card 2 A");
 });
 
 test("Layout change only renders templates that use it", async (t) => {
   let { trigger, read } = await getWatchInstance(createProject("layout"));
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     await trigger("_includes/layout.njk", "{% rendered %}<main class=\"v2\">{{ content | safe }}</main>"),
     ["layout.njk", "markdown.md"],
   );
-  t.is(read("layout/index.html"), `<main class="v2">Page</main>`);
+  t.assert.strictEqual(read("layout/index.html"), `<main class="v2">Page</main>`);
 });
 
 test("Unused include falls back to a full build", async (t) => {
   let { trigger } = await getWatchInstance(createProject("unused"));
   let rendered = await trigger("_includes/unused.njk", "Unused 2");
-  t.true(rendered.includes("static.njk"));
+  t.assert.strictEqual(rendered.includes("static.njk"), true);
 });
 
 test("Includes edited after a template changed its includes", async (t) => {
   let { trigger, read } = await getWatchInstance(createProject("template-changed"));
-  t.deepEqual(await trigger("header.njk", "{% rendered %}{% include 'footer.liquid' %}"), [
+  t.assert.deepStrictEqual(await trigger("header.njk", "{% rendered %}{% include 'footer.liquid' %}"), [
     "header.njk",
   ]);
 
-  t.deepEqual(await trigger("_includes/footer.liquid", "Footer 3"), [
+  t.assert.deepStrictEqual(await trigger("_includes/footer.liquid", "Footer 3"), [
     "footer.liquid",
     "header.njk",
     "markdown.md",
   ]);
-  t.is(read("header/index.html"), "Footer 3");
+  t.assert.strictEqual(read("header/index.html"), "Footer 3");
 });
 
 test("Include change with --ignore-initial falls back to a full build", async (t) => {
   let { trigger } = await getWatchInstance(createProject("ignore-initial"), {
     ignoreInitial: true,
   });
-  t.deepEqual(await trigger("header.njk"), ["header.njk"]);
+  t.assert.deepStrictEqual(await trigger("header.njk"), ["header.njk"]);
 
   // The graph only knows about header.njk, the rest were never rendered
   let rendered = await trigger("_includes/footer.liquid", "Footer 4");
-  t.true(rendered.includes("footer.liquid"));
-  t.true(rendered.includes("markdown.md"));
+  t.assert.strictEqual(rendered.includes("footer.liquid"), true);
+  t.assert.strictEqual(rendered.includes("markdown.md"), true);
 });
 
 test("Layout added to a template on a later build is tracked", async (t) => {
   let { trigger, read } = await getWatchInstance(createProject("layout-added"));
-  t.deepEqual(await trigger("static.njk", "---\nlayout: layout.njk\n---\n{% rendered %}Static"), [
+  t.assert.deepStrictEqual(await trigger("static.njk", "---\nlayout: layout.njk\n---\n{% rendered %}Static"), [
     "static.njk",
   ]);
 
   let rendered = await trigger("_includes/layout.njk", "<div>{{ content | safe }}</div>");
-  t.true(rendered.includes("static.njk"));
-  t.is(read("static/index.html"), "<div>Static</div>");
+  t.assert.strictEqual(rendered.includes("static.njk"), true);
+  t.assert.strictEqual(read("static/index.html"), "<div>Static</div>");
 });
 
 test("Include change after a failed build falls back to a full build", async (t) => {
@@ -180,9 +180,9 @@ test("Include change after a failed build falls back to a full build", async (t)
   elev.errorHandler.error = () => {};
   await trigger("header.njk", "{% rendered %}{% include 'missing.njk' %}");
 
-  t.deepEqual(await trigger("header.njk", "{% rendered %}Fixed"), ["header.njk"]);
+  t.assert.deepStrictEqual(await trigger("header.njk", "{% rendered %}Fixed"), ["header.njk"]);
   let rendered = await trigger("_includes/footer.liquid", "Footer 5");
-  t.true(rendered.includes("static.njk"));
+  t.assert.strictEqual(rendered.includes("static.njk"), true);
 });
 
 test("Nunjucks extends parent edit after two rebuilds is not stale (full builds)", async (t) => {
@@ -191,7 +191,7 @@ test("Nunjucks extends parent edit after two rebuilds is not stale (full builds)
   });
   await trigger("static.njk", "{% rendered %}Static 2");
   await trigger("_includes/base.njk", "Base 3 {% block body %}{% endblock %}");
-  t.is(read("extends/index.html"), "Base 3 Body");
+  t.assert.strictEqual(read("extends/index.html"), "Base 3 Body");
 });
 
 test("Global data change nothing reads runs a full build", async (t) => {
@@ -200,9 +200,9 @@ test("Global data change nothing reads runs a full build", async (t) => {
   fs.writeFileSync(path.join(dir, "_data/site.json"), JSON.stringify({ title: "A" }));
   let { elev, trigger } = await getWatchInstance(dir);
 
-  t.false(elev.isIncrementalBuildPossible([`./${dir}/_data/site.json`]));
+  t.assert.strictEqual(elev.isIncrementalBuildPossible([`./${dir}/_data/site.json`]), false);
   let rendered = await trigger("_data/site.json", JSON.stringify({ title: "B" }));
-  t.true(rendered.includes("static.njk"));
+  t.assert.strictEqual(rendered.includes("static.njk"), true);
 });
 
 test("Passthrough copy outside the input directory is incremental", async (t) => {
@@ -217,7 +217,7 @@ test("Passthrough copy outside the input directory is incremental", async (t) =>
     },
   });
 
-  t.true(elev.isIncrementalBuildPossible([`./${assets}/style.css`]));
+  t.assert.strictEqual(elev.isIncrementalBuildPossible([`./${assets}/style.css`]), true);
 });
 
 function addDataFiles(dir) {
@@ -237,35 +237,35 @@ function addDataFiles(dir) {
 test("Directory data change only renders templates in that directory", async (t) => {
   let { trigger, read } = await getWatchInstance(addDataFiles(createProject("dir-data")));
   let rendered = await trigger("blog/blog.11tydata.json", JSON.stringify({ name: "News", tags: ["blog"] }));
-  t.true(rendered.includes("blog/a.njk"));
-  t.true(rendered.includes("blog/b.njk"));
-  t.true(rendered.includes("blog/c.njk"));
-  t.false(rendered.includes("static.njk"));
-  t.is(read("blog/a/index.html"), "A News");
+  t.assert.strictEqual(rendered.includes("blog/a.njk"), true);
+  t.assert.strictEqual(rendered.includes("blog/b.njk"), true);
+  t.assert.strictEqual(rendered.includes("blog/c.njk"), true);
+  t.assert.strictEqual(rendered.includes("static.njk"), false);
+  t.assert.strictEqual(read("blog/a/index.html"), "A News");
 });
 
 // Like a template change, consumers need `eleventyImport.collections`
 test("Directory data change re-renders templates that consume the collection", async (t) => {
   let { trigger, read } = await getWatchInstance(addDataFiles(createProject("dir-data-collection")));
   let rendered = await trigger("blog/blog.11tydata.json", JSON.stringify({ name: "News", tags: ["blog"] }));
-  t.true(rendered.includes("blog-index.njk"));
-  t.is(read("blog-index/index.html"), "News News News ");
+  t.assert.strictEqual(rendered.includes("blog-index.njk"), true);
+  t.assert.strictEqual(read("blog-index/index.html"), "News News News ");
 });
 
 test("Template data file change only renders that template", async (t) => {
   let { trigger, read } = await getWatchInstance(addDataFiles(createProject("template-data")));
   let rendered = await trigger("blog/b.11tydata.js", `export default { name: "Bee" };`);
-  t.true(rendered.includes("blog/b.njk"));
-  t.false(rendered.includes("blog/a.njk"));
-  t.false(rendered.includes("static.njk"));
-  t.is(read("blog/b/index.html"), "B Bee");
+  t.assert.strictEqual(rendered.includes("blog/b.njk"), true);
+  t.assert.strictEqual(rendered.includes("blog/a.njk"), false);
+  t.assert.strictEqual(rendered.includes("static.njk"), false);
+  t.assert.strictEqual(read("blog/b/index.html"), "B Bee");
 });
 
 test("New directory data file renders the templates it applies to", async (t) => {
   let { trigger, read } = await getWatchInstance(addDataFiles(createProject("new-data")));
   let rendered = await trigger("blog/c.11tydata.json", JSON.stringify({ suffix: "?" }));
-  t.true(rendered.includes("blog/c.njk"));
-  t.is(read("blog/c/index.html"), "C ?");
+  t.assert.strictEqual(rendered.includes("blog/c.njk"), true);
+  t.assert.strictEqual(read("blog/c/index.html"), "C ?");
 });
 
 function addGlobalData(dir) {
@@ -283,31 +283,31 @@ function addGlobalData(dir) {
 
 test("Global data change only renders templates that read it", async (t) => {
   let { trigger, read } = await getWatchInstance(addGlobalData(createProject("global-reads")));
-  t.deepEqual(await trigger("_data/site.json", JSON.stringify({ title: "New" })), [
+  t.assert.deepStrictEqual(await trigger("_data/site.json", JSON.stringify({ title: "New" })), [
     "uses-layout.njk",
     "uses-meta.liquid",
     "uses-site.njk",
   ]);
-  t.is(read("uses-site/index.html"), "New");
-  t.is(read("uses-layout/index.html"), "<title>New</title>Body");
+  t.assert.strictEqual(read("uses-site/index.html"), "New");
+  t.assert.strictEqual(read("uses-layout/index.html"), "<title>New</title>Body");
 });
 
 test("Nested global data file renders templates that read its top-level key", async (t) => {
   let { trigger, read } = await getWatchInstance(addGlobalData(createProject("global-nested")));
   let rendered = await trigger("_data/site/meta.json", JSON.stringify({ author: "Z" }));
-  t.true(rendered.includes("uses-meta.liquid"));
-  t.false(rendered.includes("paged.njk"));
-  t.false(rendered.includes("static.njk"));
-  t.is(read("uses-meta/index.html"), "Z");
+  t.assert.strictEqual(rendered.includes("uses-meta.liquid"), true);
+  t.assert.strictEqual(rendered.includes("paged.njk"), false);
+  t.assert.strictEqual(rendered.includes("static.njk"), false);
+  t.assert.strictEqual(read("uses-meta/index.html"), "Z");
 });
 
 test("Global data used for pagination renders the paginated template", async (t) => {
   let { trigger, read } = await getWatchInstance(addGlobalData(createProject("global-pagination")));
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     await trigger("_data/nav.json", JSON.stringify([{ title: "Uno" }, { title: "Dos" }, { title: "Tres" }])),
     ["paged.njk"],
   );
-  t.is(read("paged/2/index.html"), "Tres");
+  t.assert.strictEqual(read("paged/2/index.html"), "Tres");
 });
 
 test("Deleted global data file runs a full build", async (t) => {
@@ -315,16 +315,16 @@ test("Deleted global data file runs a full build", async (t) => {
   let { trigger, read } = await getWatchInstance(dir);
   fs.rmSync(path.join(dir, "_data/site/meta.json"));
   let rendered = await trigger("_data/site/meta.json");
-  t.true(rendered.includes("static.njk"));
-  t.is(read("uses-meta/index.html"), "");
+  t.assert.strictEqual(rendered.includes("static.njk"), true);
+  t.assert.strictEqual(read("uses-meta/index.html"), "");
 });
 
 test("Template edit keeps its data file edges for the next build", async (t) => {
   let { trigger, read } = await getWatchInstance(addDataFiles(createProject("template-then-data")));
-  t.true((await trigger("blog/a.njk", "{% rendered %}A2 {{ name }}")).includes("blog/a.njk"));
+  t.assert.strictEqual((await trigger("blog/a.njk", "{% rendered %}A2 {{ name }}")).includes("blog/a.njk"), true);
   let rendered = await trigger("blog/blog.11tydata.json", JSON.stringify({ name: "Later", tags: ["blog"] }));
-  t.true(rendered.includes("blog/a.njk"));
-  t.is(read("blog/a/index.html"), "A2 Later");
+  t.assert.strictEqual(rendered.includes("blog/a.njk"), true);
+  t.assert.strictEqual(read("blog/a/index.html"), "A2 Later");
 });
 
 test("Global data read through a collection renders the reader", async (t) => {
@@ -335,22 +335,22 @@ test("Global data read through a collection renders the reader", async (t) => {
   );
   let { trigger, read } = await getWatchInstance(dir);
   let rendered = await trigger("_data/site.json", JSON.stringify({ title: "New" }));
-  t.true(rendered.includes("blog-index.njk"));
-  t.is(read("blog-index/index.html"), "New New New ");
+  t.assert.strictEqual(rendered.includes("blog-index.njk"), true);
+  t.assert.strictEqual(read("blog-index/index.html"), "New New New ");
 });
 
 test("Collection consumers render when a template leaves the collection", async (t) => {
   let { trigger, read } = await getWatchInstance(addDataFiles(createProject("collection-leave")));
   let rendered = await trigger("blog/a.njk", "---\noverride:tags: []\n---\n{% rendered %}A {{ name }}");
-  t.true(rendered.includes("blog-index.njk"));
-  t.is(read("blog-index/index.html"), "Blog Blog ");
+  t.assert.strictEqual(rendered.includes("blog-index.njk"), true);
+  t.assert.strictEqual(read("blog-index/index.html"), "Blog Blog ");
 });
 
 test("Collection consumers render when directory data removes the tag", async (t) => {
   let { trigger, read } = await getWatchInstance(addDataFiles(createProject("collection-leave-data")));
   let rendered = await trigger("blog/blog.11tydata.json", JSON.stringify({ name: "Blog" }));
-  t.true(rendered.includes("blog-index.njk"));
-  t.is(read("blog-index/index.html"), "");
+  t.assert.strictEqual(rendered.includes("blog-index.njk"), true);
+  t.assert.strictEqual(read("blog-index/index.html"), "");
 });
 
 function addJavaScriptTemplates(dir) {
@@ -389,29 +389,29 @@ async function getJavaScriptWatchInstance(name) {
   };
 }
 
-test.serial("JavaScript template dependency change only renders templates that import it", async (t) => {
+test("JavaScript template dependency change only renders templates that import it", async (t) => {
   let { trigger, read } = await getJavaScriptWatchInstance("js-deps");
-  t.deepEqual(await trigger("lib/helper.js", `export default function() { return "Helper 2"; }`), ["page.11ty.js"]);
-  t.is(read("page/index.html"), "Helper 2");
+  t.assert.deepStrictEqual(await trigger("lib/helper.js", `export default function() { return "Helper 2"; }`), ["page.11ty.js"]);
+  t.assert.strictEqual(read("page/index.html"), "Helper 2");
 });
 
-test.serial("JavaScript layout dependency change only renders templates using the layout", async (t) => {
+test("JavaScript layout dependency change only renders templates using the layout", async (t) => {
   let { trigger, read } = await getJavaScriptWatchInstance("js-layout-deps");
-  t.deepEqual(await trigger("lib/layout-helper.js", `export default "Layout 2";`), ["uses-js-layout.njk"]);
-  t.is(read("uses-js-layout/index.html"), "Layout 2 Body");
+  t.assert.deepStrictEqual(await trigger("lib/layout-helper.js", `export default "Layout 2";`), ["uses-js-layout.njk"]);
+  t.assert.strictEqual(read("uses-js-layout/index.html"), "Layout 2 Body");
 });
 
-test.serial("JavaScript dependency of a data file runs a full build", async (t) => {
+test("JavaScript dependency of a data file runs a full build", async (t) => {
   let { trigger, read } = await getJavaScriptWatchInstance("js-data-deps");
   let rendered = await trigger("lib/shared.js", `export default "Shared 2";`);
-  t.true(rendered.includes("static.njk"));
-  t.is(read("uses-shared/index.html"), "Shared 2");
+  t.assert.strictEqual(rendered.includes("static.njk"), true);
+  t.assert.strictEqual(read("uses-shared/index.html"), "Shared 2");
 });
 
-test.serial("JavaScript layout dependencies are watched (#1812)", async (t) => {
+test("JavaScript layout dependencies are watched (#1812)", async (t) => {
   let { elev } = await getJavaScriptWatchInstance("js-layout-watched");
   let { targets } = await elev.getWatchedTargets();
-  t.true(targets.includes("./test/stubs-incremental-includes/js-layout-watched/lib/layout-helper.js"));
+  t.assert.strictEqual(targets.includes("./test/stubs-incremental-includes/js-layout-watched/lib/layout-helper.js"), true);
 });
 
 for (let includeExtension of ["njk", "md"]) {
@@ -428,7 +428,7 @@ for (let includeExtension of ["njk", "md"]) {
 
     for (let i = 1; i <= 3; i++) {
       await trigger(`_includes/snippet.${includeExtension}`, `Snippet ${i}`);
-      t.is(read("md-page/index.html").trim(), `<p>Snippet ${i}</p>`);
+      t.assert.strictEqual(read("md-page/index.html").trim(), `<p>Snippet ${i}</p>`);
     }
   });
 }
@@ -467,25 +467,25 @@ test("renderFile renders again when the rendered file changes (#2909)", async (t
   for (let i = 1; i <= 2; i++) {
     fs.writeFileSync(`${outside}/doc.md`, `# Doc ${i}`);
     await elev.triggerWatchRunForPath(`./${outside}/doc.md`);
-    t.is(read("render-file/index.html").trim(), `<h1>Doc ${i}</h1>`);
+    t.assert.strictEqual(read("render-file/index.html").trim(), `<h1>Doc ${i}</h1>`);
   }
-  t.true(elev.isIncrementalBuildPossible([`./${outside}/doc.md`]));
+  t.assert.strictEqual(elev.isIncrementalBuildPossible([`./${outside}/doc.md`]), true);
 });
 
 test("renderTemplate includes are tracked (Nunjucks)", async (t) => {
   let { trigger, read } = await getRenderPluginWatchInstance("render-template-njk");
   let rendered = await trigger("_includes/partial.njk", "Partial 1");
-  t.true(rendered.includes("render-template-njk.njk"));
-  t.false(rendered.includes("static.njk"));
-  t.is(read("render-template-njk/index.html"), "Partial 1");
+  t.assert.strictEqual(rendered.includes("render-template-njk.njk"), true);
+  t.assert.strictEqual(rendered.includes("static.njk"), false);
+  t.assert.strictEqual(read("render-template-njk/index.html"), "Partial 1");
 });
 
 test("renderTemplate includes are tracked (Liquid)", async (t) => {
   let { trigger, read } = await getRenderPluginWatchInstance("render-template-liquid");
   let rendered = await trigger("_includes/partial.liquid", "Liquid partial 1");
-  t.true(rendered.includes("render-template-liquid.liquid"));
-  t.false(rendered.includes("static.njk"));
-  t.is(read("render-template-liquid/index.html"), "Liquid partial 1");
+  t.assert.strictEqual(rendered.includes("render-template-liquid.liquid"), true);
+  t.assert.strictEqual(rendered.includes("static.njk"), false);
+  t.assert.strictEqual(read("render-template-liquid/index.html"), "Liquid partial 1");
 });
 
 test("renderTemplate WebC components are tracked", async (t) => {
@@ -505,8 +505,8 @@ test("renderTemplate WebC components are tracked", async (t) => {
 
   for (let i = 1; i <= 2; i++) {
     let rendered = await trigger("_components/main-button.webc", `<button>Button ${i}</button>`);
-    t.true(rendered.includes("uses-webc.liquid"));
-    t.false(rendered.includes("static.njk"));
-    t.is(read("uses-webc/index.html").trim(), `<button>Button ${i}</button>`);
+    t.assert.strictEqual(rendered.includes("uses-webc.liquid"), true);
+    t.assert.strictEqual(rendered.includes("static.njk"), false);
+    t.assert.strictEqual(read("uses-webc/index.html").trim(), `<button>Button ${i}</button>`);
   }
 });

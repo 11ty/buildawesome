@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("Eleventy addGlobalData should run once", async (t) => {
@@ -13,7 +13,7 @@ test("Eleventy addGlobalData should run once", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(count, 1);
+  t.assert.strictEqual(count, 1);
 });
 
 test("Eleventy addGlobalData shouldn’t run if no input templates match!", async (t) => {
@@ -32,7 +32,7 @@ test("Eleventy addGlobalData shouldn’t run if no input templates match!", asyn
   );
 
   let results = await elev.toJSON();
-  t.is(count, 0);
+  t.assert.strictEqual(count, 0);
 });
 
 test("Eleventy addGlobalData can feed layouts to populate data cascade with layout data, issue #1245", async (t) => {
@@ -44,8 +44,8 @@ test("Eleventy addGlobalData can feed layouts to populate data cascade with layo
   });
 
   let [result] = await elev.toJSON();
-  t.deepEqual(result.data, { LayoutData: 123 });
-  t.is(result.content.trim(), "FromLayoutlayout.njk");
+  t.assert.deepStrictEqual(result.data, { LayoutData: 123 });
+  t.assert.strictEqual(result.content.trim(), "FromLayoutlayout.njk");
 });
 
 test("Eleventy addGlobalData merge data #3389", async (t) => {
@@ -68,8 +68,8 @@ test("Eleventy addGlobalData merge data #3389", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content, "testing:/computed/|other:/computed/");
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, "testing:/computed/|other:/computed/");
 });
 
 test("Eleventy addGlobalData merge data #3389 lodash set", async (t) => {
@@ -92,8 +92,8 @@ test("Eleventy addGlobalData merge data #3389 lodash set", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content, "testing:/computed/|other:/computed/");
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, "testing:/computed/|other:/computed/");
 });
 
 test.skip("Eleventy addGlobalData merge data #3389 no nested function", async (t) => {
@@ -112,7 +112,7 @@ test.skip("Eleventy addGlobalData merge data #3389 no nested function", async (t
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content, "testing:/computed/|other:/computed/");
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, "testing:/computed/|other:/computed/");
 });
 

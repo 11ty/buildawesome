@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import Eleventy from "../src/Core.js";
@@ -43,7 +43,7 @@ function getUrls(event) {
   return event.build.templates.map((entry) => entry.url).sort();
 }
 
-test.after.always(() => {
+test.after(() => {
   fs.rmSync("test/stubs-output-hashes", { recursive: true, force: true });
 });
 
@@ -54,11 +54,11 @@ test("Data file edit only sends pages whose output changed", async (t) => {
   fs.writeFileSync(path.join(dir, "_data/site.json"), JSON.stringify({ title: "Second" }));
   await elev.triggerWatchRunForPath(`./${dir}/_data/site.json`);
 
-  t.is(events.length, 1);
-  t.true(events[0].build.outputs);
-  t.deepEqual(getUrls(events[0]), ["/uses-data/"]);
-  t.is(events[0].build.templates[0].content, "Second");
-  t.deepEqual(events[0].build.passthrough, []);
+  t.assert.strictEqual(events.length, 1);
+  t.assert.strictEqual(events[0].build.outputs, true);
+  t.assert.deepStrictEqual(getUrls(events[0]), ["/uses-data/"]);
+  t.assert.strictEqual(events[0].build.templates[0].content, "Second");
+  t.assert.deepStrictEqual(events[0].build.passthrough, []);
 });
 
 test("Unchanged rebuild sends no templates", async (t) => {
@@ -67,9 +67,9 @@ test("Unchanged rebuild sends no templates", async (t) => {
 
   await elev.triggerWatchRunForPath(`./${dir}/static.njk`);
 
-  t.is(events.length, 1);
-  t.true(events[0].build.outputs);
-  t.deepEqual(events[0].build.templates, []);
+  t.assert.strictEqual(events.length, 1);
+  t.assert.strictEqual(events[0].build.outputs, true);
+  t.assert.deepStrictEqual(events[0].build.templates, []);
 });
 
 test("New page counts as changed", async (t) => {
@@ -80,18 +80,18 @@ test("New page counts as changed", async (t) => {
   elev.fileSystemSearch.add(`./${dir}/added.njk`);
   await elev.triggerWatchRunForPath(`./${dir}/added.njk`);
 
-  t.deepEqual(getUrls(events[0]), ["/added/"]);
+  t.assert.deepStrictEqual(getUrls(events[0]), ["/added/"]);
 });
 
 test("Config reset clears output hashes", async (t) => {
   let dir = createProject("config-reset");
   let { elev, events } = await getWatchInstance(dir);
 
-  t.true(elev.outputHashes.size > 0);
+  t.assert.strictEqual(elev.outputHashes.size > 0, true);
 
   await elev.triggerWatchRunForPath(`./${dir}/eleventy.config.js`);
 
-  t.deepEqual(getUrls(events[0]), ["/static/", "/uses-data/"]);
+  t.assert.deepStrictEqual(getUrls(events[0]), ["/static/", "/uses-data/"]);
 });
 
 test("Serve mode skips writing unchanged output", async (t) => {
@@ -103,7 +103,7 @@ test("Serve mode skips writing unchanged output", async (t) => {
 
   await elev.triggerWatchRunForPath(`./${dir}/static.njk`);
 
-  t.is(fs.readFileSync(outputPath, "utf8"), "Modified on disk");
+  t.assert.strictEqual(fs.readFileSync(outputPath, "utf8"), "Modified on disk");
 });
 
 test("Serve mode writes unchanged output when opted out", async (t) => {
@@ -120,7 +120,7 @@ test("Serve mode writes unchanged output when opted out", async (t) => {
 
   await elev.triggerWatchRunForPath(`./${dir}/static.njk`);
 
-  t.is(fs.readFileSync(outputPath, "utf8"), "Static");
+  t.assert.strictEqual(fs.readFileSync(outputPath, "utf8"), "Static");
 });
 
 test("Watch mode skips writing unchanged output", async (t) => {
@@ -132,8 +132,8 @@ test("Watch mode skips writing unchanged output", async (t) => {
 
   await elev.triggerWatchRunForPath(`./${dir}/static.njk`);
 
-  t.is(fs.readFileSync(outputPath, "utf8"), "Modified on disk");
-  t.true(events[0].build.outputs);
+  t.assert.strictEqual(fs.readFileSync(outputPath, "utf8"), "Modified on disk");
+  t.assert.strictEqual(events[0].build.outputs, true);
 });
 
 test("Changed non-CSS passthrough copy files are sent as passthrough URLs", async (t) => {
@@ -151,9 +151,9 @@ test("Changed non-CSS passthrough copy files are sent as passthrough URLs", asyn
   fs.writeFileSync(path.join(dir, "file.txt"), "Two");
   await elev.triggerWatchRunForPath(`./${dir}/file.txt`);
 
-  t.deepEqual(events[0].build.passthrough, ["/file.txt"]);
-  t.deepEqual(events[0].build.stylesheets, []);
-  t.deepEqual(events[0].build.templates, []);
+  t.assert.deepStrictEqual(events[0].build.passthrough, ["/file.txt"]);
+  t.assert.deepStrictEqual(events[0].build.stylesheets, []);
+  t.assert.deepStrictEqual(events[0].build.templates, []);
 });
 
 test("Changed files in emulated passthrough copy directories are sent as passthrough URLs", async (t) => {
@@ -171,7 +171,7 @@ test("Changed files in emulated passthrough copy directories are sent as passthr
   fs.writeFileSync(path.join(dir, "img/file.txt"), "Two");
   await elev.triggerWatchRunForPath(`./${dir}/img/file.txt`);
 
-  t.deepEqual(events[0].build.passthrough, ["/img/file.txt"]);
+  t.assert.deepStrictEqual(events[0].build.passthrough, ["/img/file.txt"]);
 });
 
 test("Watch target changes don’t filter by changed output", async (t) => {
@@ -187,8 +187,8 @@ test("Watch target changes don’t filter by changed output", async (t) => {
 
   await elev.triggerWatchRunForPath(`./${dir}/js/app.js`);
 
-  t.false(events[0].build.outputs);
-  t.deepEqual(getUrls(events[0]), ["/static/", "/uses-data/"]);
+  t.assert.strictEqual(events[0].build.outputs, false);
+  t.assert.deepStrictEqual(getUrls(events[0]), ["/static/", "/uses-data/"]);
 });
 
 test("Watch target changes declared via addDependencies filter by changed output", async (t) => {
@@ -215,9 +215,9 @@ test("Watch target changes declared via addDependencies filter by changed output
   fs.writeFileSync(componentPath, "Second");
   await elev.triggerWatchRunForPath(`./${componentPath}`);
 
-  t.true(events[0].build.outputs);
-  t.deepEqual(getUrls(events[0]), ["/uses-component/"]);
-  t.is(events[0].build.templates[0].content, "Second");
+  t.assert.strictEqual(events[0].build.outputs, true);
+  t.assert.deepStrictEqual(getUrls(events[0]), ["/uses-component/"]);
+  t.assert.strictEqual(events[0].build.templates[0].content, "Second");
 });
 
 test("Build mode doesn’t track output hashes", async (t) => {
@@ -226,5 +226,5 @@ test("Build mode doesn’t track output hashes", async (t) => {
   elev.disableLogger();
   await elev.write();
 
-  t.is(elev.outputHashes.size, 0);
+  t.assert.strictEqual(elev.outputHashes.size, 0);
 });

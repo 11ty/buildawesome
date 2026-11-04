@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#3825 #3834 addCollection consumes tag from pagination template", async (t) => {
@@ -38,8 +38,8 @@ tags: childTag
 
   let results = await elev.toJSON();
 
-  t.is(results.length, 5);
-  t.is(results.filter((entry) => entry.url === "/")[0]?.content.trim(), "2")
+  t.assert.strictEqual(results.length, 5);
+  t.assert.strictEqual(results.filter((entry) => entry.url === "/")[0]?.content.trim(), "2")
 });
 
 test("#3825 addCollection consumes tag from pagination template", async (t) => {
@@ -78,8 +78,8 @@ pagination:
 
   let results = await elev.toJSON();
 
-  t.is(results.length, 5);
-  t.is(results.filter((entry) => entry.url === "/")[0]?.content.trim(), "2")
+  t.assert.strictEqual(results.length, 5);
+  t.assert.strictEqual(results.filter((entry) => entry.url === "/")[0]?.content.trim(), "2")
 });
 
 test("Side-issue #3825 #3834 tried to Reflect.has on a string in pagination", async (t) => {
@@ -116,6 +116,6 @@ tag: someArbitraryTag
 
   let results = await elev.toJSON();
 
-  t.is(results.length, 5);
-  t.is(results.filter((entry) => entry.url === "/")[0]?.content.trim(), "0")
+  t.assert.strictEqual(results.length, 5);
+  t.assert.strictEqual(results.filter((entry) => entry.url === "/")[0]?.content.trim(), "0")
 });

@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import JavaScriptDependencies from "../src/Util/JavaScriptDependencies.js";
 
 test("No node_modules", async (t) => {
@@ -6,7 +6,7 @@ test("No node_modules", async (t) => {
     "./test/stubs-dependency-tree/index.cjs",
   ]);
 
-  t.deepEqual(deps, [
+  t.assert.deepStrictEqual(deps, [
     "./test/stubs-dependency-tree/child.cjs",
     "./test/stubs-dependency-tree/grandchild.cjs",
   ]);

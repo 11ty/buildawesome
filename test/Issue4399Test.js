@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#4399: Layouts and transforms skip pages that are not written", async (t) => {
@@ -18,8 +18,8 @@ test("#4399: Layouts and transforms skip pages that are not written", async (t) 
   elev.setDryRun(true);
 
   await elev.write();
-  t.deepEqual(transformed, ["./test/stubs-virtual/index.njk"]);
+  t.assert.deepStrictEqual(transformed, ["./test/stubs-virtual/index.njk"]);
 
   let json = await elev.toJSON();
-  t.is(json.find((entry) => entry.inputPath.endsWith("hidden.njk")).content, "Layout Hidden");
+  t.assert.strictEqual(json.find((entry) => entry.inputPath.endsWith("hidden.njk")).content, "Layout Hidden");
 });

@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test.skip("#3794: page.inputPathDir and page.dir", async (t) => {
@@ -9,7 +9,7 @@ test.skip("#3794: page.inputPathDir and page.dir", async (t) => {
   });
 
   let [result] = await elev.toJSON();
-  t.is(result.content, "./test/stubs-virtual/ and /test/");
+  t.assert.strictEqual(result.content, "./test/stubs-virtual/ and /test/");
 });
 
 test.skip("#3794: page.inputPathDir and page.dir (index file)", async (t) => {
@@ -20,7 +20,7 @@ test.skip("#3794: page.inputPathDir and page.dir (index file)", async (t) => {
   });
 
   let [result] = await elev.toJSON();
-  t.is(result.content, "./test/stubs-virtual/ and /");
+  t.assert.strictEqual(result.content, "./test/stubs-virtual/ and /");
 });
 
 test.skip("#3794: page.inputPathDir and page.dir (paginated)", async (t) => {
@@ -37,12 +37,12 @@ test.skip("#3794: page.inputPathDir and page.dir (paginated)", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 3);
+  t.assert.strictEqual(results.length, 3);
 
   let [page1, page2, page3]  = results;
-  t.is(page1.content, "./test/stubs-virtual/ and /");
-  t.is(page2.content, "./test/stubs-virtual/ and /1/");
-  t.is(page3.content, "./test/stubs-virtual/ and /2/");
+  t.assert.strictEqual(page1.content, "./test/stubs-virtual/ and /");
+  t.assert.strictEqual(page2.content, "./test/stubs-virtual/ and /1/");
+  t.assert.strictEqual(page3.content, "./test/stubs-virtual/ and /2/");
 });
 
 test.skip("#3794: page.inputPathDir and page.dir (with file slug and index)", async (t) => {
@@ -55,10 +55,10 @@ test.skip("#3794: page.inputPathDir and page.dir (with file slug and index)", as
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
+  t.assert.strictEqual(results.length, 1);
 
   let [page1]  = results;
-  t.is(page1.content, "./test/stubs-virtual/yawn/ and /yawn/");
+  t.assert.strictEqual(page1.content, "./test/stubs-virtual/yawn/ and /yawn/");
 });
 
 test.skip("#3794: page.inputPathDir and page.dir (with file slug and not-index)", async (t) => {
@@ -71,10 +71,10 @@ test.skip("#3794: page.inputPathDir and page.dir (with file slug and not-index)"
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
+  t.assert.strictEqual(results.length, 1);
 
   let [page1]  = results;
-  t.is(page1.content, "./test/stubs-virtual/yawn/ and /yawn/");
+  t.assert.strictEqual(page1.content, "./test/stubs-virtual/yawn/ and /yawn/");
 });
 
 test.skip("#3794: page.inputPathDir and page.dir (paginated with file slug and not-index)", async (t) => {
@@ -92,12 +92,12 @@ test.skip("#3794: page.inputPathDir and page.dir (paginated with file slug and n
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 3);
+  t.assert.strictEqual(results.length, 3);
 
   let [page1, page2, page3]  = results;
-  t.is(page1.content, "./test/stubs-virtual/yawn/ and /0/yawn/");
-  t.is(page2.content, "./test/stubs-virtual/yawn/ and /1/yawn/");
-  t.is(page3.content, "./test/stubs-virtual/yawn/ and /2/yawn/");
+  t.assert.strictEqual(page1.content, "./test/stubs-virtual/yawn/ and /0/yawn/");
+  t.assert.strictEqual(page2.content, "./test/stubs-virtual/yawn/ and /1/yawn/");
+  t.assert.strictEqual(page3.content, "./test/stubs-virtual/yawn/ and /2/yawn/");
 });
 
 test.skip("#3794: page.inputPathDir and page.dir (permalink: false)", async (t) => {
@@ -108,5 +108,5 @@ test.skip("#3794: page.inputPathDir and page.dir (permalink: false)", async (t) 
   });
 
   let [result] = await elev.toJSON();
-  t.is(result.content, "./test/stubs-virtual/ and false");
+  t.assert.strictEqual(result.content, "./test/stubs-virtual/ and false");
 });

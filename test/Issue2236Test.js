@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 function captureWarnings(elev) {
@@ -38,8 +38,8 @@ test("#2236: Computed `layout` applies the layout’s front matter", async (t) =
 	let warnings = captureWarnings(elev);
 
 	let results = await elev.toJSON();
-	t.is(results[0].content, "L[base]T[base|page title]");
-	t.is(warnings.length, 0);
+	t.assert.strictEqual(results[0].content, "L[base]T[base|page title]");
+	t.assert.strictEqual(warnings.length, 0);
 });
 
 test("#2236: Other computed data sees the computed layout’s front matter", async (t) => {
@@ -51,7 +51,7 @@ test("#2236: Other computed data sees the computed layout’s front matter", asy
 	});
 
 	let results = await elev.toJSON();
-	t.is(results[0].content, "L[base]T[base|base!]");
+	t.assert.strictEqual(results[0].content, "L[base]T[base|base!]");
 });
 
 test("#2236: Computed `layout` replaces the cascade layout’s front matter", async (t) => {
@@ -61,7 +61,7 @@ test("#2236: Computed `layout` replaces the cascade layout’s front matter", as
 	);
 
 	let results = await elev.toJSON();
-	t.is(results[0].content, "L[base]T[base|]");
+	t.assert.strictEqual(results[0].content, "L[base]T[base|]");
 });
 
 test("#2236: Computed `layout` per paginated page", async (t) => {
@@ -79,8 +79,8 @@ test("#2236: Computed `layout` per paginated page", async (t) => {
 	let warnings = captureWarnings(elev);
 
 	let results = await elev.toJSON();
-	t.deepEqual(results.map((entry) => entry.content).sort(), ["A[a]T[a]", "B[b]T[b]"]);
-	t.is(warnings.length, 0);
+	t.assert.deepStrictEqual(results.map((entry) => entry.content).sort(), ["A[a]T[a]", "B[b]T[b]"]);
+	t.assert.strictEqual(warnings.length, 0);
 });
 
 test("#2236: Warns once when a computed `layout` reads collections", async (t) => {
@@ -91,9 +91,9 @@ test("#2236: Warns once when a computed `layout` reads collections", async (t) =
 	let warnings = captureWarnings(elev);
 
 	let results = await elev.toJSON();
-	t.is(results[0].content, "L[]T[|]");
-	t.is(warnings.length, 1);
-	t.true(warnings[0].includes("`layout` to `base.njk`"));
+	t.assert.strictEqual(results[0].content, "L[]T[|]");
+	t.assert.strictEqual(warnings.length, 1);
+	t.assert.strictEqual(warnings[0].includes("`layout` to `base.njk`"), true);
 });
 
 test("#2236: No warning when `layout` is set outside computed data", async (t) => {
@@ -101,6 +101,6 @@ test("#2236: No warning when `layout` is set outside computed data", async (t) =
 	let warnings = captureWarnings(elev);
 
 	let results = await elev.toJSON();
-	t.is(results[0].content, "L[base]T[base|base title]");
-	t.is(warnings.length, 0);
+	t.assert.strictEqual(results[0].content, "L[base]T[base|base title]");
+	t.assert.strictEqual(warnings.length, 0);
 });

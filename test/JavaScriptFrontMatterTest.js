@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("Custom Front Matter Parsing Options (using JavaScript node-retrieve-globals)", async (t) => {
@@ -7,9 +7,9 @@ test("Custom Front Matter Parsing Options (using JavaScript node-retrieve-global
 
   let result = await elev.toJSON();
 
-  t.deepEqual(result.length, 1);
+  t.assert.deepStrictEqual(result.length, 1);
 
-  t.is(result[0]?.content, `<div>Hi</div><div>Bye</div>`);
+  t.assert.strictEqual(result[0]?.content, `<div>Hi</div><div>Bye</div>`);
 });
 
 test("Custom Front Matter Parsing Options (using JavaScript node-retrieve-globals), override project-wide front matter default.", async (t) => {
@@ -24,9 +24,9 @@ test("Custom Front Matter Parsing Options (using JavaScript node-retrieve-global
 
   let result = await elev.toJSON();
 
-  t.deepEqual(result.length, 1);
+  t.assert.deepStrictEqual(result.length, 1);
 
-  t.is(result[0]?.content, `<div>Hi</div><div>Bye</div>`);
+  t.assert.strictEqual(result[0]?.content, `<div>Hi</div><div>Bye</div>`);
 });
 
 test("Custom Front Matter Parsing Options (using backwards-compatible `js` instead of node-retrieve-globals)", async (t) => {
@@ -35,9 +35,9 @@ test("Custom Front Matter Parsing Options (using backwards-compatible `js` inste
 
   let result = await elev.toJSON();
 
-  t.deepEqual(result.length, 1);
+  t.assert.deepStrictEqual(result.length, 1);
 
-  t.is(result[0]?.content, `<div>HELLO!</div>`);
+  t.assert.strictEqual(result[0]?.content, `<div>HELLO!</div>`);
 });
 
 // https://github.com/11ty/eleventy/issues/3917
@@ -61,9 +61,9 @@ Hello`);
 
   let result = await elev.toJSON();
 
-  t.deepEqual(result.length, 1);
+  t.assert.deepStrictEqual(result.length, 1);
 
-  t.is(result[0]?.content, `Hello`);
+  t.assert.strictEqual(result[0]?.content, `Hello`);
 });
 
 // https://github.com/11ty/buildawesome/issues/4354
@@ -97,7 +97,7 @@ const file = bn("/a/b.txt");
 
   let result = await elev.toJSON();
 
-  t.deepEqual(result.length, 1);
+  t.assert.deepStrictEqual(result.length, 1);
 
-  t.is(result[0]?.content, `Hi!|b.txt|1|3|4|`);
+  t.assert.strictEqual(result[0]?.content, `Hi!|b.txt|1|3|4|`);
 });

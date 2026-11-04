@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import { createSSRApp } from "vue";
 import { renderToString } from "@vue/server-renderer";
 import * as sass from "sass";
@@ -51,8 +51,8 @@ test("Custom plaintext Render", async (t) => {
 
   let tr = await getNewTemplateRender("txt", null, eleventyConfig);
   let fn = await tr.getCompiledTemplate("<p>Paragraph</p>");
-  t.is(await fn(), "<p>Paragraph</p>");
-  t.is(await fn({}), "<p>Paragraph</p>");
+  t.assert.strictEqual(await fn(), "<p>Paragraph</p>");
+  t.assert.strictEqual(await fn({}), "<p>Paragraph</p>");
 });
 
 test("Custom Markdown Render with `compile` override", async (t) => {
@@ -73,8 +73,8 @@ test("Custom Markdown Render with `compile` override", async (t) => {
   let tr = await getNewTemplateRender("md", null, eleventyConfig);
 
   let fn = await tr.getCompiledTemplate("# Markdown?");
-  t.is((await fn()).trim(), "<not-markdown># Markdown?</not-markdown>");
-  t.is((await fn({})).trim(), "<not-markdown># Markdown?</not-markdown>");
+  t.assert.strictEqual((await fn()).trim(), "<not-markdown># Markdown?</not-markdown>");
+  t.assert.strictEqual((await fn({})).trim(), "<not-markdown># Markdown?</not-markdown>");
 });
 
 test("Custom Markdown Render without `compile` override", async (t) => {
@@ -94,9 +94,9 @@ test("Custom Markdown Render without `compile` override", async (t) => {
   let tr = await getNewTemplateRender("md", null, eleventyConfig);
 
   let fn = await tr.getCompiledTemplate("# Header");
-  t.is(initCalled, true);
-  t.is((await fn()).trim(), "<h1>Header</h1>");
-  t.is((await fn({})).trim(), "<h1>Header</h1>");
+  t.assert.strictEqual(initCalled, true);
+  t.assert.strictEqual((await fn()).trim(), "<h1>Header</h1>");
+  t.assert.strictEqual((await fn({})).trim(), "<h1>Header</h1>");
 });
 
 test("Custom Markdown Render with `compile` override + call to default compiler", async (t) => {
@@ -118,8 +118,8 @@ test("Custom Markdown Render with `compile` override + call to default compiler"
   let tr = await getNewTemplateRender("md", null, eleventyConfig);
 
   let fn = await tr.getCompiledTemplate("Hey {{name}}");
-  t.is((await fn()).trim(), "<custom-wrapper><p>Hey</p></custom-wrapper>");
-  t.is((await fn({ name: "Zach" })).trim(), "<custom-wrapper><p>Hey Zach</p></custom-wrapper>");
+  t.assert.strictEqual((await fn()).trim(), "<custom-wrapper><p>Hey</p></custom-wrapper>");
+  t.assert.strictEqual((await fn({ name: "Zach" })).trim(), "<custom-wrapper><p>Hey Zach</p></custom-wrapper>");
 });
 
 test("Custom Vue Render", async (t) => {
@@ -146,7 +146,7 @@ test("Custom Vue Render", async (t) => {
 
   let tr = await getNewTemplateRender("vue", null, eleventyConfig);
   let fn = await tr.getCompiledTemplate('<p v-html="test">Paragraph</p>');
-  t.is(await fn({ test: "Hello" }), "<p>Hello</p>");
+  t.assert.strictEqual(await fn({ test: "Hello" }), "<p>Hello</p>");
 });
 
 test("Custom Sass Render", async (t) => {
@@ -186,7 +186,7 @@ test("Custom Sass Render", async (t) => {
 
   let tr = await getNewTemplateRender("sass", null, eleventyConfig);
   let fn = await tr.getCompiledTemplate("$color: blue; p { color: $color; }");
-  t.is(
+  t.assert.strictEqual(
     (await fn({})).trim(),
     `p {
   color: blue;
@@ -217,11 +217,11 @@ test("JavaScript functions should not be mutable but not *that* mutable", async 
       cfg.addExtension("js1", {
         getData: ["dataForCascade"],
         getInstanceFromInputPath: function (inputPath) {
-          t.truthy(true);
+          t.assert.ok(true);
           return instance;
         },
         compile: function (str, inputPath) {
-          t.falsy(this.config.javascriptFunctions.shouldnotmutatethething);
+          t.assert.ok(!this.config.javascriptFunctions.shouldnotmutatethething);
 
           // plaintext
           return (data) => {
@@ -241,7 +241,7 @@ test("JavaScript functions should not be mutable but not *that* mutable", async 
     eleventyConfig,
   );
   let data = await tmpl.getData();
-  t.is(await renderTemplate(tmpl, data), "<p>Paragraph</p>");
+  t.assert.strictEqual(await renderTemplate(tmpl, data), "<p>Paragraph</p>");
 });
 
 test("Return undefined in compile to ignore #2267", async (t) => {
@@ -259,7 +259,7 @@ test("Return undefined in compile to ignore #2267", async (t) => {
 
   let tr = await getNewTemplateRender("txt", null, eleventyConfig);
   let fn = await tr.getCompiledTemplate("<p>Paragraph</p>");
-  t.is(fn, undefined);
+  t.assert.strictEqual(fn, undefined);
 });
 
 test("Simple alias to Markdown Render", async (t) => {
@@ -275,8 +275,8 @@ test("Simple alias to Markdown Render", async (t) => {
   let tr = await getNewTemplateRender("mdx", null, eleventyConfig);
 
   let fn = await tr.getCompiledTemplate("# Header");
-  t.is((await fn()).trim(), "<h1>Header</h1>");
-  t.is((await fn({})).trim(), "<h1>Header</h1>");
+  t.assert.strictEqual((await fn()).trim(), "<h1>Header</h1>");
+  t.assert.strictEqual((await fn({})).trim(), "<h1>Header</h1>");
 });
 
 // NOTE: Breaking change in 3.0 `import` does not allow aliasing to non-.js file names
@@ -292,7 +292,7 @@ test.skip("Breaking Change (3.0): Simple alias to JavaScript Render", async (t) 
 
   let tr = await getNewTemplateRender("./test/stubs/string.11ty.custom", null, eleventyConfig);
   let fn = await tr.getCompiledTemplate();
-  t.is(await fn({ name: "Bill" }), "<p>Zach</p>");
+  t.assert.strictEqual(await fn({ name: "Bill" }), "<p>Zach</p>");
 });
 
 // NOTE: Breaking change in 3.0 `import` does not allow aliasing to non-.js file names
@@ -309,7 +309,7 @@ test.skip("Breaking Change (3.0): Override to JavaScript Render", async (t) => {
 
   let tr = await getNewTemplateRender("./test/stubs/string.11ty.custom", null, eleventyConfig);
   let fn = await tr.getCompiledTemplate();
-  t.is(await fn({ name: "Bill" }), "<p>Zach</p>");
+  t.assert.strictEqual(await fn({ name: "Bill" }), "<p>Zach</p>");
 });
 
 // NOTE: Breaking change in 3.0 `import` does not allow aliasing to non-.js file names
@@ -329,7 +329,7 @@ test.skip("Breaking Change (3.0): Two simple aliases to JavaScript Render", asyn
 
   let tr = await getNewTemplateRender("./test/stubs/string.11ty.custom", null, eleventyConfig, map);
   let fn = await tr.getCompiledTemplate();
-  t.is(await fn({}), "<p>Zach</p>");
+  t.assert.strictEqual(await fn({}), "<p>Zach</p>");
 
   let tr2 = await getNewTemplateRender(
     "./test/stubs/string.11ty.possum",
@@ -338,7 +338,7 @@ test.skip("Breaking Change (3.0): Two simple aliases to JavaScript Render", asyn
     map,
   );
   let fn2 = await tr2.getCompiledTemplate();
-  t.is(await fn2({}), "<p>Possum</p>");
+  t.assert.strictEqual(await fn2({}), "<p>Possum</p>");
 });
 
 test("Double override (one simple alias to custom) works fine", async (t) => {
@@ -349,10 +349,10 @@ test("Double override (one simple alias to custom) works fine", async (t) => {
     function(cfg) {
       cfg.addExtension(["11ty.possum"], {
         init: function () {
-          t.true(true);
+          t.assert.strictEqual(true, true);
         },
         compile: function(content, inputPath) {
-          t.true(true);
+          t.assert.strictEqual(true, true);
           return (data) => "Appended " + content;
         }
       });
@@ -375,7 +375,7 @@ test("Double override (one simple alias to custom) works fine", async (t) => {
   );
 
   let fn = await tr.getCompiledTemplate("Template content");
-  t.is(await fn({}), "Appended Template content");
+  t.assert.strictEqual(await fn({}), "Appended Template content");
 });
 
 
@@ -405,7 +405,7 @@ test("Double override (two simple aliases)", async (t) => {
   );
 
   let fn = await tr.getCompiledTemplate("Template content");
-  t.is(await fn({}), "Template content");
+  t.assert.strictEqual(await fn({}), "Template content");
 });
 
 test("Double override (two complex aliases) is supported as of 3.0", async (t) => {
@@ -417,10 +417,10 @@ test("Double override (two complex aliases) is supported as of 3.0", async (t) =
       cfg.addExtension(["possum"], {
         key: "html",
         init: function () {
-          t.true(true);
+          t.assert.strictEqual(true, true);
         },
         compile: function() {
-          t.true(true);
+          t.assert.strictEqual(true, true);
           return async function(data) {
             const result = await this.defaultRenderer(data);
             return `possum|${result}`;
@@ -431,10 +431,10 @@ test("Double override (two complex aliases) is supported as of 3.0", async (t) =
       cfg.addExtension(["11ty.custom"], {
         key: "possum",
         init: function () {
-          t.true(true);
+          t.assert.strictEqual(true, true);
         },
         compile: function() {
-          t.true(true);
+          t.assert.strictEqual(true, true);
           return async function(data) {
             const result = await this.defaultRenderer(data);
             return `11ty.custom|${result}`;
@@ -455,11 +455,11 @@ test("Double override (two complex aliases) is supported as of 3.0", async (t) =
   );
 
   let fn = await tr.getCompiledTemplate("Template content");
-  t.is(await fn({}), "11ty.custom|possum|Template content");
+  t.assert.strictEqual(await fn({}), "11ty.custom|possum|Template content");
 });
 
 test("Double override (not aliases) throws an error", async (t) => {
-  await t.throwsAsync(
+  await t.assert.rejects(
     async () => {
       await getTemplateConfigInstanceCustomCallback(
         {},

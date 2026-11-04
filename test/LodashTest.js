@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import lodash from "@11ty/lodash-custom";
 import { ProxyWrap } from "../src/Util/Objects/ProxyWrap.js";
 import { DeepFreeze } from "../src/Util/Objects/DeepFreeze.js";
@@ -6,15 +6,15 @@ import { DeepFreeze } from "../src/Util/Objects/DeepFreeze.js";
 const { set: lodashSet } = lodash;
 
 test("Lodash sanity tests", t => {
-	t.deepEqual(lodashSet({}, "test", true), {"test": true});
-	t.deepEqual(lodashSet({}, "metadata.title", true), {"metadata": {title: true}});
+	t.assert.deepStrictEqual(lodashSet({}, "test", true), {"test": true});
+	t.assert.deepStrictEqual(lodashSet({}, "metadata.title", true), {"metadata": {title: true}});
 });
 
 test("Lodash set on proxy", t => {
 	let target = {};
 	let obj = ProxyWrap(target, {});
 	let ret = lodashSet(obj, "metadata.title", "test");
-	t.deepEqual(ret, {metadata: {title: "test"}});
+	t.assert.deepStrictEqual(ret, {metadata: {title: "test"}});
 });
 
 test("Lodash set on proxy object with data", t => {
@@ -23,7 +23,7 @@ test("Lodash set on proxy object with data", t => {
 	let fallback = {};
 	let obj = ProxyWrap(target, fallback);
 	lodashSet(obj, "metadata.title", "test");
-	t.deepEqual(obj, {metadata: {title: "test"}});
+	t.assert.deepStrictEqual(obj, {metadata: {title: "test"}});
 });
 
 test("Fallback is *not* mutated (is frozen) (does not exist in fallback)", t => {
@@ -39,11 +39,11 @@ test("Fallback is *not* mutated (is frozen) (does not exist in fallback)", t => 
 
 	lodashSet(target1, "metadata.c", 1);
 
-	t.is(target1.metadata.c, 1);
-	t.is(target2.metadata.c, undefined);
+	t.assert.strictEqual(target1.metadata.c, 1);
+	t.assert.strictEqual(target2.metadata.c, undefined);
 
-	t.deepEqual(target1, { first: true, metadata: { a: 1, c: 1}});
-	t.deepEqual(target2, { second: true, metadata: { b: 1 } });
+	t.assert.deepStrictEqual(target1, { first: true, metadata: { a: 1, c: 1}});
+	t.assert.deepStrictEqual(target2, { second: true, metadata: { b: 1 } });
 });
 
 // TODO re-add support for frozen fallbacks
@@ -57,9 +57,9 @@ test.skip("Fallback is *not* mutated (is frozen) (exists in fallback)", t => {
 
 	let target3 = ProxyWrap({ third: true }, fallback);
 
-	t.deepEqual(target3, { third: true, metadata: { d: 888 }});
+	t.assert.deepStrictEqual(target3, { third: true, metadata: { d: 888 }});
 
 	lodashSet(target3, "metadata.d", "all");
 
-	t.deepEqual(target3, { third: true, metadata: { d: "all" }});
+	t.assert.deepStrictEqual(target3, { third: true, metadata: { d: "all" }});
 });

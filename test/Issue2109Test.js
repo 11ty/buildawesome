@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 // Global data files can’t be virtual, so only the templates are.
@@ -12,8 +12,8 @@ test("#2109: Global eleventyComputed data file uses each page’s own page data"
 	});
 
 	let results = await elev.toJSON();
-	t.is(results.length, 3);
+	t.assert.strictEqual(results.length, 3);
 	for (let { content, outputPath } of results) {
-		t.is(content, `${outputPath}|${outputPath}`);
+		t.assert.strictEqual(content, `${outputPath}|${outputPath}`);
 	}
 });

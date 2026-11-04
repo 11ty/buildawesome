@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 
 import { spawnAsync } from "../src/Util/spawn.js";
 
@@ -14,6 +14,6 @@ test("#3809 parent directory for content, with global data files", async (t) => 
 	);
 
   let json = JSON.parse(result);
-  t.is(json.length, 1);
-  t.is(json[0]?.content.trim(), "My Application");
+  t.assert.strictEqual(json.length, 1);
+  t.assert.strictEqual(json[0]?.content.trim(), "My Application");
 });

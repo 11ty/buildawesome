@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 function captureWarnings(elev) {
@@ -33,9 +33,9 @@ test("#1469: Computed `permalink` reads collections", async (t) => {
 	let warnings = captureWarnings(elev);
 
 	let [result] = await elev.toJSON();
-	t.is(result.url, "/blog-1/");
-	t.is(result.outputPath, "./_site/blog-1/index.html");
-	t.is(warnings.length, 0);
+	t.assert.strictEqual(result.url, "/blog-1/");
+	t.assert.strictEqual(result.outputPath, "./_site/blog-1/index.html");
+	t.assert.strictEqual(warnings.length, 0);
 });
 
 test("#1469: Collections show the late URL at render time and in pagination", async (t) => {
@@ -52,9 +52,9 @@ test("#1469: Collections show the late URL at render time and in pagination", as
 	let warnings = captureWarnings(elev);
 
 	let results = await elev.toJSON();
-	t.is(results.find((entry) => entry.url === "/").content, "/blog-1/,");
-	t.is(results.find((entry) => entry.url === "/paged/0/").content, "/blog-1/");
-	t.is(warnings.length, 0);
+	t.assert.strictEqual(results.find((entry) => entry.url === "/").content, "/blog-1/,");
+	t.assert.strictEqual(results.find((entry) => entry.url === "/paged/0/").content, "/blog-1/");
+	t.assert.strictEqual(warnings.length, 0);
 });
 
 test("#1469: Warns when other computed data reads the URL before it resolves", async (t) => {
@@ -69,6 +69,6 @@ test("#1469: Warns when other computed data reads the URL before it resolves", a
 	let warnings = captureWarnings(elev);
 
 	await elev.toJSON();
-	t.is(warnings.length, 1);
-	t.true(warnings[0].includes(": ./test/noop/blog.njk › page.url › permalink › collections. "));
+	t.assert.strictEqual(warnings.length, 1);
+	t.assert.strictEqual(warnings[0].includes(": ./test/noop/blog.njk › page.url › permalink › collections. "), true);
 });

@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import fs from "node:fs";
 import { TemplatePath } from "@11ty/eleventy-utils";
 import { globSync } from "tinyglobby";
@@ -8,7 +8,7 @@ import { default as HtmlBasePlugin } from "../src/Plugins/HtmlBasePlugin.js";
 import Eleventy from "../src/Core.js";
 import { deleteDirectory } from "./_testHelpers.js";
 
-test.after.always("Directory cleanup", () => {
+test.after(() => {
   let dirs = globSync("./test/stubs-autocopy/_site*", {
     onlyDirectories: true,
     expandDirectories: false,
@@ -31,7 +31,7 @@ test("Basic usage", async (t) => {
 			})
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, {
+				t.assert.deepStrictEqual(copyMap, {
 					entries: [],
 					incremental: false,
 					map: {
@@ -48,10 +48,10 @@ test("Basic usage", async (t) => {
 
 	let [copy, templates] = await elev.write();
 
-	t.is(copy.length, 1);
-	t.is(templates.length, 1);
+	t.assert.strictEqual(copy.length, 1);
+	t.assert.strictEqual(templates.length, 1);
 
-	t.deepEqual(templates[0], {
+	t.assert.deepStrictEqual(templates[0], {
 		inputPath: './test/stubs-autocopy/test.njk',
 		outputPath: './test/stubs-autocopy/_site-basica/test/index.html',
 		url: '/test/',
@@ -59,15 +59,15 @@ test("Basic usage", async (t) => {
 		rawInput: '<img src="possum.png">'
 	});
 
-	t.deepEqual(copy[0], {
+	t.assert.deepStrictEqual(copy[0], {
 		count: 1,
 		map: {
 			[TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.png")]: TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/_site-basica/test/possum.png"),
 		}
 	});
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site-basica/test/possum.png"), true);
-	t.is(fs.existsSync("test/stubs-autocopy/_site-basica/test/index.html"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site-basica/test/possum.png"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site-basica/test/index.html"), true);
 });
 
 test("More complex image path (parent dir)", async (t) => {
@@ -82,7 +82,7 @@ test("More complex image path (parent dir)", async (t) => {
 			})
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, {
+				t.assert.deepStrictEqual(copyMap, {
 					entries: [],
 					incremental: false,
 					map: {
@@ -99,10 +99,10 @@ test("More complex image path (parent dir)", async (t) => {
 
 	let [copy, templates] = await elev.write();
 
-	t.is(copy.length, 1);
-	t.is(templates.length, 1);
+	t.assert.strictEqual(copy.length, 1);
+	t.assert.strictEqual(templates.length, 1);
 
-	t.deepEqual(templates[0], {
+	t.assert.deepStrictEqual(templates[0], {
 		inputPath: './test/stubs-autocopy/test.njk',
 		outputPath: './test/stubs-autocopy/_site-basicb/test/index.html',
 		url: '/test/',
@@ -110,7 +110,7 @@ test("More complex image path (parent dir)", async (t) => {
 		rawInput: '<img src="../stubs-img-transform/possum.png">'
 	});
 
-	t.deepEqual(copy[0], {
+	t.assert.deepStrictEqual(copy[0], {
 		count: 1,
 		map: {
 			// test/stubs-autocopy/test.njk => "../stubs-img-transform/possum.png"
@@ -118,8 +118,8 @@ test("More complex image path (parent dir)", async (t) => {
 		}
 	});
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site-basicb/stubs-img-transform/possum.png"), true);
-	t.is(fs.existsSync("test/stubs-autocopy/_site-basicb/test/index.html"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site-basicb/stubs-img-transform/possum.png"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site-basicb/test/index.html"), true);
 });
 
 test("No matches", async (t) => {
@@ -134,7 +134,7 @@ test("No matches", async (t) => {
 			})
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { entries: [], incremental: false, map: {} })
+				t.assert.deepStrictEqual(copyMap, { entries: [], incremental: false, map: {} })
 			});
 
 			$config.addTemplate("test.njk", `<img src="lol.lol">`)
@@ -145,11 +145,11 @@ test("No matches", async (t) => {
 
 	let [copy, templates] = await elev.write();
 
-	t.is(copy.length, 0);
-	t.is(templates.length, 1);
+	t.assert.strictEqual(copy.length, 0);
+	t.assert.strictEqual(templates.length, 1);
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site2/test/lol.lol"), false);
-	t.is(fs.existsSync("test/stubs-autocopy/_site2/test/index.html"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site2/test/lol.lol"), false);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site2/test/index.html"), true);
 });
 
 test("Match but does not exist (throws error)", async (t) => {
@@ -161,7 +161,7 @@ test("Match but does not exist (throws error)", async (t) => {
 			});
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { entries: [], incremental: false, map: {} })
+				t.assert.deepStrictEqual(copyMap, { entries: [], incremental: false, map: {} })
 			});
 
 			$config.addTemplate("test.njk", `<img src="missing.png">`)
@@ -170,13 +170,13 @@ test("Match but does not exist (throws error)", async (t) => {
 
 	elev.disableLogger();
 
-	await t.throwsAsync(async () => {
+	await t.assert.rejects(async () => {
 		await elev.write();
 	}, {
 		message: `Having trouble writing to "./test/stubs-autocopy/_site3/test/index.html" from "./test/stubs-autocopy/test.njk"`
 	});
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site3/test/index.html"), false);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site3/test/index.html"), false);
 });
 
 test("Match but does not exist (no error, using `failOnError: false`)", async (t) => {
@@ -192,7 +192,7 @@ test("Match but does not exist (no error, using `failOnError: false`)", async (t
 			})
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { entries: [], incremental: false, map: {} })
+				t.assert.deepStrictEqual(copyMap, { entries: [], incremental: false, map: {} })
 			});
 
 			$config.addTemplate("test.njk", `<img src="missing.png">`)
@@ -203,11 +203,11 @@ test("Match but does not exist (no error, using `failOnError: false`)", async (t
 
 	let [copy, templates] = await elev.write();
 
-	t.is(copy.length, 0);
-	t.is(templates.length, 1);
+	t.assert.strictEqual(copy.length, 0);
+	t.assert.strictEqual(templates.length, 1);
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site4/test/missing.png"), false);
-	t.is(fs.existsSync("test/stubs-autocopy/_site4/test/index.html"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site4/test/missing.png"), false);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site4/test/index.html"), true);
 });
 
 test("Copying dotfiles are not allowed", async (t) => {
@@ -226,7 +226,7 @@ test("Copying dotfiles are not allowed", async (t) => {
 			});
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { entries: [], incremental: false, map: {} })
+				t.assert.deepStrictEqual(copyMap, { entries: [], incremental: false, map: {} })
 			});
 
 			$config.addTemplate("test.njk", `<img src=".gitkeep">`)
@@ -237,13 +237,13 @@ test("Copying dotfiles are not allowed", async (t) => {
 
 	let [copy, templates] = await elev.write();
 
-	t.is(copy.length, 1);
-	t.is(copy[0].count, 0);
-	t.is(templates.length, 1);
+	t.assert.strictEqual(copy.length, 1);
+	t.assert.strictEqual(copy[0].count, 0);
+	t.assert.strictEqual(templates.length, 1);
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site5/.gitkeep"), false);
-	t.is(fs.existsSync("test/stubs-autocopy/_site5/test/.gitkeep"), false);
-	t.is(fs.existsSync("test/stubs-autocopy/_site5/test/index.html"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site5/.gitkeep"), false);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site5/test/.gitkeep"), false);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site5/test/index.html"), true);
 });
 
 test("Using with InputPathToUrl plugin", async (t) => {
@@ -261,7 +261,7 @@ test("Using with InputPathToUrl plugin", async (t) => {
 			$config.addPlugin(InputPathToUrlTransformPlugin);
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { entries: [], incremental: false, map: {} })
+				t.assert.deepStrictEqual(copyMap, { entries: [], incremental: false, map: {} })
 			});
 
 			$config.addTemplate("test1.njk", `Test 1`)
@@ -273,13 +273,13 @@ test("Using with InputPathToUrl plugin", async (t) => {
 
 	let [copy, templates] = await elev.write();
 
-	t.is(copy.length, 0);
-	t.is(templates.length, 2);
+	t.assert.strictEqual(copy.length, 0);
+	t.assert.strictEqual(templates.length, 2);
 
-	t.is(templates.filter(entry => entry.url.endsWith("/test2/"))[0].content, `<a href="/test1/">Test 2</a>`);
+	t.assert.strictEqual(templates.filter(entry => entry.url.endsWith("/test2/"))[0].content, `<a href="/test1/">Test 2</a>`);
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site6/test2/test1.njk"), false);
-	t.is(fs.existsSync("test/stubs-autocopy/_site6/test2/index.html"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site6/test2/test1.njk"), false);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site6/test2/index.html"), true);
 });
 
 test("Using with InputPathToUrl plugin (reverse addPlugin order)", async (t) => {
@@ -297,7 +297,7 @@ test("Using with InputPathToUrl plugin (reverse addPlugin order)", async (t) => 
 			});
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { entries: [], incremental: false, map: {} })
+				t.assert.deepStrictEqual(copyMap, { entries: [], incremental: false, map: {} })
 			});
 
 			$config.addTemplate("test1.njk", `Test 1`)
@@ -309,12 +309,12 @@ test("Using with InputPathToUrl plugin (reverse addPlugin order)", async (t) => 
 
 	let [copy, templates] = await elev.write();
 
-	t.is(copy.length, 0);
-	t.is(templates.length, 2);
-	t.is(templates.filter(entry => entry.url.endsWith("/test2/"))[0].content, `<a href="/test1/">Test 2</a>`);
+	t.assert.strictEqual(copy.length, 0);
+	t.assert.strictEqual(templates.length, 2);
+	t.assert.strictEqual(templates.filter(entry => entry.url.endsWith("/test2/"))[0].content, `<a href="/test1/">Test 2</a>`);
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site7/test2/test1.njk"), false);
-	t.is(fs.existsSync("test/stubs-autocopy/_site7/test2/index.html"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site7/test2/test1.njk"), false);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site7/test2/index.html"), true);
 });
 
 test("Use with HtmlBasePlugin usage", async (t) => {
@@ -331,7 +331,7 @@ test("Use with HtmlBasePlugin usage", async (t) => {
 			});
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, {
+				t.assert.deepStrictEqual(copyMap, {
 					entries: [],
 					incremental: false,
 					map: {
@@ -348,10 +348,10 @@ test("Use with HtmlBasePlugin usage", async (t) => {
 
 	let [copy, templates] = await elev.write();
 
-	t.is(copy.length, 1);
-	t.is(templates.length, 1);
+	t.assert.strictEqual(copy.length, 1);
+	t.assert.strictEqual(templates.length, 1);
 
-	t.deepEqual(templates[0], {
+	t.assert.deepStrictEqual(templates[0], {
 		inputPath: './test/stubs-autocopy/test.njk',
 		outputPath: './test/stubs-autocopy/_site8a/test/index.html',
 		url: '/test/',
@@ -359,15 +359,15 @@ test("Use with HtmlBasePlugin usage", async (t) => {
 		rawInput: '<img src="possum.png"><img src="/test/possum.png">'
 	});
 
-	t.deepEqual(copy[0], {
+	t.assert.deepStrictEqual(copy[0], {
 		count: 1,
 		map: {
 			[TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.png")]: TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/_site8a/test/possum.png"),
 		}
 	});
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site8a/test/possum.png"), true);
-	t.is(fs.existsSync("test/stubs-autocopy/_site8a/test/index.html"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site8a/test/possum.png"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site8a/test/index.html"), true);
 });
 
 test("Using with InputPathToUrl plugin and HtmlBasePlugin", async (t) => {
@@ -387,7 +387,7 @@ test("Using with InputPathToUrl plugin and HtmlBasePlugin", async (t) => {
 			$config.addPlugin(HtmlBasePlugin);
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { entries: [], incremental: false, map: {} })
+				t.assert.deepStrictEqual(copyMap, { entries: [], incremental: false, map: {} })
 			});
 
 			$config.addTemplate("test1.njk", `Test 1`)
@@ -399,13 +399,13 @@ test("Using with InputPathToUrl plugin and HtmlBasePlugin", async (t) => {
 
 	let [copy, templates] = await elev.write();
 
-	t.is(copy.length, 0);
-	t.is(templates.length, 2);
+	t.assert.strictEqual(copy.length, 0);
+	t.assert.strictEqual(templates.length, 2);
 
-	t.is(templates.filter(entry => entry.url.endsWith("/test2/"))[0].content, `<a href="/yolo/test1/">Test 2</a>`);
+	t.assert.strictEqual(templates.filter(entry => entry.url.endsWith("/test2/"))[0].content, `<a href="/yolo/test1/">Test 2</a>`);
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site8b/test2/test1.njk"), false);
-	t.is(fs.existsSync("test/stubs-autocopy/_site8b/test2/index.html"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site8b/test2/test1.njk"), false);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site8b/test2/index.html"), true);
 });
 
 test("Multiple addPlugin calls (use both globs)", async (t) => {
@@ -423,7 +423,7 @@ test("Multiple addPlugin calls (use both globs)", async (t) => {
 			});
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, {
+				t.assert.deepStrictEqual(copyMap, {
 					entries: [],
 					incremental: false,
 					map: {
@@ -441,10 +441,10 @@ test("Multiple addPlugin calls (use both globs)", async (t) => {
 
 	let [copy, templates] = await elev.write();
 
-	t.is(copy.length, 2);
-	t.is(templates.length, 1);
+	t.assert.strictEqual(copy.length, 2);
+	t.assert.strictEqual(templates.length, 1);
 
-	t.deepEqual(templates[0], {
+	t.assert.deepStrictEqual(templates[0], {
 		inputPath: './test/stubs-autocopy/test.njk',
 		outputPath: './test/stubs-autocopy/_site9/test/index.html',
 		url: '/test/',
@@ -452,22 +452,22 @@ test("Multiple addPlugin calls (use both globs)", async (t) => {
 		rawInput: '<img src="possum.png"><img src="possum.jpg">'
 	});
 
-	t.deepEqual(copy[0], {
+	t.assert.deepStrictEqual(copy[0], {
 		count: 1,
 		map: {
 			[TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.png")]: TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/_site9/test/possum.png"),
 		}
 	});
-	t.deepEqual(copy[1], {
+	t.assert.deepStrictEqual(copy[1], {
 		count: 1,
 		map: {
 			[TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.jpg")]: TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/_site9/test/possum.jpg"),
 		}
 	});
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site9/test/possum.jpg"), true);
-	t.is(fs.existsSync("test/stubs-autocopy/_site9/test/possum.png"), true);
-	t.is(fs.existsSync("test/stubs-autocopy/_site9/test/index.html"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site9/test/possum.jpg"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site9/test/possum.png"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site9/test/index.html"), true);
 });
 
 test("Array of globs", async (t) => {
@@ -482,7 +482,7 @@ test("Array of globs", async (t) => {
 			});
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, {
+				t.assert.deepStrictEqual(copyMap, {
 					entries: [],
 					incremental: false,
 					map: {
@@ -500,10 +500,10 @@ test("Array of globs", async (t) => {
 
 	let [copy, templates] = await elev.write();
 
-	t.is(copy.length, 2);
-	t.is(templates.length, 1);
+	t.assert.strictEqual(copy.length, 2);
+	t.assert.strictEqual(templates.length, 1);
 
-	t.deepEqual(templates[0], {
+	t.assert.deepStrictEqual(templates[0], {
 		inputPath: './test/stubs-autocopy/test.njk',
 		outputPath: './test/stubs-autocopy/_site10/test/index.html',
 		url: '/test/',
@@ -511,22 +511,22 @@ test("Array of globs", async (t) => {
 		rawInput: '<img src="possum.png"><img src="possum.jpg">'
 	});
 
-	t.deepEqual(copy[0], {
+	t.assert.deepStrictEqual(copy[0], {
 		count: 1,
 		map: {
 			[TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.png")]: TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/_site10/test/possum.png"),
 		}
 	});
-	t.deepEqual(copy[1], {
+	t.assert.deepStrictEqual(copy[1], {
 		count: 1,
 		map: {
 			[TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/possum.jpg")]: TemplatePath.normalizeOperatingSystemFilePath("test/stubs-autocopy/_site10/test/possum.jpg"),
 		}
 	});
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site10/test/possum.jpg"), true);
-	t.is(fs.existsSync("test/stubs-autocopy/_site10/test/possum.png"), true);
-	t.is(fs.existsSync("test/stubs-autocopy/_site10/test/index.html"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site10/test/possum.jpg"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site10/test/possum.png"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site10/test/index.html"), true);
 });
 
 test("overwrite: false", async (t) => {
@@ -547,7 +547,7 @@ test("overwrite: false", async (t) => {
 			});
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, {
+				t.assert.deepStrictEqual(copyMap, {
 					entries: [],
 					incremental: false,
 					map: {}
@@ -562,10 +562,10 @@ test("overwrite: false", async (t) => {
 
 	let [copy, templates] = await elev.write();
 
-	t.is(copy.length, 1);
-	t.is(templates.length, 1);
+	t.assert.strictEqual(copy.length, 1);
+	t.assert.strictEqual(templates.length, 1);
 
-	t.deepEqual(templates[0], {
+	t.assert.deepStrictEqual(templates[0], {
 		inputPath: './test/stubs-autocopy/test.njk',
 		outputPath: './test/stubs-autocopy/_site11/test/index.html',
 		url: '/test/',
@@ -573,13 +573,13 @@ test("overwrite: false", async (t) => {
 		rawInput: '<img src="possum.png">'
 	});
 
-	t.deepEqual(copy[0], {
+	t.assert.deepStrictEqual(copy[0], {
 		count: 0,
 		map: {}
 	});
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site11/test/possum.png"), true);
-	t.is(fs.existsSync("test/stubs-autocopy/_site11/test/index.html"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site11/test/possum.png"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site11/test/index.html"), true);
 });
 
 test("Input -> output remapping not yet supported (throws error)", async (t) => {
@@ -595,7 +595,7 @@ test("Input -> output remapping not yet supported (throws error)", async (t) => 
 			});
 
 			$config.on("buildawesome.passthrough", copyMap => {
-				t.deepEqual(copyMap, { entries: [], incremental: false, map: {} })
+				t.assert.deepStrictEqual(copyMap, { entries: [], incremental: false, map: {} })
 			});
 
 			$config.addTemplate("test.njk", `<img src="missing.png">`)
@@ -604,13 +604,13 @@ test("Input -> output remapping not yet supported (throws error)", async (t) => 
 
 	elev.disableLogger();
 
-	await t.throwsAsync(async () => {
+	await t.assert.rejects(async () => {
 		await elev.write();
 	}, {
 		message: `mode: 'html-relative' does not yet support passthrough copy objects (input -> output mapping). Use a string glob or an Array of string globs.`
 	});
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site12/test/index.html"), false);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site12/test/index.html"), false);
 });
 
 test("Invalid copy mode throws error", async (t) => {
@@ -629,11 +629,11 @@ test("Invalid copy mode throws error", async (t) => {
 
 	elev.disableLogger();
 
-	await t.throwsAsync(async () => {
+	await t.assert.rejects(async () => {
 		await elev.write();
 	}, {
 		message: `Invalid \`mode\` option for \`addPassthroughCopy\`. Received: 'throw-an-error'`
 	});
 
-	t.is(fs.existsSync("test/stubs-autocopy/_site13/test/index.html"), false);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site13/test/index.html"), false);
 });

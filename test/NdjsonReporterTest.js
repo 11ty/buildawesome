@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -28,12 +28,12 @@ test("passthrough event is emulated in serve mode with serverPassthroughCopyBeha
 
 	let events = readEvents(eventsFile);
 	let passthrough = events.find((e) => e.type === "passthrough");
-	t.true(passthrough.emulated);
-	t.deepEqual(passthrough.map, {
+	t.assert.strictEqual(passthrough.emulated, true);
+	t.assert.deepStrictEqual(passthrough.map, {
 		"/robots.txt": "./test/stubs/events-file-passthrough/robots.txt",
 		"/img": "./test/stubs/events-file-passthrough/img/",
 	});
-	t.deepEqual(passthrough.copied, []);
+	t.assert.deepStrictEqual(passthrough.copied, []);
 });
 
 test("passthrough event lists passthroughs the dev server can’t emulate as copied", async (t) => {
@@ -54,16 +54,16 @@ test("passthrough event lists passthroughs the dev server can’t emulate as cop
 	await core.write();
 
 	let passthrough = readEvents(eventsFile).find((e) => e.type === "passthrough");
-	t.true(passthrough.emulated);
-	t.deepEqual(passthrough.copied, ["/img/a.txt"]);
-	t.true(Object.keys(passthrough.map).includes("/robots.txt"));
+	t.assert.strictEqual(passthrough.emulated, true);
+	t.assert.deepStrictEqual(passthrough.copied, ["/img/a.txt"]);
+	t.assert.strictEqual(Object.keys(passthrough.map).includes("/robots.txt"), true);
 });
 
 test("passthrough event skips files excluded by `dot` and `junk`", async (t) => {
 	// Inside the project, absolute input paths on another drive fail on Windows
 	let dir = "test/stubs-ndjson-dot-junk";
 	rmSync(dir, { recursive: true, force: true });
-	t.teardown(() => rmSync(dir, { recursive: true, force: true }));
+	t.after(() => rmSync(dir, { recursive: true, force: true }));
 	// Globs need forward slashes
 	let input = path.posix.join(dir, "src");
 	mkdirSync(path.join(input, "og/sources"), { recursive: true });
@@ -95,11 +95,11 @@ test("passthrough event skips files excluded by `dot` and `junk`", async (t) => 
 			await core.write();
 
 			let events = readEvents(eventsFile).filter((e) => e.type === "passthrough");
-			t.is(events.length, 2);
+			t.assert.strictEqual(events.length, 2);
 			for (let { map, copied } of events) {
 				let urls = Object.keys(map).concat(copied);
-				t.true(urls.length > 0, `${runMode} ${entry}`);
-				t.false(urls.some((url) => /DS_Store|Thumbs\.db/.test(url)), `${runMode} ${entry}: ${urls}`);
+				t.assert.strictEqual(urls.length > 0, true, `${runMode} ${entry}`);
+				t.assert.strictEqual(urls.some((url) => /DS_Store|Thumbs\.db/.test(url)), false, `${runMode} ${entry}: ${urls}`);
 			}
 		}
 	}
@@ -110,7 +110,7 @@ test("watch run with a throwing config writes one `build.error`, then recovers",
 	let dir = "test/stubs-ndjson-config-error";
 	rmSync(dir, { recursive: true, force: true });
 	mkdirSync(dir, { recursive: true });
-	t.teardown(() => rmSync(dir, { recursive: true, force: true }));
+	t.after(() => rmSync(dir, { recursive: true, force: true }));
 
 	let configPath = path.join(dir, "eleventy.config.js");
 	writeFileSync(configPath, "export default function() {};");
@@ -132,19 +132,19 @@ test("watch run with a throwing config writes one `build.error`, then recovers",
 
 	let readBuildEvents = () => readEvents(eventsFile).filter((e) => e.type.startsWith("build."));
 	let events = readBuildEvents();
-	t.deepEqual(events.map((e) => e.type), ["build.start", "build.end", "build.error"]);
+	t.assert.deepStrictEqual(events.map((e) => e.type), ["build.start", "build.end", "build.error"]);
 	let { error, ok, durationMs } = events[2];
-	t.false(ok);
-	t.is(durationMs, null);
-	t.is(error.name, "ConfigError");
-	t.true(error.message.includes("eleventy.config.js"));
+	t.assert.strictEqual(ok, false);
+	t.assert.strictEqual(durationMs, null);
+	t.assert.strictEqual(error.name, "ConfigError");
+	t.assert.strictEqual(error.message.includes("eleventy.config.js"), true);
 
 	writeFileSync(configPath, "export default function() {};");
 	await core.triggerWatchRunForPath(`./${configPath}`);
 
 	events = readBuildEvents();
-	t.deepEqual(events.slice(3).map((e) => e.type), ["build.start", "build.end"]);
-	t.true(events[4].ok);
+	t.assert.deepStrictEqual(events.slice(3).map((e) => e.type), ["build.start", "build.end"]);
+	t.assert.strictEqual(events[4].ok, true);
 });
 
 test("an error already reported by the build isn’t reported again", async (t) => {
@@ -165,10 +165,14 @@ test("an error already reported by the build isn’t reported again", async (t) 
 	core.disableLogger();
 	core.setIsVerbose(false);
 
-	let error = await t.throwsAsync(() => core.write());
+	let error;
+	await t.assert.rejects(() => core.write(), (err) => {
+		error = err;
+		return true;
+	});
 	core.reportError(error);
 
 	let errors = readEvents(eventsFile).filter((e) => e.type === "build.error");
-	t.is(errors.length, 1);
-	t.is(typeof errors[0].durationMs, "number");
+	t.assert.strictEqual(errors.length, 1);
+	t.assert.strictEqual(typeof errors[0].durationMs, "number");
 });

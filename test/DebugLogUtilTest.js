@@ -1,9 +1,9 @@
-import test from "ava";
+import test from "node:test";
 import { execFileSync } from "node:child_process";
 import { createDebug } from "../src/Util/DebugLogUtil.js";
 
 test("Debug namespace uses a single colon", (t) => {
-	t.is(createDebug("Benchmark").namespace, "Eleventy:Benchmark");
+	t.assert.strictEqual(createDebug("Benchmark").namespace, "Eleventy:Benchmark");
 });
 
 test("Debug namespace uses BuildAwesome prefix", (t) => {
@@ -16,5 +16,5 @@ test("Debug namespace uses BuildAwesome prefix", (t) => {
 		],
 		{ env: { ...process.env, BUILDAWESOME_PACKAGE: "@awesome.me/buildawesome" } },
 	).toString();
-	t.is(namespace, "BuildAwesome:Benchmark");
+	t.assert.strictEqual(namespace, "BuildAwesome:Benchmark");
 });

@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 
 import {
   default as RenderPlugin,
@@ -39,7 +39,7 @@ async function getTestOutputForFile(inputFile, configCallback) {
 
 test("Use liquid in nunjucks", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid.njk");
-  t.is(
+  t.assert.strictEqual(
     html,
     `nunjucksHi
 69
@@ -51,7 +51,7 @@ test("Use liquid in nunjucks", async (t) => {
 
 test("Use liquid+markdown in 11ty.js", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid-md.11ty.cjs");
-  t.is(
+  t.assert.strictEqual(
     html,
     `<h1>Markdown</h1>
 <ul>
@@ -62,18 +62,18 @@ test("Use liquid+markdown in 11ty.js", async (t) => {
 
 test("Use nunjucks in 11ty.js", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/nunjucks.11ty.cjs");
-  t.is(html, `* iHtpircsavaj`);
+  t.assert.strictEqual(html, `* iHtpircsavaj`);
 });
 
 // This is not yet supported and currently throws an error.
 test.skip("Use 11ty.js in liquid", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/11tyjs.liquid");
-  t.is(html, `TESTING`);
+  t.assert.strictEqual(html, `TESTING`);
 });
 
 test("Use nunjucks in liquid", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/nunjucks.liquid");
-  t.is(
+  t.assert.strictEqual(
     html,
     `* iHdiuqil
 * lfjksdlba`
@@ -82,7 +82,7 @@ test("Use nunjucks in liquid", async (t) => {
 
 test("Use markdown in liquid", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/md.liquid");
-  t.is(
+  t.assert.strictEqual(
     html,
     `<h1>Hello {{ hi }}</h1>
 <ul>
@@ -93,7 +93,7 @@ test("Use markdown in liquid", async (t) => {
 
 test("Use nunjucks file in njk (uses renderTemplate inside of the nunjucks file)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/njk-file.njk");
-  t.is(
+  t.assert.strictEqual(
     html,
     `TESTING
 
@@ -105,24 +105,24 @@ TESTING IN LIQUID
 
 test("Use 11ty.js file in njk", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/11tyjs-file.njk");
-  t.is(html, `TESTING`);
+  t.assert.strictEqual(html, `TESTING`);
 });
 
 // 3.0 breaking change, we can’t alias to 11ty.js any more
 test.skip("Breaking Change (3.0): Use txt file in njk (override to 11ty.js)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/11tyjs-file-override.njk");
-  t.is(html, `TESTING`);
+  t.assert.strictEqual(html, `TESTING`);
 });
 
 test("Use nunjucks file in liquid but it doesn’t exist", async (t) => {
-  await t.throwsAsync(async () => {
+  await t.assert.rejects(async () => {
     await getTestOutputForFile("./test/stubs-render-plugin/njk-file-not-exist.liquid");
   });
 });
 
 test("No syntax passed, uses parent page syntax: liquid", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/false.liquid");
-  t.is(
+  t.assert.strictEqual(
     html,
     `# Hello Bruno
 * Testing`
@@ -131,7 +131,7 @@ test("No syntax passed, uses parent page syntax: liquid", async (t) => {
 
 test("No syntax passed (uses parent page syntax), but does pass data: liquid", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/data-no-templatelang.liquid");
-  t.is(
+  t.assert.strictEqual(
     html,
     `# Hello Bruno
 * Testing`
@@ -141,30 +141,30 @@ test("No syntax passed (uses parent page syntax), but does pass data: liquid", a
 // Not yet supported
 test.skip("renderFile but the target has front matter.", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/using-frontmatter.liquid");
-  t.is(html, `frontmatterString`);
+  t.assert.strictEqual(html, `frontmatterString`);
 });
 
 // Idea from https://twitter.com/raymondcamden/status/1460961620247650312
 test("Capture nunjucks render output to a liquid variable", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/capture-njk.liquid");
-  t.is(html, `4`);
+  t.assert.strictEqual(html, `4`);
 });
 
 // Idea from https://twitter.com/raymondcamden/status/1460961620247650312
 // Possibly blocked by async in {% set %} https://github.com/mozilla/nunjucks/issues/815
 test("Capture liquid render output to a njk variable", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/capture-liquid.njk");
-  t.is(html, `4`);
+  t.assert.strictEqual(html, `4`);
 });
 
 test("Capture liquid render output to a njk variable (new async support for set)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/capture-liquid-set.njk");
-  t.is(html, `4`);
+  t.assert.strictEqual(html, `4`);
 });
 
 test("Remap non-object data to data._ if object is not passed in", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/bad-data.njk");
-  t.is(html, "string");
+  t.assert.strictEqual(html, "string");
 });
 
 test("Direct use of render string plugin, rendering Nunjucks (and nested Liquid)", async (t) => {
@@ -196,7 +196,7 @@ test("Direct use of render string plugin, rendering Nunjucks (and nested Liquid)
   };
   let html = await fn(data);
 
-  t.is(
+  t.assert.strictEqual(
     normalizeNewLines(html.trim()),
     `nunjucksHi
 69
@@ -236,7 +236,7 @@ test("Direct use of render string plugin, rendering Liquid (and nested Nunjucks)
   };
   let html = await fn(data);
 
-  t.is(
+  t.assert.strictEqual(
     normalizeNewLines(html.trim()),
     `liquidHi
 69
@@ -265,7 +265,7 @@ test("Direct use of render file plugin, rendering Nunjucks (and nested Liquid)",
   };
   let html = await fn(data);
 
-  t.is(
+  t.assert.strictEqual(
     normalizeNewLines(html.trim()),
     `liquidHi
 69
@@ -278,43 +278,43 @@ tested.
 
 test("Use page in renderTemplate (liquid in liquid)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid-page.liquid");
-  t.is(html, `/liquid-page/`);
+  t.assert.strictEqual(html, `/liquid-page/`);
 });
 
 test("Use page in renderTemplate (liquid in njk)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid-page.njk");
-  t.is(html, `/liquid-page/`);
+  t.assert.strictEqual(html, `/liquid-page/`);
 });
 
 test("Use page in renderTemplate (njk in liquid)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/njk-page.liquid");
-  t.is(html, `/njk-page/`);
+  t.assert.strictEqual(html, `/njk-page/`);
 });
 
 test("Use eleventy in renderTemplate (njk in liquid)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/njk-eleventy.liquid");
-  t.true(html.startsWith("4."));
+  t.assert.strictEqual(html.startsWith("4."), true);
 });
 
 test("Use eleventy in renderTemplate (liquid in njk)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid-eleventy.njk");
-  t.true(html.startsWith("4."));
+  t.assert.strictEqual(html.startsWith("4."), true);
 });
 test.skip("Use nunjucks in liquid (access to all global data)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/nunjucks-global.liquid");
-  t.is(html, `globalHi`);
+  t.assert.strictEqual(html, `globalHi`);
 });
 
 test.skip("Use liquid in njk (access to all global data)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid-global.njk");
-  t.is(html, `globalHi`);
+  t.assert.strictEqual(html, `globalHi`);
 });
 
 test("renderContent filter #3369 #3370 via renderTemplate (njk)", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/nunjucks-frontmatter.njk", ($config) => {
     $config.addShortcode("test", () => "test content")
   });
-  t.is(html, "test content");
+  t.assert.strictEqual(html, "test content");
 });
 
 test("#3368 #3810 config init bug with RenderManager", async (t) => {
@@ -322,5 +322,5 @@ test("#3368 #3810 config init bug with RenderManager", async (t) => {
     configPath: "./test/stubs-3810/eleventy.config.js",
   });
   let results = await elev.toJSON();
-  t.is(results[0].content, `<h1>Sign up for our newsletter!</h1>`);
+  t.assert.strictEqual(results[0].content, `<h1>Sign up for our newsletter!</h1>`);
 });

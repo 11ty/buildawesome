@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import { DepGraph as DependencyGraph } from "dependency-graph";
 
 test("Dependency graph nodes don’t require dependencies", async (t) => {
@@ -10,13 +10,13 @@ test("Dependency graph nodes don’t require dependencies", async (t) => {
   graph.addNode("template-c");
 
   let order = graph.overallOrder();
-  t.true(order.includes("all"));
-  t.true(order.includes("template-a"));
-  t.true(order.includes("template-b"));
-  t.true(order.includes("template-c"));
+  t.assert.strictEqual(order.includes("all"), true);
+  t.assert.strictEqual(order.includes("template-a"), true);
+  t.assert.strictEqual(order.includes("template-b"), true);
+  t.assert.strictEqual(order.includes("template-c"), true);
 
   // in order of addNode
-  t.deepEqual(graph.overallOrder(), ["all", "template-a", "template-b", "template-c"]);
+  t.assert.deepStrictEqual(graph.overallOrder(), ["all", "template-a", "template-b", "template-c"]);
 });
 
 test("Dependency graph relationships", async (t) => {
@@ -33,7 +33,7 @@ test("Dependency graph relationships", async (t) => {
   graph.addDependency("all", "template-c");
   graph.addDependency("userCollection", "all");
 
-  t.deepEqual(graph.overallOrder(), [
+  t.assert.deepStrictEqual(graph.overallOrder(), [
     "template-a",
     "template-b",
     "template-c",
@@ -48,15 +48,15 @@ test("Do dependencies (edges) get removed when nodes are deleted? (yes)", async 
   graph.addNode("template-a");
   graph.addNode("template-b");
   graph.addDependency("template-a", "template-b");
-  t.deepEqual(graph.overallOrder(), ["template-b", "template-a"]);
+  t.assert.deepStrictEqual(graph.overallOrder(), ["template-b", "template-a"]);
 
-  t.deepEqual(graph.dependenciesOf("template-a"), ["template-b"]);
+  t.assert.deepStrictEqual(graph.dependenciesOf("template-a"), ["template-b"]);
 
   graph.removeNode("template-b");
-  t.deepEqual(graph.dependenciesOf("template-a"), []);
+  t.assert.deepStrictEqual(graph.dependenciesOf("template-a"), []);
 
   graph.addNode("template-b");
-  t.deepEqual(graph.dependenciesOf("template-a"), []);
+  t.assert.deepStrictEqual(graph.dependenciesOf("template-a"), []);
 
-  t.deepEqual(graph.overallOrder(), ["template-a", "template-b"]);
+  t.assert.deepStrictEqual(graph.overallOrder(), ["template-a", "template-b"]);
 });

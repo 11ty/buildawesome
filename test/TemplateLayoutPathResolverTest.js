@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 
 import TemplateLayoutPathResolver from "../src/TemplateLayoutPathResolver.js";
 import ExtensionMap from "../src/ExtensionMap.js";
@@ -24,12 +24,12 @@ async function getResolverInstance(path, inputDir, { eleventyConfig, map } = {})
 
 test("Layout", async (t) => {
   let res = await getResolverInstance("default", "./test/stubs");
-  t.is(res.getFileName(), "default.liquid");
+  t.assert.strictEqual(res.getFileName(), "default.liquid");
 });
 
 test("Layout already has extension", async (t) => {
   let res = await getResolverInstance("default.liquid", "./test/stubs");
-  t.is(res.getFileName(), "default.liquid");
+  t.assert.strictEqual(res.getFileName(), "default.liquid");
 });
 
 test("Layout (uses empty string includes folder)", async (t) => {
@@ -45,7 +45,7 @@ test("Layout (uses empty string includes folder)", async (t) => {
     eleventyConfig,
   });
 
-  t.is(res.getFileName(), "includesemptystring.liquid");
+  t.assert.strictEqual(res.getFileName(), "includesemptystring.liquid");
 });
 
 test("Layout (uses empty string includes folder) already has extension", async (t) => {
@@ -61,7 +61,7 @@ test("Layout (uses empty string includes folder) already has extension", async (
     eleventyConfig,
   });
 
-  t.is(res.getFileName(), "includesemptystring.liquid");
+  t.assert.strictEqual(res.getFileName(), "includesemptystring.liquid");
 });
 
 test("Layout (uses layouts folder)", async (t) => {
@@ -78,7 +78,7 @@ test("Layout (uses layouts folder)", async (t) => {
     eleventyConfig,
   });
 
-  t.is(res.getFileName(), "layoutsdefault.liquid");
+  t.assert.strictEqual(res.getFileName(), "layoutsdefault.liquid");
 });
 
 test("Layout (uses layouts folder) already has extension", async (t) => {
@@ -94,7 +94,7 @@ test("Layout (uses layouts folder) already has extension", async (t) => {
     eleventyConfig,
   });
 
-  t.is(res.getFileName(), "layoutsdefault.liquid");
+  t.assert.strictEqual(res.getFileName(), "layoutsdefault.liquid");
 });
 
 test("Layout (uses empty string layouts folder)", async (t) => {
@@ -110,7 +110,7 @@ test("Layout (uses empty string layouts folder)", async (t) => {
     eleventyConfig,
   });
 
-  t.is(res.getFileName(), "layoutsemptystring.liquid");
+  t.assert.strictEqual(res.getFileName(), "layoutsemptystring.liquid");
 });
 
 test("Layout (uses empty string layouts folder) no template resolution", async (t) => {
@@ -125,7 +125,7 @@ test("Layout (uses empty string layouts folder) no template resolution", async (
     eleventyConfig,
   });
 
-  t.throws(() => {
+  t.assert.throws(() => {
     res.getFileName();
   }, {
     message: `You’re trying to use a layout that does not exist: test/stubs/layoutsemptystring (via \`layout: layoutsemptystring\`)`
@@ -145,31 +145,31 @@ test("Layout (uses empty string layouts folder) already has extension", async (t
     eleventyConfig,
   });
 
-  t.is(res.getFileName(), "layoutsemptystring.liquid");
+  t.assert.strictEqual(res.getFileName(), "layoutsemptystring.liquid");
 });
 
 test("Layout subdir", async (t) => {
   let res = await getResolverInstance("layouts/inasubdir", "./test/stubs");
-  t.is(res.getFileName(), "layouts/inasubdir.njk");
+  t.assert.strictEqual(res.getFileName(), "layouts/inasubdir.njk");
 });
 
 test("Layout subdir already has extension", async (t) => {
   let res = await getResolverInstance("layouts/inasubdir.njk", "./test/stubs");
-  t.is(res.getFileName(), "layouts/inasubdir.njk");
+  t.assert.strictEqual(res.getFileName(), "layouts/inasubdir.njk");
 });
 
 test("Multiple layouts exist with the same file base, pick one", async (t) => {
   let res = await getResolverInstance("multiple", "./test/stubs");
   // pick the first one if multiple exist.
-  t.is(res.getFileName(), "multiple.liquid");
+  t.assert.strictEqual(res.getFileName(), "multiple.liquid");
 });
 
 test("Multiple layouts exist but we are being explicit—layout already has extension", async (t) => {
   let res = await getResolverInstance("multiple.liquid", "./test/stubs");
-  t.is(res.getFileName(), "multiple.liquid");
+  t.assert.strictEqual(res.getFileName(), "multiple.liquid");
 
   let res2 = await getResolverInstance("multiple.md", "./test/stubs");
-  t.is(res2.getFileName(), "multiple.md");
+  t.assert.strictEqual(res2.getFileName(), "multiple.md");
 });
 
 test("Layout is aliased to a new location", async (t) => {
@@ -177,7 +177,7 @@ test("Layout is aliased to a new location", async (t) => {
   tl.addLayoutAlias("post", "layouts/post.liquid");
   tl.init();
 
-  t.is(tl.getFileName(), "layouts/post.liquid");
+  t.assert.strictEqual(tl.getFileName(), "layouts/post.liquid");
 });
 
 test("Global default with empty string alias", async (t) => {
@@ -185,7 +185,7 @@ test("Global default with empty string alias", async (t) => {
   tl.addLayoutAlias("", "layouts/post.liquid");
   tl.init();
 
-  t.is(tl.getFileName(), "layouts/post.liquid");
+  t.assert.strictEqual(tl.getFileName(), "layouts/post.liquid");
 });
 
 test("Global default with empty string alias (but no alias exists for this instance)", async (t) => {
@@ -193,7 +193,7 @@ test("Global default with empty string alias (but no alias exists for this insta
   tl.addLayoutAlias("", "layouts/post.liquid");
   tl.init();
 
-  t.throws(() => {
+  t.assert.throws(() => {
     tl.getFileName();
   });
 });
@@ -203,11 +203,11 @@ test("Layout has no alias and does not exist", async (t) => {
   tl.addLayoutAlias("post", "layouts/post.liquid");
   tl.init();
 
-  t.throws(() => {
+  t.assert.throws(() => {
     tl.getFileName();
   });
 
-  t.throws(() => {
+  t.assert.throws(() => {
     tl.getFullPath();
   });
 });

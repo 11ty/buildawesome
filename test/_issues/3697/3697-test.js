@@ -1,6 +1,6 @@
 // import path from "node:path";
 // import { fileURLToPath } from "node:url";
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../../../src/Core.js";
 
 test("Number file names on global data files", async t => {
@@ -16,6 +16,6 @@ test("Number file names on global data files", async t => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 1);
-  t.is(results[0].content, `[{"key":"value"},null,null,{}]`);
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, `[{"key":"value"},null,null,{}]`);
 });

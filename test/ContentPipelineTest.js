@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import path from "node:path";
 import Eleventy from "../src/Core.js";
 import PathNormalizer from "../src/Util/PathNormalizer.js";
@@ -47,8 +47,8 @@ test("contentPipeline.md with Liquid preprocessing (default)", async (t) => {
 	});
 
 	let results = await elev.toJSON();
-	t.is(getByUrl(results, "/about/").trim(), "<h1>About</h1>\n<p>Liquid ran</p>");
-	t.is(getByUrl(results, "/about.md"), "# About\n\nLiquid ran");
+	t.assert.strictEqual(getByUrl(results, "/about/").trim(), "<h1>About</h1>\n<p>Liquid ran</p>");
+	t.assert.strictEqual(getByUrl(results, "/about.md"), "# About\n\nLiquid ran");
 });
 
 test("contentPipeline.md with Nunjucks preprocessing", async (t) => {
@@ -63,7 +63,7 @@ test("contentPipeline.md with Nunjucks preprocessing", async (t) => {
 	});
 
 	let results = await elev.toJSON();
-	t.is(getByUrl(results, "/about.md"), "# ABOUT\n\n4");
+	t.assert.strictEqual(getByUrl(results, "/about.md"), "# ABOUT\n\n4");
 });
 
 test("contentPipeline.md with `templateEngineOverride: njk,md` on a Markdown file", async (t) => {
@@ -78,7 +78,7 @@ test("contentPipeline.md with `templateEngineOverride: njk,md` on a Markdown fil
 	});
 
 	let results = await elev.toJSON();
-	t.is(getByUrl(results, "/about.md"), "# ABOUT");
+	t.assert.strictEqual(getByUrl(results, "/about.md"), "# ABOUT");
 });
 
 test("contentPipeline.md with `templateEngineOverride: md` is the raw input", async (t) => {
@@ -93,7 +93,7 @@ test("contentPipeline.md with `templateEngineOverride: md` is the raw input", as
 	});
 
 	let results = await elev.toJSON();
-	t.is(getByUrl(results, "/about.md"), "# {{ title }}");
+	t.assert.strictEqual(getByUrl(results, "/about.md"), "# {{ title }}");
 });
 
 test("contentPipeline.md with `markdownTemplateEngine: false` is the raw input", async (t) => {
@@ -106,7 +106,7 @@ test("contentPipeline.md with `markdownTemplateEngine: false` is the raw input",
 	});
 
 	let results = await elev.toJSON();
-	t.is(getByUrl(results, "/about.md"), "# {{ title }}");
+	t.assert.strictEqual(getByUrl(results, "/about.md"), "# {{ title }}");
 });
 
 test("contentPipeline.md is undefined for templates that don’t use Markdown", async (t) => {
@@ -130,7 +130,7 @@ test("contentPipeline.md is undefined for templates that don’t use Markdown", 
 	});
 
 	let results = await elev.toJSON();
-	t.deepEqual(JSON.parse(getByUrl(results, "/report/")).sort(), [
+	t.assert.deepStrictEqual(JSON.parse(getByUrl(results, "/report/")).sort(), [
 		["/override/", null],
 		["/page/", null],
 	]);
@@ -153,9 +153,9 @@ test("Shortcodes see the source page and run once per page", async (t) => {
 	});
 
 	let results = await elev.toJSON();
-	t.is(getByUrl(results, "/about.md"), "Liquid /about/");
-	t.is(getByUrl(results, "/contact.md"), "Nunjucks /contact/");
-	t.deepEqual(calls.sort(), ["/about/", "/contact/"]);
+	t.assert.strictEqual(getByUrl(results, "/about.md"), "Liquid /about/");
+	t.assert.strictEqual(getByUrl(results, "/contact.md"), "Nunjucks /contact/");
+	t.assert.deepStrictEqual(calls.sort(), ["/about/", "/contact/"]);
 });
 
 test("contentPipeline is available to a Liquid page iterating collections", async (t) => {
@@ -171,7 +171,7 @@ test("contentPipeline is available to a Liquid page iterating collections", asyn
 	});
 
 	let results = await elev.toJSON();
-	t.is(getByUrl(results, "/llms.txt"), "# About");
+	t.assert.strictEqual(getByUrl(results, "/llms.txt"), "# About");
 });
 
 function addReport(eleventyConfig) {
@@ -198,7 +198,7 @@ test("contentPipeline has an entry for every step in the template syntax", async
 	});
 
 	let results = await elev.toJSON();
-	t.deepEqual(JSON.parse(results.find((entry) => entry.url === "/report/").content), {
+	t.assert.deepStrictEqual(JSON.parse(results.find((entry) => entry.url === "/report/").content), {
 		"/md/": { liquid: "# {{ title }}", md: "# Hi" },
 		"/njk-md/": { njk: "# {{ title | upper }}", md: "# HI" },
 		"/raw/": { md: "# {{ title }}" },
@@ -215,7 +215,7 @@ test("contentPipeline for a Nunjucks page is its source", async (t) => {
 	});
 
 	let results = await elev.toJSON();
-	t.deepEqual(JSON.parse(results.find((entry) => entry.url === "/report/").content), {
+	t.assert.deepStrictEqual(JSON.parse(results.find((entry) => entry.url === "/report/").content), {
 		"/page/": { njk: "{{ title }}" },
 	});
 });
@@ -243,5 +243,5 @@ test("contentPipeline is copied onto collection items that are copies of page en
 	});
 
 	let results = await elev.toJSON();
-	t.is(results.find((entry) => entry.url === "/report/").content, "# Hi");
+	t.assert.strictEqual(results.find((entry) => entry.url === "/report/").content, "# Hi");
 });

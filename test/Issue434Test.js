@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#434 Using `with context` to access collections", async (t) => {
@@ -11,7 +11,7 @@ test("#434 Using `with context` to access collections", async (t) => {
 
 
 	let [result] = await elev.toJSON();
-	t.is(result.content, "<label>test:1:/</label>");
+	t.assert.strictEqual(result.content, "<label>test:1:/</label>");
 });
 
 test("#434 (not ideal) Filters in macros cannot access global data", async (t) => {
@@ -32,5 +32,5 @@ test("#434 (not ideal) Filters in macros cannot access global data", async (t) =
 
 
 	let [result] = await elev.toJSON();
-	t.is(result.content, "<label>test:0</label>");
+	t.assert.strictEqual(result.content, "<label>test:0</label>");
 });

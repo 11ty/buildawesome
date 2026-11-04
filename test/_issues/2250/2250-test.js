@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../../../src/Core.js";
 
 test("Issue #2250, page is available in filters", async (t) => {
@@ -15,17 +15,17 @@ test("Issue #2250, page is available in filters", async (t) => {
     return entry.url.startsWith("/nunjucks/");
   });
 
-  t.is(nunjucks[0].content.trim(), "/nunjucks/");
+  t.assert.strictEqual(nunjucks[0].content.trim(), "/nunjucks/");
 
   let liquid = results.filter((entry) => {
     return entry.url.startsWith("/liquid/");
   });
 
-  t.is(liquid[0].content.trim(), "/liquid/");
+  t.assert.strictEqual(liquid[0].content.trim(), "/liquid/");
 
   let javascript = results.filter((entry) => {
     return entry.url.startsWith("/javascript/");
   });
 
-  t.is(javascript[0].content.trim(), "/javascript/");
+  t.assert.strictEqual(javascript[0].content.trim(), "/javascript/");
 });

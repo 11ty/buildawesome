@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("addBundle", async (t) => {
@@ -12,7 +12,7 @@ test("addBundle", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results[0].content, `<style>/* Hi */</style>`);
+  t.assert.strictEqual(results[0].content, `<style>/* Hi */</style>`);
 });
 
 test("addBundle (empty css)", async (t) => {
@@ -27,7 +27,7 @@ test("addBundle (empty css)", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results[0].content, `Hi`);
+  t.assert.strictEqual(results[0].content, `Hi`);
 });
 
 test("addBundle (empty js)", async (t) => {
@@ -42,7 +42,7 @@ test("addBundle (empty js)", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results[0].content, `Hi`);
+  t.assert.strictEqual(results[0].content, `Hi`);
 });
 
 test("Empty script node is removed (not using bundle)", async (t) => {
@@ -57,7 +57,7 @@ test("Empty script node is removed (not using bundle)", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results[0].content, `Hi`);
+  t.assert.strictEqual(results[0].content, `Hi`);
 });
 
 
@@ -73,7 +73,7 @@ test("Empty style node is removed (not using bundle)", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results[0].content, `Hi`);
+  t.assert.strictEqual(results[0].content, `Hi`);
 });
 
 test("Empty link node is removed (not using bundle)", async (t) => {
@@ -88,7 +88,7 @@ test("Empty link node is removed (not using bundle)", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results[0].content, `Hi`);
+  t.assert.strictEqual(results[0].content, `Hi`);
 });
 
 test("Empty link node is removed (no href attribute at all, not using bundle)", async (t) => {
@@ -103,7 +103,7 @@ test("Empty link node is removed (no href attribute at all, not using bundle)", 
   });
 
   let results = await elev.toJSON();
-  t.is(results[0].content, `Hi`);
+  t.assert.strictEqual(results[0].content, `Hi`);
 });
 
 test("Empty link node is kept (no rel attribute, not using bundle)", async (t) => {
@@ -118,7 +118,7 @@ test("Empty link node is kept (no rel attribute, not using bundle)", async (t) =
   });
 
   let results = await elev.toJSON();
-  t.is(results[0].content, `Hi<link>`);
+  t.assert.strictEqual(results[0].content, `Hi<link>`);
 });
 
 // Not yet fixed upstream
@@ -144,13 +144,13 @@ Paged{% blarg %}<!-- via paged.njk -->{% endblarg %}{% for post in posts %}<code
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 2);
-  t.is(results[0].inputPath, `./test/stubs-virtual/paged.njk`);
-  t.is(results[0].content, `Paged<code>/</code><!-- via paged.njk -->
+  t.assert.strictEqual(results.length, 2);
+  t.assert.strictEqual(results[0].inputPath, `./test/stubs-virtual/paged.njk`);
+  t.assert.strictEqual(results[0].content, `Paged<code>/</code><!-- via paged.njk -->
 <!-- via index.njk -->`);
 
-  t.is(results[1].inputPath, `./test/stubs-virtual/index.njk`);
-  t.is(results[1].content, `Index<!-- via index.njk -->`);
+  t.assert.strictEqual(results[1].inputPath, `./test/stubs-virtual/index.njk`);
+  t.assert.strictEqual(results[1].content, `Index<!-- via index.njk -->`);
 });
 
 test("Pagination bundles plucked, https://github.com/11ty/eleventy-plugin-bundle/issues/37", async (t) => {
@@ -177,11 +177,11 @@ Paged<style>* { color: blue }</style>{% for post in posts %}{{ post.content | sa
   });
 
   let results = await elev.toJSON();
-  t.is(results.length, 2);
-  t.is(results[0].inputPath, `./test/stubs-virtual/paged.njk`);
-  t.is(results[0].content, `PagedIndex<style>* { color: blue }
+  t.assert.strictEqual(results.length, 2);
+  t.assert.strictEqual(results[0].inputPath, `./test/stubs-virtual/paged.njk`);
+  t.assert.strictEqual(results[0].content, `PagedIndex<style>* { color: blue }
 * { color: red }</style>`);
 
-  t.is(results[1].inputPath, `./test/stubs-virtual/index.njk`);
-  t.is(results[1].content, `Index<style>* { color: red }</style>`);
+  t.assert.strictEqual(results[1].inputPath, `./test/stubs-virtual/index.njk`);
+  t.assert.strictEqual(results[1].content, `Index<style>* { color: red }</style>`);
 });

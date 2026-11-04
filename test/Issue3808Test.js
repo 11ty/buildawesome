@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#3808 addCollection in buildawesome.before", async (t) => {
@@ -18,7 +18,7 @@ test("#3808 addCollection in buildawesome.before", async (t) => {
 
   let result = await elev.toJSON();
 
-  t.is(result.filter((entry) => entry.url === "/")[0]?.content.trim(), "2")
+  t.assert.strictEqual(result.filter((entry) => entry.url === "/")[0]?.content.trim(), "2")
 });
 
 // /* broken */

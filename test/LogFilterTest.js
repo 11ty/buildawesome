@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 async function captureLogs(callback) {
@@ -15,7 +15,7 @@ async function captureLogs(callback) {
   }
 }
 
-test.serial("log filter (sync, njk)", async (t) => {
+test("log filter (sync, njk)", async (t) => {
   let { results, logs } = await captureLogs(() => {
     let elev = new Eleventy("test/noop", false, {
       config($config) {
@@ -25,11 +25,11 @@ test.serial("log filter (sync, njk)", async (t) => {
     return elev.toJSON();
   });
 
-  t.is(results[0].content, "a");
-  t.deepEqual(logs, [["a", "b"]]);
+  t.assert.strictEqual(results[0].content, "a");
+  t.assert.deepStrictEqual(logs, [["a", "b"]]);
 });
 
-test.serial("log filter with promises returns input unchanged (11ty.js)", async (t) => {
+test("log filter with promises returns input unchanged (11ty.js)", async (t) => {
   let input = Promise.resolve("a");
   let { results, logs } = await captureLogs(() => {
     let elev = new Eleventy("test/noop", false, {
@@ -37,7 +37,7 @@ test.serial("log filter with promises returns input unchanged (11ty.js)", async 
         $config.addTemplate("index.11ty.js", {
           async render() {
             let ret = this.log(input, Promise.resolve("b"), "c");
-            t.is(ret, input);
+            t.assert.strictEqual(ret, input);
             return ret;
           },
         });
@@ -46,11 +46,11 @@ test.serial("log filter with promises returns input unchanged (11ty.js)", async 
     return elev.toJSON();
   });
 
-  t.is(results[0].content, "a");
-  t.deepEqual(logs, [["a", "b", "c"]]);
+  t.assert.strictEqual(results[0].content, "a");
+  t.assert.deepStrictEqual(logs, [["a", "b", "c"]]);
 });
 
-test.serial("log filter ignores rejected promises", async (t) => {
+test("log filter ignores rejected promises", async (t) => {
   let { results, logs } = await captureLogs(() => {
     let elev = new Eleventy("test/noop", false, {
       config($config) {
@@ -65,6 +65,6 @@ test.serial("log filter ignores rejected promises", async (t) => {
     return elev.toJSON();
   });
 
-  t.is(results[0].content, "a");
-  t.deepEqual(logs, []);
+  t.assert.strictEqual(results[0].content, "a");
+  t.assert.deepStrictEqual(logs, []);
 });

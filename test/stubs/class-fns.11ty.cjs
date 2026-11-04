@@ -1,11 +1,11 @@
 class Test {
-  render({ avaTest }) {
-    avaTest.truthy(this.url);
-    avaTest.truthy(this.slug);
-    avaTest.truthy(this.log);
-    avaTest.truthy(this.getPreviousCollectionItem);
-    avaTest.truthy(this.getNextCollectionItem);
-    avaTest.truthy(this.page);
+  render({ assert }) {
+    assert.ok(this.url);
+    assert.ok(this.slug);
+    assert.ok(this.log);
+    assert.ok(this.getPreviousCollectionItem);
+    assert.ok(this.getNextCollectionItem);
+    assert.ok(this.page);
   }
 }
 

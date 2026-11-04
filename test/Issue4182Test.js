@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 function captureWarnings(elev) {
@@ -33,10 +33,10 @@ test("#4182 addCollection warns when a template that imports it publishes to its
 	let warnings = captureWarnings(elev);
 
 	let [result] = await elev.toJSON();
-	t.is(result.content, "0");
-	t.is(warnings.length, 1);
-	t.true(warnings[0].includes("`collections.nav`"));
-	t.true(warnings[0].includes("{ defer: true }"));
+	t.assert.strictEqual(result.content, "0");
+	t.assert.strictEqual(warnings.length, 1);
+	t.assert.strictEqual(warnings[0].includes("`collections.nav`"), true);
+	t.assert.strictEqual(warnings[0].includes("{ defer: true }"), true);
 });
 
 test("#4182 addCollection does not warn for templates that paginate over it or over collections", async (t) => {
@@ -63,9 +63,9 @@ test("#4182 addCollection does not warn for templates that paginate over it or o
 	let warnings = captureWarnings(elev);
 
 	let results = await elev.toJSON();
-	t.is(results.find((entry) => entry.url === "/feed/")?.content, "2");
-	t.is(runs, 1);
-	t.deepEqual(warnings, []);
+	t.assert.strictEqual(results.find((entry) => entry.url === "/feed/")?.content, "2");
+	t.assert.strictEqual(runs, 1);
+	t.assert.deepStrictEqual(warnings, []);
 });
 
 test("#4182 addCollection with defer runs once, after templates are added", async (t) => {
@@ -91,8 +91,8 @@ test("#4182 addCollection with defer runs once, after templates are added", asyn
 	});
 
 	let [result] = await elev.toJSON();
-	t.is(result.content, "1");
-	t.is(runs, 1);
+	t.assert.strictEqual(result.content, "1");
+	t.assert.strictEqual(runs, 1);
 });
 
 test("#4182 pagination over a deferred addCollection warns and ignores defer", async (t) => {
@@ -118,9 +118,9 @@ test("#4182 pagination over a deferred addCollection warns and ignores defer", a
 	let warnings = captureWarnings(elev);
 
 	let results = await elev.toJSON();
-	t.is(results.find((entry) => entry.url === "/list/")?.content, "2");
-	t.is(warnings.length, 1);
-	t.true(warnings[0].includes("`defer: true` was ignored for `collections.nav`"));
+	t.assert.strictEqual(results.find((entry) => entry.url === "/list/")?.content, "2");
+	t.assert.strictEqual(warnings.length, 1);
+	t.assert.strictEqual(warnings[0].includes("`defer: true` was ignored for `collections.nav`"), true);
 });
 
 test("#4182 deferred addCollection runs before templates that paginate over collections", async (t) => {
@@ -151,5 +151,5 @@ test("#4182 deferred addCollection runs before templates that paginate over coll
 	});
 
 	let results = await elev.toJSON();
-	t.is(results.find((entry) => entry.url === "/nav/")?.content, "1");
+	t.assert.strictEqual(results.find((entry) => entry.url === "/nav/")?.content, "1");
 });

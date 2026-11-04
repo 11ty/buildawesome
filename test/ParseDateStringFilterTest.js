@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("parseDateString filter (njk)", async (t) => {
@@ -9,7 +9,7 @@ test("parseDateString filter (njk)", async (t) => {
 		},
 	});
 	let results = await elev.toJSON();
-	t.is(results[0].content, "2018-01-01T00:00:00.000Z");
+	t.assert.strictEqual(results[0].content, "2018-01-01T00:00:00.000Z");
 });
 
 test("parseDateString filter (liquid)", async (t) => {
@@ -20,7 +20,7 @@ test("parseDateString filter (liquid)", async (t) => {
 		},
 	});
 	let results = await elev.toJSON();
-	t.is(results[0].content, "2018-01-01T18:30:00.000Z");
+	t.assert.strictEqual(results[0].content, "2018-01-01T18:30:00.000Z");
 });
 
 test("parseDateString filter can be overridden by project config", async (t) => {
@@ -31,5 +31,5 @@ test("parseDateString filter can be overridden by project config", async (t) => 
 		},
 	});
 	let results = await elev.toJSON();
-	t.is(results[0].content, "custom");
+	t.assert.strictEqual(results[0].content, "custom");
 });
