@@ -346,3 +346,32 @@ test("setPassthroughCopyOptions with `rename` disables dev server emulation", as
   t.assert.deepStrictEqual(mgr.getConfigPathGlobs(true), []);
   t.assert.deepStrictEqual(mgr.getConfigPathGlobs(false), ["./img"]);
 });
+
+test("`rawPathFilter` disables dev server emulation", async (t) => {
+  let eleventyConfig = new TemplateConfig();
+  eleventyConfig.userConfig.setServerPassthroughCopyBehavior("passthrough");
+  eleventyConfig.userConfig.addPassthroughCopy("img", { rawPathFilter: () => true });
+  await eleventyConfig.init();
+
+  let mgr = new TemplatePassthroughManager(eleventyConfig);
+  t.assert.deepStrictEqual(mgr.getConfigPathGlobs(true), []);
+  t.assert.deepStrictEqual(mgr.getConfigPathGlobs(false), ["./img"]);
+});
+
+test("`rawPathFilter` receives full paths when copying", async (t) => {
+  let outputDir = path.join(mkdtempSync(path.join(tmpdir(), "passthrough-rawpathfilter-")), "_site");
+  let core = new Core("test/stubs/template-passthrough", outputDir, {
+    quietMode: true,
+    configPath: false,
+    config(eleventyConfig) {
+      eleventyConfig.addPassthroughCopy({ "test/stubs/template-passthrough/static": "static" }, {
+        rawPathFilter: (p) => !p.endsWith("test.js"),
+      });
+    },
+  });
+  core.disableLogger();
+  await core.write();
+
+  t.assert.strictEqual(fs.existsSync(path.join(outputDir, "static/test.css")), true);
+  t.assert.strictEqual(fs.existsSync(path.join(outputDir, "static/test.js")), false);
+});

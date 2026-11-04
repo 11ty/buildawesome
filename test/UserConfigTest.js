@@ -120,6 +120,16 @@ test("Set manual Pass-through File Copy (chained calls)", (t) => {
   });
 });
 
+test("Set manual Pass-through File Copy (array)", (t) => {
+  let userCfg = new UserConfig();
+  userCfg.addPassthroughCopy(["img", "./src/**/*.css"], { dot: false });
+
+  t.assert.deepStrictEqual(userCfg.passthroughCopies, {
+    img: { outputPath: true, copyOptions: { dot: false } },
+    "./src/**/*.css": { outputPath: true, copyOptions: { dot: false } },
+  });
+});
+
 test("Set manual Pass-through File Copy (glob patterns)", (t) => {
   let userCfg = new UserConfig();
   userCfg.addPassthroughCopy({

@@ -785,6 +785,10 @@ export default class UserConfig {
 			});
 		} else if (typeof fileOrDir === "string") {
 			this.passthroughCopies[fileOrDir] = { outputPath: true, copyOptions };
+		} else if (Array.isArray(fileOrDir)) {
+			for (let inputPath of fileOrDir) {
+				this.passthroughCopies[inputPath] = { outputPath: true, copyOptions };
+			}
 		} else {
 			for (let [inputPath, outputPath] of Object.entries(fileOrDir)) {
 				this.passthroughCopies[inputPath] = { outputPath, copyOptions };

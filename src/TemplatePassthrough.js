@@ -321,7 +321,12 @@ class TemplatePassthrough {
 
 	// The dev server can only emulate `dot` and `junk`, so these copy files for real
 	static isEmulatable(copyOptions) {
-		return !copyOptions?.filter && !copyOptions?.rename && !copyOptions?.transform;
+		return (
+			!copyOptions?.filter &&
+			!copyOptions?.rawPathFilter &&
+			!copyOptions?.rename &&
+			!copyOptions?.transform
+		);
 	}
 
 	get isEmulated() {
@@ -352,9 +357,7 @@ class TemplatePassthrough {
 			expand: false, // follow symlinks (matches recursive-copy default)
 			debug: false, // (matches recursive-copy default)
 
-			// Note: `filter` callback function only passes in a relative path, which is unreliable
-			// See https://github.com/timkendrick/recursive-copy/blob/4c9a8b8a4bf573285e9c4a649a30a2b59ccf441c/lib/copy.js#L59
-			// e.g. `{ filePaths: [ './img/coolkid.jpg' ], relativePaths: [ '' ] }`
+			// `filter` receives paths relative to the copy source (empty for single files), use `rawPathFilter` for full paths.
 		};
 
 		let copyOptions = Object.assign(copyOptionsDefault, this.copyOptions);
