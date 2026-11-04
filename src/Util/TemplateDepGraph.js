@@ -186,12 +186,26 @@ export class TemplateDepGraph extends DependencyGraph {
 		}
 	}
 
+	// A tag published by a config collection consumer resolves at `[keys]`, not `[basic]`, Issue #3931
+	#removeBasicEdgesFromKeysTags() {
+		let basicKey = `${COLLECTION_PREFIX}[basic]`;
+		let keysKey = `${COLLECTION_PREFIX}[keys]`;
+		for (let tagNode of this.outgoingEdges.get(keysKey)) {
+			if (!tagNode.startsWith(`${COLLECTION_PREFIX}[`)) {
+				this.removeDependency(basicKey, tagNode);
+			}
+		}
+	}
+
 	unfilteredOrder() {
 		// these need to be added last, after the template map has been added (see addConfigCollectionName)
 		for (let collectionName of this.#configCollectionNames) {
 			this.uses(`${COLLECTION_PREFIX}[keys]`, `${COLLECTION_PREFIX}${collectionName}`);
+			// Templates that consume nothing must be in collections before config collections run, Issue #3931
+			this.uses(`${COLLECTION_PREFIX}${collectionName}`, `${COLLECTION_PREFIX}[userconfig]`);
 		}
 
+		this.#removeBasicEdgesFromKeysTags();
 		this.#addTagConsumersBeforeConfigCollections();
 
 		return super.overallOrder();
