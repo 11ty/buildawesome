@@ -52,3 +52,20 @@ test("Preprocess Markdown with markdown #3925", async (t) => {
 # This is another code
 </code></pre>`);
 });
+
+test("Preprocessing engine does not need to be in templateFormats #514", async (t) => {
+  let elev = new Eleventy({
+    input: "./test/stubs-virtual/",
+    config: $config => {
+      $config.setTemplateFormats(["md", "html"]);
+      $config.setMarkdownTemplateEngine("liquid");
+      $config.setHtmlTemplateEngine("liquid");
+      $config.addTemplate("index.md", `{% assign x = "md" %}{{ x }}`);
+      $config.addTemplate("page.html", `{% assign x = "html" %}{{ x }}`);
+    }
+  });
+
+  let results = await elev.toJSON();
+  let contents = results.map(({ content }) => content.trim()).sort();
+  t.assert.deepStrictEqual(contents, ["<p>md</p>", "html"]);
+});
