@@ -213,6 +213,25 @@ test("Virtual templates as layouts, issue #2307", async (t) => {
 	t.assert.deepStrictEqual(results[0].rawInput, `# Hello`);
 });
 
+test("Virtual templates as layouts outside of the input directory, issue #4409", async (t) => {
+	let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
+		config: function ($config) {
+			$config.setLayoutsDirectory("../stubs-virtual-layouts-outside");
+
+			$config.addTemplate("virtual.md", `# Hello`, {
+				layout: "outside.html"
+			});
+
+			$config.addTemplate("../stubs-virtual-layouts-outside/outside.html", `<!-- Layout -->{{ content }}`);
+		},
+	});
+
+	let results = await elev.toJSON();
+
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<!-- Layout --><h1>Hello</h1>`);
+});
+
 test("11ty.js Virtual Templates (object), issue #3347", async (t) => {
   let templateDefinition = {
     data: () => {
