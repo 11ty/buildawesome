@@ -172,10 +172,10 @@ test("eleventyComputed intermixes with global data", async (t) => {
   );
 
   let fetchedData = await tmpl.getData();
-  t.truthy(fetchedData.eleventyComputed.image);
-  t.truthy(fetchedData.eleventyComputed.image2);
-  t.truthy(fetchedData.eleventyComputed.image3);
-  t.truthy(fetchedData.eleventyComputed.eleventyNavigation.key);
+  t.truthy(fetchedData.buildawesomeComputed.image);
+  t.truthy(fetchedData.buildawesomeComputed.image2);
+  t.truthy(fetchedData.buildawesomeComputed.image3);
+  t.truthy(fetchedData.buildawesomeComputed.eleventyNavigation.key);
 
   let templates = await tmpl.getTemplates(fetchedData);
   let data = templates[0].data;

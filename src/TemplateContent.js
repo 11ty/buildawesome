@@ -7,6 +7,7 @@ import JavaScriptFrontMatter from "./Engines/FrontMatter/JavaScript.js";
 import { createDebug } from "./Util/DebugLogUtil.js";
 import { EOL } from "./Util/NewLineAdapter.js";
 import TemplateData from "./Data/TemplateData.js";
+import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
 import TemplateRender from "./TemplateRender.js";
 import BaseError from "./Errors/BaseError.js";
 import ErrorUtil from "./Errors/ErrorUtil.js";
@@ -428,7 +429,9 @@ class TemplateContent {
 			isVirtualTemplate: Boolean(virtualTemplateData),
 		});
 
-		let data = Object.assign(frontMatterData, extraData, virtualTemplateData);
+		let data = ResolveConfigurationData.normalize(
+			Object.assign(frontMatterData, extraData, virtualTemplateData),
+		);
 
 		return {
 			data,

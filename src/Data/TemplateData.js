@@ -432,7 +432,10 @@ class TemplateData {
 		let configApiGlobalData = await this.getInitialGlobalData();
 
 		let globalJson = await this.getAllGlobalData();
-		let mergedGlobalData = Merge(globalJson, configApiGlobalData);
+		let mergedGlobalData = Merge(
+			ResolveConfigurationData.normalize(globalJson),
+			ResolveConfigurationData.normalize(configApiGlobalData),
+		);
 
 		// OK: Shallow merge when combining rawImports (pkg) with global data files
 		return Object.assign({}, mergedGlobalData, rawImports);
@@ -496,7 +499,7 @@ class TemplateData {
 					dataSource[key] = path;
 				}
 
-				Merge(localData, cleanedDataForPath);
+				Merge(localData, ResolveConfigurationData.normalize(cleanedDataForPath));
 			}
 		}
 

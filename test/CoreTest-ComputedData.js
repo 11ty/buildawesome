@@ -581,3 +581,38 @@ test("Computed functions see front matter objects on their first run, Issue #224
     ["async", { key: "value" }],
   ]);
 });
+
+test("Global eleventyComputed does not override template buildawesomeComputed, Issue #4311", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addGlobalData("eleventyComputed", { title: () => "global" });
+      configApi.addTemplate("index.njk", "{{ title }}", { buildawesomeComputed: { title: () => "template" } });
+    }
+  });
+
+  let results = await elev.toJSON();
+  t.is(results[0].content, "template");
+});
+
+test("Global eleventyComputed does not override directory data buildawesomeComputed, Issue #4311", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-4311/", undefined, {
+    config: configApi => {
+      configApi.addGlobalData("eleventyComputed", { title: () => "global" });
+    }
+  });
+
+  let results = await elev.toJSON();
+  t.is(results[0].content.trim(), "dir");
+});
+
+test("Global buildawesomeComputed does not override template eleventyComputed, Issue #4311", async (t) => {
+  let elev = new BuildAwesome("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addGlobalData("buildawesomeComputed", { title: () => "global" });
+      configApi.addTemplate("index.njk", "{{ title }}", { eleventyComputed: { title: () => "template" } });
+    }
+  });
+
+  let results = await elev.toJSON();
+  t.is(results[0].content, "template");
+});

@@ -83,3 +83,24 @@ test("Both locations exist, merge Array", (t) => {
 
 	t.deepEqual(ResolveConfigurationData.getValue(data, "buildawesomeExcludeFromCollections"), ["two", "one"]);
 });
+
+test("Normalize folds aliases into the buildawesome key", (t) => {
+	let data = {
+		eleventyComputed: { key1: "value1" },
+		buildawesomeComputed: { key2: "value2" },
+		eleventyExcludeFromCollections: true,
+		other: 1,
+	};
+
+	t.deepEqual(ResolveConfigurationData.normalize(data), {
+		buildawesomeComputed: { key1: "value1", key2: "value2" },
+		buildawesomeExcludeFromCollections: true,
+		other: 1,
+	});
+	t.true("eleventyComputed" in data);
+});
+
+test("Normalize returns the same object without aliases", (t) => {
+	let data = { buildawesomeComputed: {} };
+	t.is(ResolveConfigurationData.normalize(data), data);
+});

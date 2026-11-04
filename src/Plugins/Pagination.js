@@ -6,6 +6,7 @@ import BaseError from "../Errors/BaseError.js";
 import { ProxyWrap } from "../Util/Objects/ProxyWrap.js";
 // import { DeepFreeze } from "../Util/Objects/DeepFreeze.js";
 import TemplateData from "../Data/TemplateData.js";
+import { ResolveConfigurationData } from "../Data/ResolveConfigurationData.js";
 import { withoutTracking } from "../Data/InternalReads.js";
 
 const { set: lodashSet, get: lodashGet, chunk: lodashChunk } = lodash;
@@ -272,7 +273,11 @@ class Pagination {
 		let hasPermalinkField = withoutTracking(
 			() =>
 				Boolean(this.data[this.config.keys.permalink]) ||
-				Boolean(this.data.eleventyComputed?.[this.config.keys.permalink]),
+				Boolean(
+					ResolveConfigurationData.getValue(this.data, this.config.keys.computed)?.[
+						this.config.keys.permalink
+					],
+				),
 		);
 
 		// Do *not* pass collections through DeepCopy, we’ll re-add them back in later.
