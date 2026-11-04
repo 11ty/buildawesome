@@ -28,7 +28,7 @@ async function compile(content, templateLang, options = {}) {
 
 	// Breaking change in 2.0+, previous default was `html` and now we default to the page template syntax
 	if (!templateLang) {
-		templateLang = this.page.templateSyntax;
+		templateLang = this?.page?.templateSyntax;
 	}
 
 	if (!extensionMap) {
@@ -135,16 +135,19 @@ async function renderShortcodeFn(fn, data) {
 		};
 	}
 
-	if ("data" in this && isPlainObject(this.data)) {
+	if (this && "data" in this && isPlainObject(this.data)) {
 		// when options.accessGlobalData is true, this allows the global data
 		// to be accessed inside of the shortcode as a fallback
 
 		data = ProxyWrap(data, this.data);
 	} else {
-		// save `page` and `eleventy` for reuse
-		data.page = this.page;
-		data.eleventy = this.eleventy;
-		data.buildawesome = this.buildawesome;
+		// Context values are fallbacks; a copy avoids leaking one page’s context into a reused data object.
+		data = {
+			page: this?.page,
+			eleventy: this?.eleventy,
+			buildawesome: this?.buildawesome,
+			...data,
+		};
 	}
 
 	return fn(data);
@@ -374,9 +377,9 @@ function RenderPlugin($config, options = {}) {
 		}
 
 		// Engines record a string template’s dependencies under the engine name (e.g. `njk` or `webc`)
-		let lang = templateLang || this.page?.templateSyntax;
+		let lang = templateLang || this?.page?.templateSyntax;
 		if (typeof lang === "string") {
-			addDependency(this.page, lang, ...lang.split(","));
+			addDependency(this?.page, lang, ...lang.split(","));
 		}
 
 		let fn = await compile.call(this, content, templateLang, {
@@ -394,7 +397,7 @@ function RenderPlugin($config, options = {}) {
 			extensionMap,
 		};
 
-		addDependency(this.page, inputPath);
+		addDependency(this?.page, inputPath);
 
 		let fn = await compileFile.call(this, inputPath, renderFileOptions, templateLang);
 

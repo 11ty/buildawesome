@@ -324,3 +324,35 @@ test("#3368 #3810 config init bug with RenderManager", async (t) => {
   let results = await elev.toJSON();
   t.assert.strictEqual(results[0].content, `<h1>Sign up for our newsletter!</h1>`);
 });
+
+async function getCustomExtensionOutput(renderFn) {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: ($config) => {
+      $config.addPlugin(RenderPlugin);
+      $config.addExtension("custom", {
+        compile() {
+          return (data) => renderFn($config.javascript.functions.renderTemplate, data);
+        },
+      });
+      $config.addTemplateFormats("custom");
+      $config.addTemplate("index.custom", "");
+    },
+  });
+
+  let results = await elev.toJSON();
+  return results[0].content;
+}
+
+test("#2912 renderTemplate called without a `this` context", async (t) => {
+  let html = await getCustomExtensionOutput((renderTemplate, data) => {
+    return renderTemplate("{{ page.url }}", "njk", { page: data.page });
+  });
+  t.assert.strictEqual(html, "/");
+});
+
+test("#2912 renderTemplate data `page` takes precedence over `this.page`", async (t) => {
+  let html = await getCustomExtensionOutput((renderTemplate) => {
+    return renderTemplate.call({ page: { url: "/context/" } }, "{{ page.url }}", "njk", { page: { url: "/data/" } });
+  });
+  t.assert.strictEqual(html, "/data/");
+});
