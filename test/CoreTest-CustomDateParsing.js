@@ -346,6 +346,19 @@ test("setDateTimeZone: file name date, Issue #3668", { skip: !HAS_TEMPORAL }, as
   t.assert.deepStrictEqual(result.data.page.date, new Date("2025-02-28T15:00:00Z"));
 });
 
+test("setDateTimeZone: Liquid date filter uses project time zone, Issue #1905", { skip: !HAS_TEMPORAL }, async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", "./test/stubs-virtual/", {
+    config: $config => {
+      $config.setDateTimeZone("Asia/Tokyo");
+      $config.addTemplate("2025-03-01-post.liquid", `{{ page.date | date: "%Y/%m/%d %H:%M" }}`);
+    }
+  });
+  elev.disableLogger();
+
+  let [result] = await elev.toJSON();
+  t.assert.strictEqual(result.content, "2025/03/01 00:00");
+});
+
 test("setDateTimeZone: invalid time zone throws, Issue #3668", { skip: !HAS_TEMPORAL }, async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", "./test/stubs-virtual/", {
     config: $config => {

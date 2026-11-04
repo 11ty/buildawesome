@@ -42,6 +42,7 @@ export default class Liquid extends TemplateEngine {
 			strictFilters: true,
 			// cache: true,
 			jsTruthy: true, // Breaking in v4 #3507
+			timezoneOffset: this.config.dateTimeZone?.zone ?? 0, // Match `setDateTimeZone` (or UTC) when parsing dates, breaking in v4 #1905
 		};
 
 		let options = Object.assign(defaults, this.liquidOptions || {});

@@ -137,7 +137,7 @@ test("Permalink with dates!", async (t) => {
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/2016/01/01/index.html");
 });
 
-test.skip("Permalink with dates on file name regex!", async (t) => {
+test("Permalink with dates on file name regex!", async (t) => {
   let tmpl = await getNewTemplate(
     "./test/stubs/2016-02-01-permalinkdate.liquid",
     "./test/stubs/",
