@@ -622,7 +622,14 @@ class TemplateData {
 			// module.exports = () => ((data) => `${data.page.filePathStem}/`); // Works
 			if (typeof returnValue === "function") {
 				let configApiGlobalData = await this.getInitialGlobalData();
-				returnValue = await returnValue(configApiGlobalData || {});
+				try {
+					returnValue = await returnValue(configApiGlobalData || {});
+				} catch (e) {
+					if (this.config.freezeReservedData && ReservedData.isFrozenError(e)) {
+						throw ReservedData.getError({ cause: e, sourceLocation: path });
+					}
+					throw e;
+				}
 			}
 
 			dataBench.after();
