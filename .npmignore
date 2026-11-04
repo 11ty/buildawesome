@@ -1,6 +1,5 @@
 docs
 test
-test_node
 coverage
 eslint.config.js
 .*

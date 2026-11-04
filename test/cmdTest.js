@@ -1,6 +1,7 @@
 import test from "node:test";
 import { exec } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { stripVTControlCharacters } from "node:util";
 import { deleteDirectory } from "./_testHelpers.js";
 
 function readEvents(filePath) {
@@ -91,7 +92,7 @@ test("Test command line --events-file writes build.end on success", async (t) =>
         t.assert.strictEqual(end.pages[0].url, "/");
         t.assert.strictEqual(typeof end.pages[0].inputPath, "string");
         t.assert.strictEqual("content" in end.pages[0], false);
-        t.assert.strictEqual(stdout.includes("Wrote 1 file"), true);
+        t.assert.strictEqual(stripVTControlCharacters(stdout).includes("Wrote 1 file"), true);
         t.assert.strictEqual(stdout.includes('{"v":1'), false);
         resolve();
       }

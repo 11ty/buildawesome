@@ -134,7 +134,7 @@ test("Paginated template with a static permalink writes to the same file, issue 
 
 // Warning: this test writes to the file system
 test("Virtual template writes to file system, issue #1612", async (t) => {
-	let elev = new Eleventy("./test/stubs-virtual", "./test/stubs-virtual/_site", {
+	let elev = new Eleventy("./test/stubs-virtual", "./test/stubs-virtual-write/_site", {
 		config: function ($config) {
 			$config.addTemplate("virtual.md", `# Hello`)
 		},
@@ -146,9 +146,9 @@ test("Virtual template writes to file system, issue #1612", async (t) => {
 	t.assert.deepStrictEqual(results.length, 1);
 	t.assert.deepStrictEqual(results[0].content.trim(), `<h1>Hello</h1>`);
 	t.assert.deepStrictEqual(results[0].rawInput, `# Hello`);
-	t.assert.strictEqual(fs.existsSync("./test/stubs-virtual/_site/virtual/index.html"), true);
+	t.assert.strictEqual(fs.existsSync("./test/stubs-virtual-write/_site/virtual/index.html"), true);
 
-	deleteDirectory("./test/stubs-virtual/_site/");
+	deleteDirectory("./test/stubs-virtual-write/");
 });
 
 test("Virtual templates conflict", async (t) => {

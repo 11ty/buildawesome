@@ -36,7 +36,7 @@ npm test
 
 We have a few test suites, for various reasons:
 
-- [Node.js Test runner](https://nodejs.org/api/test.html) (primary test suite in `test/`, plus `test_node/` for tests that need `tsx` loaders)
+- [Node.js Test runner](https://nodejs.org/api/test.html) (`test/`)
 - [Vitest (in Browser Mode)](https://vitest.dev/guide/browser/) (browser tests in `packages/browser/test/`)
 - [Benchmark for Performance Regressions](https://github.com/11ty/buildbenchmark)
 

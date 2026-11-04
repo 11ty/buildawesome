@@ -54,10 +54,8 @@
 	],
 	"scripts": {
 		"default": "npm run test",
-		"test": "npm run test:server && npm run test:browser",
-		"test:server": "npm run test:node && npm run test:core",
+		"test": "npm run test:core && npm run test:browser",
 		"test:core": "node --test --test-timeout=20000 'test/[!_]*.js' 'test/_issues/**/*test.js'",
-		"test:node": "node --test 'test_node/**/*test.js'",
 		"test:browser": "cross-env CI=true npm run test --workspaces",
 		"format": "prettier . --write",
 		"check": "eslint src",

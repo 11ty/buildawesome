@@ -1,11 +1,8 @@
-// This test file is using Node’s test runner because `tsx` doesn’t work with worker threads (used by avajs)
-// See https://github.com/privatenumber/tsx/issues/354
-// See https://github.com/nodejs/node/issues/47747
 import test from "node:test";
 import fs from "node:fs";
 import assert from "node:assert";
 
-import Eleventy from "../../src/Core.js";
+import Eleventy from "../src/Core.js";
 
 // This tests Eleventy Watch and the file system!
 
@@ -44,7 +41,7 @@ test(
 		});
 
 		// Restore original content
-		const ROOT_DIR = "./test_node/3824-incremental/";
+		const ROOT_DIR = "./test/stubs-3824-incremental/";
 		const OUTPUT_DIR = ROOT_DIR + "_site/";
 
 		const FILE_CHANGING = ROOT_DIR + "_includes/head.tsx";
