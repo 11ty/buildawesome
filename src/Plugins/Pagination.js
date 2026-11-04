@@ -4,6 +4,7 @@ import { DeepCopy } from "@11ty/eleventy-utils";
 
 import BaseError from "../Errors/BaseError.js";
 import { ProxyWrap } from "../Util/Objects/ProxyWrap.js";
+import PathPrefixer from "../Util/PathPrefixer.js";
 // import { DeepFreeze } from "../Util/Objects/DeepFreeze.js";
 import TemplateData from "../Data/TemplateData.js";
 import { ResolveConfigurationData } from "../Data/ResolveConfigurationData.js";
@@ -368,7 +369,7 @@ class Pagination {
 				await cloned.getOutputLocations(clonedData);
 			// TODO subdirectory to links if the site doesn’t live at /
 			if (rawPath) {
-				links.push("/" + rawPath);
+				links.push(PathPrefixer.joinUrlParts("/", rawPath));
 			}
 
 			hrefs.push(href);

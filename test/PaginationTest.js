@@ -219,6 +219,23 @@ test("Permalink with pagination variables (numeric)", async (t) => {
   t.assert.strictEqual(pages[1].data.pagination.hrefs.length, 2);
 });
 
+test("Pagination links with a leading slash permalink, issue #1350", async (t) => {
+  let tmpl = await getNewTemplate(
+    "./test/stubs/paged/pagedpermalinkleadingslash.njk",
+    "./test/stubs/",
+    "./dist"
+  );
+
+  let data = await tmpl.getData();
+  let pages = await tmpl.getTemplates(data);
+
+  t.assert.deepStrictEqual(pages[0].data.pagination.links, ["/paged/page-0/index.html", "/paged/page-1/index.html"]);
+  t.assert.strictEqual(pages[0].data.pagination.nextPageLink, "/paged/page-1/index.html");
+  t.assert.strictEqual(pages[1].data.pagination.previousPageLink, "/paged/page-0/index.html");
+  t.assert.strictEqual(pages[1].data.pagination.firstPageLink, "/paged/page-0/index.html");
+  t.assert.deepStrictEqual(pages[0].data.pagination.hrefs, ["/paged/page-0/", "/paged/page-1/"]);
+});
+
 test("Permalink with pagination variables (numeric, one indexed)", async (t) => {
   let tmpl = await getNewTemplate(
     "./test/stubs/paged/pagedpermalinknumericoneindexed.njk",
