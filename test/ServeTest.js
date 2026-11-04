@@ -149,9 +149,9 @@ test("Emulated passthrough entries reach the dev server before templates finish 
 });
 
 test("Emulated passthrough copy files added or deleted after the build update the dev server (#3007)", async (t) => {
-  let inputDir = "test/stubs-3007";
+  let inputDir = "test/_generated/3007";
   deleteDirectory(inputDir);
-  mkdirSync(inputDir);
+  mkdirSync(inputDir, { recursive: true });
   t.after(() => deleteDirectory(inputDir));
 
   let core = new Core(inputDir, mkdtempSync(path.join(tmpdir(), "serve-3007-")), {
@@ -160,7 +160,7 @@ test("Emulated passthrough copy files added or deleted after the build update th
     configPath: false,
     config(eleventyConfig) {
       eleventyConfig.setServerPassthroughCopyBehavior("passthrough");
-      eleventyConfig.addPassthroughCopy({ "test/stubs-3007/_tmp/styles.css": "assets/styles.css" });
+      eleventyConfig.addPassthroughCopy({ "test/_generated/3007/_tmp/styles.css": "assets/styles.css" });
       eleventyConfig.addTemplate("index.html", "Hello");
     },
   });
@@ -184,7 +184,7 @@ test("Emulated passthrough copy files added or deleted after the build update th
   watcher.emit("add", `${inputDir}/_tmp/styles.css`);
   await new Promise((resolve) => setTimeout(resolve, 50));
 
-  t.assert.deepStrictEqual(entries?.map(({ url, inputPath }) => [url, inputPath]), [["/assets/styles.css", "./test/stubs-3007/_tmp/styles.css"]]);
+  t.assert.deepStrictEqual(entries?.map(({ url, inputPath }) => [url, inputPath]), [["/assets/styles.css", "./test/_generated/3007/_tmp/styles.css"]]);
 
   watcher.emit("unlink", `${inputDir}/_tmp/styles.css`);
   t.assert.deepStrictEqual(entries, []);

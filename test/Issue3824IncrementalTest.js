@@ -29,7 +29,7 @@ test(
 	{
 		timeout: 10000,
 	},
-	async () => {
+	async (t) => {
 		let comparisonStrings = ["first", "second"];
 
 		let runs = comparisonStrings.map((str) => {
@@ -40,14 +40,14 @@ test(
 			};
 		});
 
-		// Restore original content
-		const ROOT_DIR = "./test/stubs-3824-incremental/";
+		const ROOT_DIR = "./test/_generated/3824-incremental/";
+		fs.rmSync(ROOT_DIR, { recursive: true, force: true });
+		fs.cpSync("./test/stubs-3824/", ROOT_DIR, { recursive: true, filter: (src) => !src.includes("_site") });
+		t.after(() => fs.rmSync(ROOT_DIR, { recursive: true, force: true }));
 		const OUTPUT_DIR = ROOT_DIR + "_site/";
 
 		const FILE_CHANGING = ROOT_DIR + "_includes/head.tsx";
 		const OUTPUT_FILE = OUTPUT_DIR + "index.html";
-
-		fs.writeFileSync(FILE_CHANGING, getInputContent(), "utf8");
 
 		let index = 0;
 		let elev = new Eleventy(ROOT_DIR, OUTPUT_DIR, {
@@ -87,8 +87,5 @@ test(
 			let content = fs.readFileSync(OUTPUT_FILE, "utf8");
 			assert.equal(content, run.expected);
 		}
-
-		fs.writeFileSync(FILE_CHANGING, getInputContent(), "utf8");
-		fs.rmSync(OUTPUT_DIR, { recursive: true });
 	},
 );

@@ -61,7 +61,7 @@ test("passthrough event lists passthroughs the dev server can’t emulate as cop
 
 test("passthrough event skips files excluded by `dot` and `junk`", async (t) => {
 	// Inside the project, absolute input paths on another drive fail on Windows
-	let dir = "test/stubs-ndjson-dot-junk";
+	let dir = "test/_generated/ndjson-dot-junk";
 	rmSync(dir, { recursive: true, force: true });
 	t.after(() => rmSync(dir, { recursive: true, force: true }));
 	// Globs need forward slashes
@@ -107,7 +107,7 @@ test("passthrough event skips files excluded by `dot` and `junk`", async (t) => 
 
 test("watch run with a throwing config writes one `build.error`, then recovers", async (t) => {
 	// Inside the project so the config file can import Core’s dependencies
-	let dir = "test/stubs-ndjson-config-error";
+	let dir = "test/_generated/ndjson-config-error";
 	rmSync(dir, { recursive: true, force: true });
 	mkdirSync(dir, { recursive: true });
 	t.after(() => rmSync(dir, { recursive: true, force: true }));
