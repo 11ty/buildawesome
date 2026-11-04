@@ -97,9 +97,33 @@ test("Virtual templates try to output to the same file, issue #1612", async (t) 
 	});
 	elev.disableLogger();
 
-	await t.throwsAsync(elev.toJSON(), {
+	let e = await t.throwsAsync(elev.toJSON(), {
 		instanceOf: DuplicatePermalinkOutputError,
 	});
+	t.true(e.message.startsWith("Output conflict: multiple input files are writing to"));
+});
+
+test("Paginated template with a static permalink writes to the same file, issue #1946", async (t) => {
+	let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
+		config: function ($config) {
+			$config.addTemplate("paged.md", "", {
+				pagination: {
+					data: "items",
+					size: 1,
+				},
+				items: ["a", "b"],
+				permalink: "/output.html",
+			})
+		},
+	});
+	elev.disableLogger();
+
+	let e = await t.throwsAsync(elev.toJSON(), {
+		instanceOf: DuplicatePermalinkOutputError,
+	});
+	t.true(e.message.includes("multiple pages from pagination template"));
+	t.true(e.message.includes("(pagination.pageNumber: 0)"));
+	t.true(e.message.includes("(pagination.pageNumber: 1)"));
 });
 
 // Warning: this test writes to the file system

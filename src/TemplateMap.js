@@ -724,20 +724,28 @@ class TemplateMap {
 				}
 				inputs[page.inputPath] = true;
 
+				let entry = { inputPath: template.inputPath, pageNumber: page.pageNumber };
 				if (!outputPaths[page.outputPath]) {
-					outputPaths[page.outputPath] = [template.inputPath];
+					outputPaths[page.outputPath] = [entry];
 				} else {
-					warnings[page.outputPath] = `Output conflict: multiple input files are writing to \`${
-						page.outputPath
-					}\`. Use distinct \`permalink\` values to resolve this conflict.
-  1. ${template.inputPath}
-${outputPaths[page.outputPath]
-	.map(function (inputPath, index) {
-		return `  ${index + 2}. ${inputPath}\n`;
-	})
-	.join("")}
-`;
-					outputPaths[page.outputPath].push(template.inputPath);
+					let entries = [entry, ...outputPaths[page.outputPath]];
+					let list = entries
+						.map(({ inputPath, pageNumber }, index) => {
+							let pageLabel =
+								typeof pageNumber === "number" ? ` (pagination.pageNumber: ${pageNumber})` : "";
+							return `  ${index + 1}. ${inputPath}${pageLabel}\n`;
+						})
+						.join("");
+
+					if (entries.every((e) => e.inputPath === template.inputPath)) {
+						// A template can only conflict with itself via pagination, Issue #1946
+						warnings[page.outputPath] =
+							`Output conflict: multiple pages from pagination template \`${template.inputPath}\` are writing to \`${page.outputPath}\`. Often this means you used an unknown property which resolved to an empty string "" in your permalink.\n${list}`;
+					} else {
+						warnings[page.outputPath] =
+							`Output conflict: multiple input files are writing to \`${page.outputPath}\`. Use distinct \`permalink\` values to resolve this conflict.\n${list}`;
+					}
+					outputPaths[page.outputPath].push(entry);
 				}
 			}
 		});
