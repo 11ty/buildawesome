@@ -75,14 +75,15 @@ test("Collection API", (t) => {
   let map = new GlobalDependencyMap();
 
   map.setCollectionApiNames(["articles"]);
+  map.initializeUserConfigurationApiCollections();
   map.addNewNodeRelationships("test.njk", [], ["all"])
   map.addNewNodeRelationships("feed.njk", ["articles"], ["all"])
 
   t.assert.deepStrictEqual(map.getTemplateOrder(), [
     "test.njk",
-    "__collection:[keys]",
     "__collection:articles",
     "feed.njk",
+    "__collection:[keys]",
     "__collection:all",
   ]);
 });

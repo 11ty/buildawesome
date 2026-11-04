@@ -9,6 +9,8 @@ export class TemplateDepGraph extends DependencyGraph {
 	static STAGES = ["[basic]", "[userconfig]", "[keys]", "all"];
 
 	#configCollectionNames = new Set();
+	#tagConsumers = new Map();
+	#tagConsumerEdges = new Set();
 
 	constructor() {
 		// BREAKING TODO move this back to non-circular with errors
@@ -84,6 +86,12 @@ export class TemplateDepGraph extends DependencyGraph {
 		}
 
 		consumes = this.cleanupCollectionNames(consumes);
+		if (consumes.length > 0) {
+			this.#tagConsumers.set(filePath, consumes);
+		} else {
+			this.#tagConsumers.delete(filePath);
+		}
+
 		publishesTo = this.cleanupCollectionNames(publishesTo);
 		// Can’t consume AND publish to `all` simultaneously
 		let consumesAll = consumes.includes("all");
@@ -139,11 +147,52 @@ export class TemplateDepGraph extends DependencyGraph {
 		}
 	}
 
+	#isBasicTag(tagName) {
+		if (
+			tagName === "all" ||
+			(tagName.startsWith("[") && tagName.endsWith("]")) ||
+			this.#configCollectionNames.has(tagName)
+		) {
+			return false;
+		}
+
+		let node = `${COLLECTION_PREFIX}${tagName}`;
+		if (!this.hasNode(node)) {
+			return true;
+		}
+
+		let deps = this.dependenciesOf(node);
+		return (
+			!deps.includes(`${COLLECTION_PREFIX}[userconfig]`) &&
+			!deps.includes(`${COLLECTION_PREFIX}[keys]`)
+		);
+	}
+
+	// Templates consuming only basic tags (e.g. paginating over one) must be in collections before config collections run, Issue #4326
+	#addTagConsumersBeforeConfigCollections() {
+		let userconfigKey = `${COLLECTION_PREFIX}[userconfig]`;
+		for (let filePath of this.#tagConsumerEdges) {
+			if (this.hasNode(filePath)) {
+				this.removeDependency(userconfigKey, filePath);
+			}
+		}
+		this.#tagConsumerEdges.clear();
+
+		for (let [filePath, consumes] of this.#tagConsumers) {
+			if (this.hasNode(filePath) && consumes.every((tagName) => this.#isBasicTag(tagName))) {
+				this.uses(userconfigKey, filePath);
+				this.#tagConsumerEdges.add(filePath);
+			}
+		}
+	}
+
 	unfilteredOrder() {
 		// these need to be added last, after the template map has been added (see addConfigCollectionName)
 		for (let collectionName of this.#configCollectionNames) {
 			this.uses(`${COLLECTION_PREFIX}[keys]`, `${COLLECTION_PREFIX}${collectionName}`);
 		}
+
+		this.#addTagConsumersBeforeConfigCollections();
 
 		return super.overallOrder();
 	}
