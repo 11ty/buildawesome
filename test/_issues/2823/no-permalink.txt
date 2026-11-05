@@ -1,0 +1,4 @@
+---
+dynamicPermalink: false
+---
+No permalink
