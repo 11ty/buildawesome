@@ -98,6 +98,10 @@ for (let method of DEFERRED_IN_PLACE_METHODS) {
 }
 
 export class TemplateQueryRegistry {
+	static FLAGS = {
+		QUERY: "COLLECTIONS_QUERY",
+	};
+
 	// inputPath => queries from that template’s front matter
 	#queries = new Map();
 	// Matches per build, shared by every template running the same query

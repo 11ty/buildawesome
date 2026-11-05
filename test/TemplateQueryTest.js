@@ -1,9 +1,11 @@
 import test from "node:test";
 import Eleventy from "../src/Core.js";
+import { TemplateQueryRegistry } from "../src/Util/TemplateQuery.js";
 
 function getEleventy(templates, configCallback) {
 	let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
 		config($config) {
+			$config.addExperimentalBehavior(TemplateQueryRegistry.FLAGS.QUERY);
 			for (let [name, content, data] of templates) {
 				$config.addTemplate(name, content, data);
 			}
@@ -289,4 +291,22 @@ const { url: aboutUrl } = collections.query("/about.md");
 
 	let results = byUrl(await elev.toJSON());
 	t.assert.strictEqual(results["/blog/"], `<p>Hi there. <a href="/about/">More</a> /about/</p>`);
+});
+
+test("collections.query() requires the experimental flag", async (t) => {
+	let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
+		config($config) {
+			$config.addTemplate(
+				"a.njk",
+				`---js
+const about = collections.query("/about.md");
+---
+{{ about.url }}`,
+			);
+			$config.addTemplate("about.md", "About");
+		},
+	});
+	elev.disableLogger();
+
+	await t.assert.rejects(elev.toJSON());
 });
