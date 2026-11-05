@@ -2,7 +2,7 @@ import { Merge, TemplatePath } from "@11ty/eleventy-utils";
 
 import TemplateLayoutPathResolver from "./TemplateLayoutPathResolver.js";
 import TemplateContent from "./TemplateContent.js";
-import layoutCache from "./LayoutCache.js";
+import { getLayoutCache } from "./LayoutCache.js";
 
 // https://github.com/11ty/eleventy/issues/3954
 class CdataWrapper {
@@ -83,6 +83,7 @@ class TemplateLayout extends TemplateContent {
 
 		let inputDir = eleventyConfig.directories.input;
 		let fullKey = TemplateLayout.resolveFullKey(key, inputDir);
+		let layoutCache = getLayoutCache(eleventyConfig);
 		if (!layoutCache.has(fullKey)) {
 			let layout = new TemplateLayout(key, extensionMap, eleventyConfig);
 
@@ -236,7 +237,7 @@ class TemplateLayout extends TemplateContent {
 
 			return fns;
 		} catch (e) {
-			layoutCache.clear();
+			getLayoutCache(this.eleventyConfig).clear();
 			throw e;
 		}
 	}

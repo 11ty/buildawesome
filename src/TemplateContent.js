@@ -11,7 +11,6 @@ import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
 import TemplateRender from "./TemplateRender.js";
 import BaseError from "./Errors/BaseError.js";
 import ErrorUtil from "./Errors/ErrorUtil.js";
-import eventBus from "./EventBus.js";
 
 const { set: lodashSet } = lodash;
 const debug = createDebug("TemplateContent");
@@ -322,16 +321,29 @@ class TemplateContent {
 
 	/* Incremental builds cache the Template instances (in TemplateWriter) but
 	 * these template specific caches are important for Pagination */
-	static cache(path, content) {
-		this._inputCache.set(TemplatePath.absolutePath(path), content);
-	}
+	static #caches = new WeakMap();
 
-	static getCached(path) {
-		return this._inputCache.get(TemplatePath.absolutePath(path));
-	}
+	static getCaches(templateConfig) {
+		let caches = TemplateContent.#caches.get(templateConfig);
+		if (!caches) {
+			caches = {
+				input: new Map(),
+				compile: new Map(),
+			};
 
-	static deleteFromInputCache(path) {
-		this._inputCache.delete(TemplatePath.absolutePath(path));
+			templateConfig.eventBus.on("buildawesome.resourcemodified", (path) => {
+				caches.input.delete(TemplatePath.absolutePath(path));
+				caches.compile.get(TemplatePath.addLeadingDotSlash(path))?.clear();
+			});
+
+			// Used when the configuration file reset https://github.com/11ty/eleventy/issues/2147
+			templateConfig.eventBus.on("buildawesome.compilecachereset", () => {
+				caches.compile = new Map();
+			});
+
+			TemplateContent.#caches.set(templateConfig, caches);
+		}
+		return caches;
 	}
 
 	// Used via clone
@@ -365,7 +377,9 @@ class TemplateContent {
 		let content;
 
 		if (this.config.useTemplateCache) {
-			content = TemplateContent.getCached(this.inputPath);
+			content = TemplateContent.getCaches(this.eleventyConfig).input.get(
+				TemplatePath.absolutePath(this.inputPath),
+			);
 		}
 
 		if (!content && content !== "") {
@@ -374,7 +388,10 @@ class TemplateContent {
 			content = contentBuffer.toString("utf8");
 
 			if (this.config.useTemplateCache) {
-				TemplateContent.cache(this.inputPath, content);
+				TemplateContent.getCaches(this.eleventyConfig).input.set(
+					TemplatePath.absolutePath(this.inputPath),
+					content,
+				);
 			}
 		}
 
@@ -468,10 +485,11 @@ class TemplateContent {
 	_getCompileCache(str) {
 		// Caches used to be bifurcated based on engine name, now they’re based on inputPath
 		// TODO does `cacheable` need to help inform whether a cache is used here?
-		let inputPathMap = TemplateContent._compileCache.get(this.inputPath);
+		let { compile } = TemplateContent.getCaches(this.eleventyConfig);
+		let inputPathMap = compile.get(this.inputPath);
 		if (!inputPathMap) {
 			inputPathMap = new Map();
-			TemplateContent._compileCache.set(this.inputPath, inputPathMap);
+			compile.set(this.inputPath, inputPathMap);
 		}
 
 		let cacheable = this.isTemplateCacheable();
@@ -781,24 +799,5 @@ class TemplateContent {
 		return false;
 	}
 }
-
-TemplateContent._inputCache = new Map();
-TemplateContent._compileCache = new Map();
-eventBus.on("buildawesome.resourcemodified", (path) => {
-	// delete from input cache
-	TemplateContent.deleteFromInputCache(path);
-
-	// delete from compile cache
-	let normalized = TemplatePath.addLeadingDotSlash(path);
-	let compileCache = TemplateContent._compileCache.get(normalized);
-	if (compileCache) {
-		compileCache.clear();
-	}
-});
-
-// Used when the configuration file reset https://github.com/11ty/eleventy/issues/2147
-eventBus.on("buildawesome.compilecachereset", () => {
-	TemplateContent._compileCache = new Map();
-});
 
 export default TemplateContent;

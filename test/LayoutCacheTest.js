@@ -1,10 +1,10 @@
 import test from "node:test";
 
-import templateCache from "../src/LayoutCache.js";
+import { LayoutCache } from "../src/LayoutCache.js";
 import getNewTemplate from "./_getNewTemplateForTests.js";
 
 test("Cache can save templates", async (t) => {
-  templateCache.clear();
+  let templateCache = new LayoutCache();
 
   let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
 
@@ -13,7 +13,7 @@ test("Cache can save templates", async (t) => {
 });
 
 test("TemplateCache clear", async (t) => {
-  templateCache.clear();
+  let templateCache = new LayoutCache();
 
   let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
 
@@ -24,7 +24,7 @@ test("TemplateCache clear", async (t) => {
 });
 
 test("TemplateCache has", async (t) => {
-  templateCache.clear();
+  let templateCache = new LayoutCache();
 
   let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
 
@@ -34,7 +34,7 @@ test("TemplateCache has", async (t) => {
 });
 
 test("TemplateCache get success", async (t) => {
-  templateCache.clear();
+  let templateCache = new LayoutCache();
 
   let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
 
@@ -47,7 +47,7 @@ test("TemplateCache get success", async (t) => {
 });
 
 test("TemplateCache get fail", async (t) => {
-  templateCache.clear();
+  let templateCache = new LayoutCache();
 
   let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
 

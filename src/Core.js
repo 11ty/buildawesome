@@ -17,7 +17,6 @@ import PathPrefixer from "./Util/PathPrefixer.js";
 import PathNormalizer from "./Util/PathNormalizer.js";
 import { isGlobMatch, isDynamicPattern } from "./Util/GlobMatcher.js";
 import { OutputHashes } from "./Util/OutputHashes.js";
-import eventBus from "./EventBus.js";
 
 const debug = createDebug("Core");
 
@@ -119,8 +118,8 @@ export default class Core extends CoreFs {
 		// v3.1.0: `eleventy.templateModified` is no longer used internally
 		// v4.0.0-alpha.8 `eleventy.templateModified` event removed
 
-		// These listeners are *global*, not cleared even on config reset (v4.0.0-alpha.8 removed some arguments here)
-		eventBus.emit("buildawesome.resourcemodified", changedFilePath);
+		// These listeners are not cleared on config reset (v4.0.0-alpha.8 removed some arguments here)
+		this.eleventyConfig.eventBus.emit("buildawesome.resourcemodified", changedFilePath);
 
 		this.config.events.emit("buildawesome#templatemodified", changedFilePath);
 	}

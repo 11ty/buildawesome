@@ -9,7 +9,10 @@ function captureWarnings(elev) {
 		info() {},
 		error() {},
 		warn(message) {
-			warnings.push(message);
+			// Verbose mode also warns about slow benchmarks, which happens under load.
+			if (!/\bBenchmark\s/.test(message)) {
+				warnings.push(message);
+			}
 		},
 	});
 	return warnings;

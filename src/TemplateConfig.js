@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { Merge, TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 
 import chalk from "./Adapters/Packages/chalk.js";
@@ -8,7 +9,6 @@ import BaseError from "./Errors/BaseError.js";
 import UserConfig from "./UserConfig.js";
 import GlobalDependencyMap from "./GlobalDependencyMap.js";
 import ExistsCache from "./Util/ExistsCache.js";
-import eventBus from "./EventBus.js";
 import ProjectTemplateFormats from "./Util/ProjectTemplateFormats.js";
 import { expandEligibleJavaScriptFilePaths } from "./Util/FilePathUtil.js";
 
@@ -55,6 +55,9 @@ class TemplateConfig {
 	constructor(customRootConfig, projectConfigPath) {
 		/** @type {object} */
 		this.overrides = {};
+
+		// Internal synchronous events, scoped to this instance (not cleared on config reset).
+		this.eventBus = new EventEmitter();
 
 		/**
 		 * @type {String}
@@ -202,7 +205,7 @@ class TemplateConfig {
 		await this.forceReloadConfig();
 
 		// Clear the compile cache
-		eventBus.emit("buildawesome.compilecachereset");
+		this.eventBus.emit("buildawesome.compilecachereset");
 	}
 
 	/**

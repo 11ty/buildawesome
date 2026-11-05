@@ -3,7 +3,7 @@ import { DepGraph } from "dependency-graph";
 import { mergeGraphs } from "@11ty/dependency-tree";
 
 import JavaScriptDependencies from "./Util/JavaScriptDependencies.js";
-import eventBus from "./EventBus.js";
+import { resetImportCache } from "./Util/Require.js";
 
 export default class WatchTargets {
 	#templateConfig;
@@ -130,7 +130,7 @@ export default class WatchTargets {
 			}
 		}
 
-		eventBus.emit("buildawesome.importcachereset", paths);
+		resetImportCache(paths);
 	}
 
 	getNewTargetsSinceLastReset() {

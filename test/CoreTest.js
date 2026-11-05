@@ -628,9 +628,8 @@ test("Improvements to custom template syntax APIs (includes a layout file) #2258
 
   fs.writeFileSync(includeFilePath, previousContents, "utf8");
 
-  let sizes = [TemplateContent._inputCache.size, TemplateContent._compileCache.size];
-
   let results = await elev.toJSON();
+  let caches = TemplateContent.getCaches(elev.eleventyConfig);
 
   t.assert.strictEqual(results.length, 1);
   t.assert.strictEqual(
@@ -642,9 +641,9 @@ ${previousContents}
   );
 
   // Cache sizes are now bigger
-  let sizesAfterBuild = [TemplateContent._inputCache.size, TemplateContent._compileCache.size];
-  t.assert.ok(sizesAfterBuild[0] > sizes[0]);
-  t.assert.ok(sizesAfterBuild[1] > sizes[1]);
+  let sizesAfterBuild = [caches.input.size, caches.compile.size];
+  t.assert.ok(sizesAfterBuild[0] > 0);
+  t.assert.ok(sizesAfterBuild[1] > 0);
 
   let results2 = await elev.toJSON();
   t.assert.strictEqual(
@@ -656,7 +655,7 @@ ${previousContents}
   );
 
   // Cache sizes are unchanged from last build
-  t.assert.deepStrictEqual([TemplateContent._inputCache.size, TemplateContent._compileCache.size], sizesAfterBuild);
+  t.assert.deepStrictEqual([caches.input.size, caches.compile.size], sizesAfterBuild);
 
   fs.writeFileSync(includeFilePath, newContents, "utf8");
 
@@ -674,6 +673,28 @@ ${newContents}
   fs.writeFileSync(includeFilePath, previousContents, "utf8");
 });
 
+test("Internal event bus and template caches are scoped per instance #1910", async (t) => {
+  let options = { configPath: "./test/stubs-2258/eleventy.config.cjs" };
+  let elev1 = new Eleventy("./test/stubs-2258/", "./test/stubs-2258/_site", options);
+  let elev2 = new Eleventy("./test/stubs-2258/", "./test/stubs-2258/_site", options);
+  await elev1.toJSON();
+  await elev2.toJSON();
+
+  t.assert.notStrictEqual(elev1.eleventyConfig.eventBus, elev2.eleventyConfig.eventBus);
+
+  let caches1 = TemplateContent.getCaches(elev1.eleventyConfig);
+  let caches2 = TemplateContent.getCaches(elev2.eleventyConfig);
+  t.assert.notStrictEqual(caches1, caches2);
+
+  let size2 = caches2.input.size;
+  t.assert.ok(size2 > 0);
+
+  for (let inputPath of caches1.input.keys()) {
+    elev1.eleventyConfig.eventBus.emit("buildawesome.resourcemodified", inputPath);
+  }
+  t.assert.strictEqual(caches1.input.size, 0);
+  t.assert.strictEqual(caches2.input.size, size2);
+});
 
 test("`useLayouts: false` custom engine property #2830", async (t) => {
   let elev = new Eleventy("./test/stubs-2258-2830-skip-layouts/", "./test/stubs-2258-2830-skip-layouts/_site", {

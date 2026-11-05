@@ -1,7 +1,5 @@
 import { TemplatePath } from "@11ty/eleventy-utils";
 
-import eventBus from "./EventBus.js";
-
 // Note: this is only used for TemplateLayout right now but could be used for more
 // Just be careful because right now the TemplateLayout cache keys are not directly mapped to paths
 // So you may get collisions if you use this for other things.
@@ -87,12 +85,19 @@ class LayoutCache {
 	}
 }
 
-let layoutCache = new LayoutCache();
+const caches = new WeakMap();
 
-eventBus.on("buildawesome.resourcemodified", () => {
-	// https://github.com/11ty/eleventy-plugin-bundle/issues/10
-	layoutCache.removeAll();
-});
+function getLayoutCache(templateConfig) {
+	let layoutCache = caches.get(templateConfig);
+	if (!layoutCache) {
+		layoutCache = new LayoutCache();
+		// https://github.com/11ty/eleventy-plugin-bundle/issues/10
+		templateConfig.eventBus.on("buildawesome.resourcemodified", () => {
+			layoutCache.removeAll();
+		});
+		caches.set(templateConfig, layoutCache);
+	}
+	return layoutCache;
+}
 
-// singleton
-export default layoutCache;
+export { LayoutCache, getLayoutCache };
