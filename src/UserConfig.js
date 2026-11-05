@@ -1,3 +1,4 @@
+/// <reference path="./UserConfigExtended.ts" preserve="true" />
 import { DeepCopy, TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 
 import { createDebug } from "./Util/DebugLogUtil.js";

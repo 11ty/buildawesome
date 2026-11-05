@@ -21,7 +21,10 @@ for (let typeFile of eligible) {
 	let srcFile = typeFile.replace("types/", "src/");
 	srcFile = srcFile.replace(".d.ts", ".js");
 
-	if (!allowedSourceFiles.has(srcFile)) {
+	if (
+		!allowedSourceFiles.has(srcFile) &&
+		!allowedSourceFiles.has(srcFile.replace(/\.js$/, ".ts"))
+	) {
 		deletedFiles.add(typeFile);
 		rmSync(typeFile);
 	} else {
