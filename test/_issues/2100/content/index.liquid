@@ -1,0 +1,11 @@
+{% assign name = "Ray" %}
+<p>Hello World, and {{ name }}</p>
+{% renderTemplate "md" %}
+# I am a title
+
+* I am a list
+* I am a list
+{% endrenderTemplate %}
+{% renderTemplate "liquid,md" %}
+* {% include "hello.liquid" %}
+{% endrenderTemplate %}
