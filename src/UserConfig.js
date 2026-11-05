@@ -1236,6 +1236,9 @@ export default class UserConfig {
 	}
 
 	addExperimentalBehavior(flag) {
+		this.logger?.warn(
+			`Experimental behavior enabled: ${flag}. Experimental APIs can change at any time.`,
+		);
 		this.#experimentalFlags.push(flag);
 	}
 

@@ -11,6 +11,7 @@ import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
 import TemplateRender from "./TemplateRender.js";
 import BaseError from "./Errors/BaseError.js";
 import ErrorUtil from "./Errors/ErrorUtil.js";
+import { TemplateQueryRegistry } from "./Util/TemplateQuery.js";
 
 const { set: lodashSet } = lodash;
 const debug = createDebug("TemplateContent");
@@ -259,6 +260,12 @@ class TemplateContent {
 			try {
 				// Added in 3.0, passed along to front matter engines
 				options.filePath = this.inputPath;
+				if (this.config.experimentalFlags.includes(TemplateQueryRegistry.FLAGS.QUERY)) {
+					options.globals = this.eleventyConfig.queryRegistry.createApi(
+						this.inputPath,
+						this.eleventyConfig.directories,
+					);
+				}
 				fm = matter(content, options);
 			} catch (e) {
 				throw new TemplateContentFrontMatterError(
