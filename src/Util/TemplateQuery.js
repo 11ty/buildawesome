@@ -147,14 +147,16 @@ export class TemplateQueryRegistry {
 		};
 
 		return {
-			query: (target) => {
-				let results = add(true, target, [target]);
-				return createLazyProxy(
-					() => results[0],
-					() => results.length > 0,
-				);
+			collections: {
+				query: (target) => {
+					let results = add(true, target, [target]);
+					return createLazyProxy(
+						() => results[0],
+						() => results.length > 0,
+					);
+				},
+				queryAll: (globs) => add(false, globs, Array.isArray(globs) ? globs : [globs]),
 			},
-			queryAll: (globs) => add(false, globs, Array.isArray(globs) ? globs : [globs]),
 		};
 	}
 
@@ -181,7 +183,7 @@ export class TemplateQueryRegistry {
 			let matches = this.#getMatches(query);
 			if (query.single && matches.length === 0) {
 				throw new Error(
-					`\`query(${JSON.stringify(query.target)})\` in ${inputPath} did not match a template.`,
+					`\`collections.query(${JSON.stringify(query.target)})\` in ${inputPath} did not match a template.`,
 				);
 			}
 			for (let mapEntry of matches) {

@@ -24,7 +24,7 @@ test("query() in JavaScript front matter returns a template that renders first",
 		[
 			"a.md",
 			`---js
-const target = query("z.njk");
+const target = collections.query("z.njk");
 ---
 [{{ target.content }}|{{ target.url }}|{{ target.data.title }}]`,
 		],
@@ -53,7 +53,7 @@ test("queryAll() supports globs", async (t) => {
 		[
 			"posts/index.njk",
 			`---js
-const posts = queryAll("*.md");
+const posts = collections.queryAll("*.md");
 ---
 {{ posts.length }}:{% for post in posts %}{{ post.data.title }},{% endfor %}`,
 		],
@@ -71,7 +71,7 @@ test("queryAll() content works in Liquid loops", async (t) => {
 		[
 			"index.liquid",
 			`---js
-const posts = queryAll(["posts/*.md"]);
+const posts = collections.queryAll(["posts/*.md"]);
 ---
 {% for post in posts %}{{ post.content }}{% endfor %}`,
 		],
@@ -88,7 +88,7 @@ test("query() finds templates excluded from collections", async (t) => {
 		[
 			"a.njk",
 			`---js
-const target = query("hidden.md");
+const target = collections.query("hidden.md");
 ---
 {{ target.content | safe }}`,
 		],
@@ -104,7 +104,7 @@ test("query() that matches nothing throws", async (t) => {
 		[
 			"a.njk",
 			`---js
-const target = query("missing.md");
+const target = collections.query("missing.md");
 ---
 {{ target.content }}`,
 		],
@@ -116,29 +116,14 @@ const target = query("missing.md");
 	});
 });
 
-test("Front matter that declares its own `query` is unchanged", async (t) => {
-	let elev = getEleventy([
-		[
-			"a.njk",
-			`---js
-const query = "mine";
----
-{{ query }}`,
-		],
-	]);
-
-	let results = byUrl(await elev.toJSON());
-	t.assert.strictEqual(results["/a/"], "mine");
-});
-
 test("Paths are relative to the calling file, and a leading `/` is the input directory", async (t) => {
 	let elev = getEleventy([
 		[
 			"blog/index.njk",
 			`---js
-const sibling = query("post.md");
-const fromRoot = query("/about.md");
-const notes = queryAll("/notes/*.md");
+const sibling = collections.query("post.md");
+const fromRoot = collections.query("/about.md");
+const notes = collections.queryAll("/notes/*.md");
 ---
 {{ sibling.data.title }}|{{ fromRoot.data.title }}|{{ notes.length }}`,
 		],
@@ -155,7 +140,7 @@ const notes = queryAll("/notes/*.md");
 test("Templates sharing a queryAll() glob each get their own Array, including themselves", async (t) => {
 	let arrays = new Set();
 	let template = `---js
-const posts = queryAll("*.md");
+const posts = collections.queryAll("*.md");
 ---
 {{ posts | track }}{% assign sorted = posts | sort: "url" %}{% for post in sorted %}{{ post.url }}{% endfor %}`;
 	let elev = getEleventy(
@@ -184,14 +169,14 @@ test("query() can return the calling template, but not its content", async (t) =
 		[
 			"a.njk",
 			`---js
-const self = query("a.njk");
+const self = collections.query("a.njk");
 ---
 {{ self.url }}`,
 		],
 		[
 			"b.njk",
 			`---js
-const self = query("b.njk");
+const self = collections.query("b.njk");
 ---
 {{ self.content }}`,
 		],
@@ -206,7 +191,7 @@ const self = query("b.njk");
 		[
 			"a.njk",
 			`---js
-const self = query("a.njk");
+const self = collections.query("a.njk");
 ---
 {{ self.url }}`,
 		],
@@ -221,7 +206,7 @@ test("queryAll() returns an Array", async (t) => {
 			[
 				"index.njk",
 				`---js
-const posts = queryAll("posts/*.md");
+const posts = collections.queryAll("posts/*.md");
 ---
 {{ posts | isArray }}:{{ posts | join(",") | length > 0 }}`,
 			],
@@ -241,7 +226,7 @@ test("Pagination works over queryAll() results", async (t) => {
 		[
 			"index.njk",
 			`---js
-const posts = queryAll("posts/*.md");
+const posts = collections.queryAll("posts/*.md");
 const pagination = { data: "posts", size: 1, alias: "post" };
 const permalink = "/page-{{ pagination.pageNumber }}/";
 ---
@@ -267,11 +252,11 @@ test("Array methods called on queryAll() in front matter apply once results exis
 		[
 			"index.njk",
 			`---js
-const posts = queryAll("posts/*.md").sort((a, b) => b.data.order - a.data.order);
-const titles = queryAll("posts/*.md")
+const posts = collections.queryAll("posts/*.md").sort((a, b) => b.data.order - a.data.order);
+const titles = collections.queryAll("posts/*.md")
 	.filter((post) => post.data.order > 1)
 	.map((post) => post.data.title);
-const reversed = queryAll("posts/*.md").sort((a, b) => a.data.order - b.data.order).reverse();
+const reversed = collections.queryAll("posts/*.md").sort((a, b) => a.data.order - b.data.order).reverse();
 ---
 {% for post in posts %}{{ post.data.title }},{% endfor %}|{{ titles | join(",") }}|{{ reversed[0].data.title }}`,
 		],
@@ -292,9 +277,9 @@ test("Destructuring query() in front matter resolves once results exist", async 
 		[
 			"blog/index.njk",
 			`---js
-const posts = queryAll("*.md");
-const { data: about } = query("/about.md");
-const { url: aboutUrl } = query("/about.md");
+const posts = collections.queryAll("*.md");
+const { data: about } = collections.query("/about.md");
+const { url: aboutUrl } = collections.query("/about.md");
 ---
 <p>{{ about.summary }} <a href="{{ about.page.url }}">More</a> {{ aboutUrl }}</p>`,
 		],
