@@ -45,6 +45,7 @@ class TemplateMap {
 		this.collectionsData = null;
 		this.cached = false;
 		this.collection = new TemplateCollection();
+		eleventyConfig.queryRegistry.setTemplateMap(this);
 	}
 
 	set userConfig(config) {
@@ -149,6 +150,8 @@ class TemplateMap {
 		);
 
 		this.config.uses.addNewNodeRelationships(entry.inputPath, consumes, publishes);
+
+		this.eleventyConfig.queryRegistry.addToGraph(entry.inputPath, this.config.uses);
 	}
 
 	addAllToGlobalDependencyGraph() {
@@ -229,6 +232,7 @@ class TemplateMap {
 
 			// is a template entry
 			let map = this.getMapEntryForInputPath(depEntry);
+			this.eleventyConfig.queryRegistry.populate(map.inputPath);
 			await this.#initDependencyMapEntry(map);
 		}
 
@@ -332,6 +336,7 @@ class TemplateMap {
 		);
 
 		await this.initDependencyMap(fullTemplateOrder);
+		this.eleventyConfig.queryRegistry.populateAll();
 		await this.resolveRemainingComputedData();
 
 		let orderedPaths = this.#removeTagsFromTemplateOrder(fullTemplateOrder);

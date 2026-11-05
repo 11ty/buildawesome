@@ -1,18 +1,16 @@
-import { parseCode, walkCode, importFromString } from "import-module-string";
-import { isBuiltin } from "node:module";
+import { importAsFunction } from "./ImportAsFunction.js";
 
 export async function RetrieveGlobals(code, filePath, options = {}) {
-	let { isJavaScriptFrontMatterCompat } = Object.assign(
-		{ isJavaScriptFrontMatterCompat: false },
-		options,
-	);
-	let data = {
-		page: {
-			// Theoretically fileSlug and filePathStem could be added here but require extensionMap
-			inputPath: filePath,
+	let { isJavaScriptFrontMatterCompat = false, globals } = options;
+	return importAsFunction(code, {
+		filePath,
+		implicitExports: !isJavaScriptFrontMatterCompat,
+		data: {
+			...globals,
+			page: {
+				// Theoretically fileSlug and filePathStem could be added here but require extensionMap
+				inputPath: filePath,
+			},
 		},
-	};
-
-	let implicitExports = isJavaScriptFrontMatterCompat ? false : true;
-	return importFromString(code, { data, filePath, implicitExports });
+	});
 }

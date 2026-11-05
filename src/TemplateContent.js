@@ -259,6 +259,10 @@ class TemplateContent {
 			try {
 				// Added in 3.0, passed along to front matter engines
 				options.filePath = this.inputPath;
+				options.globals = this.eleventyConfig.queryRegistry.createApi(
+					this.inputPath,
+					this.eleventyConfig.directories,
+				);
 				fm = matter(content, options);
 			} catch (e) {
 				throw new TemplateContentFrontMatterError(

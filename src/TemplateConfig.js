@@ -8,6 +8,7 @@ import { DynamicImportRaw } from "./Util/Require.js";
 import BaseError from "./Errors/BaseError.js";
 import UserConfig from "./UserConfig.js";
 import GlobalDependencyMap from "./GlobalDependencyMap.js";
+import { TemplateQueryRegistry } from "./Util/TemplateQuery.js";
 import ExistsCache from "./Util/ExistsCache.js";
 import ProjectTemplateFormats from "./Util/ProjectTemplateFormats.js";
 import { expandEligibleJavaScriptFilePaths } from "./Util/FilePathUtil.js";
@@ -50,6 +51,7 @@ class TemplateConfig {
 	#userConfig = new UserConfig();
 	#existsCache = new ExistsCache();
 	#usesGraph;
+	#queryRegistry = new TemplateQueryRegistry();
 	#activeConfigPath;
 
 	constructor(customRootConfig, projectConfigPath) {
@@ -571,6 +573,11 @@ class TemplateConfig {
 			this.#usesGraph.setTemplateConfig(this);
 		}
 		return this.#usesGraph;
+	}
+
+	// `query`/`queryAll` calls from JavaScript front matter
+	get queryRegistry() {
+		return this.#queryRegistry;
 	}
 
 	/**
