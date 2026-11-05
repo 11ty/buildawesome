@@ -1520,6 +1520,23 @@ test("Recognizes a Premature Template Content Error wrapped by a Nunjucks filter
   t.assert.strictEqual(ErrorUtil.isPrematureTemplateContentError(error), true);
 });
 
+test("Recognizes a Premature Template Content Error wrapped by a custom extension (#2328)", async (t) => {
+  let error = await getPrematureErrorFromRendering(t, "./test/stubs/prematureTemplateContent/test.wrapped", function (cfg) {
+    cfg.addExtension("wrapped", {
+      compile: function () {
+        return function (data) {
+          try {
+            return data.sample.templateContent;
+          } catch (e) {
+            throw new Error("Custom engine failed", { cause: e });
+          }
+        };
+      },
+    });
+  });
+  t.assert.strictEqual(ErrorUtil.isPrematureTemplateContentError(error), true);
+});
+
 test("Premature Template Content Error detection handles cycles", (t) => {
   let error = new Error("Outer error");
   let cause = new Error("Inner error");
