@@ -132,7 +132,7 @@ test("Eleventy file watching", async (t) => {
   await elev.eleventyFiles.getFiles();
   await elev.startWatch();
 
-  let { targets, ignores } = await elev.getWatchedTargets();
+  let { targets, ignores, projectIgnores } = await elev.getWatchedTargets();
   await elev.stopWatch();
 
   t.assert.deepStrictEqual(targets, [
@@ -148,11 +148,11 @@ test("Eleventy file watching", async (t) => {
     "./test/stubs/deps/dep2.cjs",
   ]);
 
-  t.assert.strictEqual(ignores.includes("node_modules/**"), true);
+  t.assert.strictEqual(projectIgnores.includes("node_modules/**"), true);
   t.assert.strictEqual(ignores.includes("**/node_modules/**"), true);
   t.assert.strictEqual(ignores.includes("test/stubs/_site/**"), true);
   t.assert.strictEqual(ignores.includes("./.git/**"), true);
-  t.assert.strictEqual(ignores.includes(".cache"), true);
+  t.assert.strictEqual(projectIgnores.includes(".cache"), true);
 });
 
 test("Eleventy file watching (don’t watch deps of passthrough copy .js files)", async (t) => {
@@ -182,7 +182,7 @@ test("Eleventy file watching (no JS dependencies)", async (t) => {
   await elev.init();
   await elev.startWatch();
 
-  let { targets, ignores } = await elev.getWatchedTargets();
+  let { targets, ignores, projectIgnores } = await elev.getWatchedTargets();
 
   await elev.stopWatch();
 
@@ -197,11 +197,11 @@ test("Eleventy file watching (no JS dependencies)", async (t) => {
     `./test/stubs/**/*.{json,data.mjs,data.cjs,data.js,data.mts,data.cts,data.ts,11tydata.mjs,11tydata.cjs,11tydata.js,11tydata.mts,11tydata.cts,11tydata.ts}`,
   ]);
 
-  t.assert.strictEqual(ignores.includes("node_modules/**"), true);
+  t.assert.strictEqual(projectIgnores.includes("node_modules/**"), true);
   t.assert.strictEqual(ignores.includes("**/node_modules/**"), true);
   t.assert.strictEqual(ignores.includes("test/stubs/_site/**"), true);
   t.assert.strictEqual(ignores.includes("./.git/**"), true);
-  t.assert.strictEqual(ignores.includes(".cache"), true);
+  t.assert.strictEqual(projectIgnores.includes(".cache"), true);
 });
 
 test("Eleventy set input/output, one file input", async (t) => {

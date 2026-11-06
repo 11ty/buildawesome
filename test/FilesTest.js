@@ -407,10 +407,11 @@ test("Glob Watcher Files with Config Passthroughs (one template format)", async 
 
   t.assert.deepStrictEqual(evf.getGlobWatcherFiles(), [
     "./test/stubs/**/*.njk",
-    "./test/stubs/img/**",
     "./test/stubs/_includes/**",
     "./test/stubs/_data/**",
   ]);
+
+  t.assert.deepStrictEqual(evf.getGlobWatcherFilesForCopiedPassthroughCopy(), ["./test/stubs/img/**"]);
 });
 
 test("Glob Watcher Files with Config Passthroughs (one template format) with Dev Server (for free passthrough copy #2456)", async (t) => {
@@ -461,11 +462,11 @@ test("Glob Watcher Files with Dev Server rebuild for passthroughs that can’t b
 
   t.assert.deepStrictEqual(evf.getGlobWatcherFiles(), [
     "./test/stubs/**/*.njk",
-    "./test/stubs/template-passthrough/static/**",
     "./test/stubs/_includes/**",
     "./test/stubs/_data/**",
   ]);
 
+  t.assert.deepStrictEqual(evf.getGlobWatcherFilesForCopiedPassthroughCopy(), ["./test/stubs/template-passthrough/static/**"]);
   t.assert.deepStrictEqual(evf.getGlobWatcherFilesForPassthroughCopy(), ["./test/stubs/img/**"]);
 });
 
