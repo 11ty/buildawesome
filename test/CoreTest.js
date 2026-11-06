@@ -1969,3 +1969,74 @@ test("Cleaner constructor args #3880", async (t) => {
   t.assert.strictEqual(results.length, 1);
   t.assert.strictEqual(results[0].content.trim(), `<h1>Title</h1>`);
 });
+
+test("--pathprefix is available as $config.pathPrefix in the config callback #3439", async (t) => {
+  let pathPrefix;
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    pathPrefix: "/hi/",
+    config: $config => {
+      pathPrefix = $config.pathPrefix;
+    }
+  });
+  elev.disableLogger();
+  await elev.init();
+
+  t.assert.strictEqual(pathPrefix, "/hi/");
+});
+
+test("--formats is available as $config.templateFormats in the config callback #3440", async (t) => {
+  let templateFormats;
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      templateFormats = $config.templateFormats;
+    }
+  });
+  elev.setFormats("md,njk");
+  elev.disableLogger();
+  await elev.init();
+
+  t.assert.deepStrictEqual(templateFormats, ["md", "njk"]);
+  t.assert.deepStrictEqual(elev.config.templateFormats, ["md", "njk"]);
+});
+
+test("--formats=* still includes default formats #3440", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/");
+  elev.setFormats("*");
+  elev.disableLogger();
+  await elev.init();
+
+  t.assert.deepStrictEqual(elev.config.templateFormats, ["liquid", "md", "njk", "html", "11ty.js"]);
+});
+
+test("--pathprefix is available as $config.pathPrefix in a config file #3439", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    pathPrefix: "/hi/",
+    configPath: "./test/stubs/cfg-cli-sync/pathprefix.config.js",
+  });
+  elev.disableLogger();
+
+  let results = await elev.toJSON();
+  t.assert.strictEqual(results[0].content, "/hi/");
+});
+
+test("--formats is available as $config.templateFormats in a config file #3440", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    configPath: "./test/stubs/cfg-cli-sync/formats.config.js",
+  });
+  elev.setFormats("njk,md");
+  elev.disableLogger();
+
+  let results = await elev.toJSON();
+  t.assert.strictEqual(results[0].content, "njk,md");
+});
+
+test("--formats=* includes formats from setTemplateFormats in a config file #3440", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    configPath: "./test/stubs/cfg-cli-sync/formats-override.config.js",
+  });
+  elev.setFormats("*");
+  elev.disableLogger();
+  await elev.init();
+
+  t.assert.deepStrictEqual(elev.config.templateFormats, ["njk", "liquid"]);
+});

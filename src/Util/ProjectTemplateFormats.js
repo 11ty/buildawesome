@@ -106,6 +106,14 @@ class ProjectTemplateFormats {
 		this.#values.configAdd = this.#normalize(formats);
 	}
 
+	// Returns undefined for `--formats=*`, which isn't resolvable until after config merges.
+	getCommandLineFormats() {
+		if (this.#raw.cli === undefined || this.#useAll.cli) {
+			return;
+		}
+		return Array.from(this.#values.cli);
+	}
+
 	getAllTemplateFormats() {
 		return Array.from(ProjectTemplateFormats.union(this.#values.config, this.#values.configAdd));
 	}

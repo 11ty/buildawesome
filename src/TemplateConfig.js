@@ -45,6 +45,7 @@ class PluginError extends BaseError {}
  */
 class TemplateConfig {
 	#templateFormats;
+	#cliTemplateFormats;
 	#runMode;
 	#configManuallyDefined = false;
 	/** @type {UserConfig} */
@@ -131,6 +132,16 @@ class TemplateConfig {
 	/* Setter for TemplateFormats instance */
 	setTemplateFormats(templateFormats) {
 		this.#templateFormats = templateFormats;
+		this.#syncCommandLineTemplateFormats();
+	}
+
+	// Expose `--formats` as `$config.templateFormats` in the configuration callback.
+	#syncCommandLineTemplateFormats() {
+		let formats = this.#templateFormats?.getCommandLineFormats();
+		this.#cliTemplateFormats = formats ? Object.freeze(formats) : undefined;
+		if (this.#cliTemplateFormats) {
+			this.userConfig.templateFormats = this.#cliTemplateFormats;
+		}
 	}
 
 	get templateFormats() {
@@ -201,6 +212,7 @@ class TemplateConfig {
 	async reset() {
 		this.#existsCache.reset();
 		this.userConfig.reset();
+		this.#syncCommandLineTemplateFormats();
 		this.usesGraph.reset(); // needs to be before forceReloadConfig #3711
 
 		// await this.initializeRootConfig();
@@ -289,6 +301,7 @@ class TemplateConfig {
 		if (pathPrefix && pathPrefix !== "/") {
 			debug("Setting pathPrefix to %o", pathPrefix);
 			this.overrides.pathPrefix = pathPrefix;
+			this.userConfig.pathPrefix = pathPrefix;
 		}
 	}
 
@@ -472,8 +485,11 @@ class TemplateConfig {
 			}
 		}
 
-		// `templateFormats` is an override via `setTemplateFormats`
-		if (this.userConfig?.templateFormats) {
+		// `templateFormats` is an override via `setTemplateFormats` (ignore the synced command line value)
+		if (
+			this.userConfig?.templateFormats &&
+			this.userConfig.templateFormats !== this.#cliTemplateFormats
+		) {
 			this.templateFormats.setViaConfig(this.userConfig.templateFormats);
 		} else if (localConfig?.templateFormats || this.rootConfig?.templateFormats) {
 			// Local project config or defaultConfig.js
