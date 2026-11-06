@@ -1,12 +1,15 @@
 import matchHelper from "posthtml-match-helper";
 import { decodeHTML } from "entities";
 
-const POSTHTML_PLUGIN_NAME = "11ty/eleventy/id-attribute";
+import { resolveAttributeName } from "../Util/PostHtml/Attrs.js";
+
+const POSTHTML_PLUGIN_NAME = "awesome.me/buildawesome/id-attribute";
 
 function getTextNodeContent(node) {
-	let ignoredAttr = node.attrs?.["eleventy:id-ignore"];
-	if (ignoredAttr === "" || ignoredAttr === true) {
-		delete node.attrs["eleventy:id-ignore"];
+	let ignoredAttrName = resolveAttributeName(node.attrs, "buildawesome:id-ignore");
+
+	if (ignoredAttrName !== undefined) {
+		delete node.attrs[ignoredAttrName];
 		return "";
 	}
 	if (!node.content) {

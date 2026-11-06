@@ -12,6 +12,7 @@ export function isGlobMatch(filepath, globs = [], options = undefined) {
 		{
 			dot: true,
 			nocase: true, // insensitive
+			posix: true,
 		},
 		options,
 	);

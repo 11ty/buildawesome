@@ -1,10 +1,10 @@
-import test from "ava";
-import Eleventy from "../src/Eleventy.js";
+import test from "node:test";
+import Eleventy from "../src/Core.js";
 
 test("#3850 Computed Data regression part 2", async (t) => {
   let elev = new Eleventy("test/noop", false, {
-    config(eleventyConfig) {
-      eleventyConfig.addTemplate("index.njk", `---
+    config($config) {
+      $config.addTemplate("index.njk", `---
 site:
   download_link_mac: "http://example.com/"
 eleventyComputed:
@@ -21,6 +21,6 @@ eleventyComputed:
   let results = await elev.toJSON();
   results.sort();
 
-  t.is(results.length, 1);
-  t.is(results[0]?.content.trim(), `http://example.com/:::[{"links":[{"url":"http://example.com/"}]}]`)
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0]?.content.trim(), `http://example.com/:::[{"links":[{"url":"http://example.com/"}]}]`)
 });

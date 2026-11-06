@@ -2,28 +2,27 @@ import { readFileSync } from "node:fs";
 import matter from "@11ty/gray-matter";
 import lodash from "@11ty/lodash-custom";
 import { DeepCopy, TemplatePath } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
 
 import JavaScriptFrontMatter from "./Engines/FrontMatter/JavaScript.js";
+import { createDebug } from "./Util/DebugLogUtil.js";
 import { EOL } from "./Util/NewLineAdapter.js";
 import TemplateData from "./Data/TemplateData.js";
+import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
 import TemplateRender from "./TemplateRender.js";
-import EleventyBaseError from "./Errors/EleventyBaseError.js";
-import EleventyErrorUtil from "./Errors/EleventyErrorUtil.js";
-import eventBus from "./EventBus.js";
-
-import { withResolvers } from "./Util/PromiseUtil.js";
+import BaseError from "./Errors/BaseError.js";
+import ErrorUtil from "./Errors/ErrorUtil.js";
+import { TemplateQueryRegistry } from "./Util/TemplateQuery.js";
 
 const { set: lodashSet } = lodash;
-const debug = debugUtil("Eleventy:TemplateContent");
-const debugDev = debugUtil("Dev:Eleventy:TemplateContent");
+const debug = createDebug("TemplateContent");
 
-class TemplateContentFrontMatterError extends EleventyBaseError {}
-class TemplateContentCompileError extends EleventyBaseError {}
-class TemplateContentRenderError extends EleventyBaseError {}
+class TemplateContentFrontMatterError extends BaseError {}
+class TemplateContentCompileError extends BaseError {}
+class TemplateContentRenderError extends BaseError {}
 
 class TemplateContent {
-	#initialized = false;
+	// The template render the preprocessor engine was looked up for (engines are recreated with it)
+	#initializedFor;
 	#config;
 	#templateRender;
 	#renderPreprocessorEngine;
@@ -44,10 +43,11 @@ class TemplateContent {
 			await this.getTemplateRender();
 		}
 
-		if (this.#initialized) {
+		if (this.#initializedFor === this.#templateRender) {
 			return;
 		}
-		this.#initialized = true;
+		this.#initializedFor = this.#templateRender;
+		this.#renderPreprocessorEngine = undefined;
 
 		let preprocessorEngineName = this.templateRender.getPreprocessorEngineName();
 		if (preprocessorEngineName && this.templateRender.engine.getName() !== preprocessorEngineName) {
@@ -218,7 +218,8 @@ class TemplateContent {
 
 					// Supplementary engines
 					engines: {
-						// Moved to a fork of gray-matter to modernize to js-yaml@4 internally
+						// v4: Moved to a fork of gray-matter to modernize to js-yaml@4 internally
+						// v4.0.0-alpha.11 gray-matter@3 upgrade removed timestamp/date from YAML parsing (workaround available at #4333)
 						// yaml: yaml.load.bind(yaml),
 
 						// Backwards compatible with `js` object front matter
@@ -259,12 +260,18 @@ class TemplateContent {
 			try {
 				// Added in 3.0, passed along to front matter engines
 				options.filePath = this.inputPath;
+				if (this.config.experimentalFlags.includes(TemplateQueryRegistry.FLAGS.QUERY)) {
+					options.globals = this.eleventyConfig.queryRegistry.createApi(
+						this.inputPath,
+						this.eleventyConfig.directories,
+					);
+				}
 				fm = matter(content, options);
 			} catch (e) {
 				throw new TemplateContentFrontMatterError(
 					`Having trouble reading front matter from template ${this.inputPath}`,
 					e,
-				);
+				).setFilePath(this.inputPath);
 			}
 
 			if (typeof fm.data?.then === "function") {
@@ -321,16 +328,29 @@ class TemplateContent {
 
 	/* Incremental builds cache the Template instances (in TemplateWriter) but
 	 * these template specific caches are important for Pagination */
-	static cache(path, content) {
-		this._inputCache.set(TemplatePath.absolutePath(path), content);
-	}
+	static #caches = new WeakMap();
 
-	static getCached(path) {
-		return this._inputCache.get(TemplatePath.absolutePath(path));
-	}
+	static getCaches(templateConfig) {
+		let caches = TemplateContent.#caches.get(templateConfig);
+		if (!caches) {
+			caches = {
+				input: new Map(),
+				compile: new Map(),
+			};
 
-	static deleteFromInputCache(path) {
-		this._inputCache.delete(TemplatePath.absolutePath(path));
+			templateConfig.eventBus.on("buildawesome.resourcemodified", (path) => {
+				caches.input.delete(TemplatePath.absolutePath(path));
+				caches.compile.get(TemplatePath.addLeadingDotSlash(path))?.clear();
+			});
+
+			// Used when the configuration file reset https://github.com/11ty/eleventy/issues/2147
+			templateConfig.eventBus.on("buildawesome.compilecachereset", () => {
+				caches.compile = new Map();
+			});
+
+			TemplateContent.#caches.set(templateConfig, caches);
+		}
+		return caches;
 	}
 
 	// Used via clone
@@ -364,7 +384,9 @@ class TemplateContent {
 		let content;
 
 		if (this.config.useTemplateCache) {
-			content = TemplateContent.getCached(this.inputPath);
+			content = TemplateContent.getCaches(this.eleventyConfig).input.get(
+				TemplatePath.absolutePath(this.inputPath),
+			);
 		}
 
 		if (!content && content !== "") {
@@ -373,7 +395,10 @@ class TemplateContent {
 			content = contentBuffer.toString("utf8");
 
 			if (this.config.useTemplateCache) {
-				TemplateContent.cache(this.inputPath, content);
+				TemplateContent.getCaches(this.eleventyConfig).input.set(
+					TemplatePath.absolutePath(this.inputPath),
+					content,
+				);
 			}
 		}
 
@@ -397,26 +422,40 @@ class TemplateContent {
 	async #getFrontMatterData() {
 		let fm = await this.read();
 
+		let virtualTemplateDefinition = this.getVirtualTemplateDefinition();
+		let virtualTemplateData;
+		if (virtualTemplateDefinition) {
+			virtualTemplateData = virtualTemplateDefinition.data;
+
+			TemplateData.cleanupData(virtualTemplateData, this.config.keys.tags, {
+				file: this.inputPath,
+				isVirtualTemplate: Boolean(virtualTemplateData),
+			});
+		}
+
 		// gray-matter isn’t async-friendly but can return a promise from custom front matter
 		if (fm.data instanceof Promise) {
 			fm.data = await fm.data;
 		}
 
-		let tr = await this.getTemplateRender();
-		let extraData = await tr.engine.getExtraDataFromFile(this.inputPath);
+		let frontMatterData = Object.assign({}, fm.data);
 
-		let virtualTemplateDefinition = this.getVirtualTemplateDefinition();
-		let virtualTemplateData;
-		if (virtualTemplateDefinition) {
-			virtualTemplateData = virtualTemplateDefinition.data;
-		}
-
-		let data = Object.assign({}, fm.data, extraData, virtualTemplateData);
-
-		TemplateData.cleanupData(data, {
+		TemplateData.cleanupData(frontMatterData, this.config.keys.tags, {
 			file: this.inputPath,
 			isVirtualTemplate: Boolean(virtualTemplateData),
 		});
+
+		let tr = await this.getTemplateRender();
+		let extraData = await tr.engine.getExtraDataFromFile(this.inputPath);
+
+		TemplateData.cleanupData(extraData, this.config.keys.tags, {
+			file: this.inputPath,
+			isVirtualTemplate: Boolean(virtualTemplateData),
+		});
+
+		let data = ResolveConfigurationData.normalize(
+			Object.assign(frontMatterData, extraData, virtualTemplateData),
+		);
 
 		return {
 			data,
@@ -437,10 +476,9 @@ class TemplateContent {
 		return this.templateRender.getEnginesList(engineOverride);
 	}
 
-	async getEngineOverride() {
-		return this.getFrontMatterData().then((data) => {
-			return data[this.config.keys.engineOverride];
-		});
+	// Pages pass the full data cascade, layouts pass their own front matter.
+	getEngineOverride(data) {
+		return data?.[this.config.keys.engineOverride];
 	}
 
 	// checks engines
@@ -454,14 +492,19 @@ class TemplateContent {
 	_getCompileCache(str) {
 		// Caches used to be bifurcated based on engine name, now they’re based on inputPath
 		// TODO does `cacheable` need to help inform whether a cache is used here?
-		let inputPathMap = TemplateContent._compileCache.get(this.inputPath);
+		let { compile } = TemplateContent.getCaches(this.eleventyConfig);
+		let inputPathMap = compile.get(this.inputPath);
 		if (!inputPathMap) {
 			inputPathMap = new Map();
-			TemplateContent._compileCache.set(this.inputPath, inputPathMap);
+			compile.set(this.inputPath, inputPathMap);
 		}
 
 		let cacheable = this.isTemplateCacheable();
 		let { useCache, key } = this.engine.getCompileCacheKey(str, this.inputPath);
+		// e.g. Markdown preprocessed by Nunjucks
+		if (useCache && this.#renderPreprocessorEngine) {
+			useCache = this.#renderPreprocessorEngine.getCompileCacheKey(str, this.inputPath).useCache;
+		}
 
 		// We also tie the compile cache key to the UserConfig instance, to alleviate issues with global template cache
 		// Better to move the cache to the Eleventy instance instead, no?
@@ -472,7 +515,7 @@ class TemplateContent {
 	}
 
 	async compile(str, options = {}) {
-		let { type, bypassMarkdown, engineOverride } = options;
+		let { type, templateOnly, engineOverride } = options;
 
 		// Must happen before cacheable fetch below
 		// Likely only necessary for Eleventy Layouts, see TemplateMap->initDependencyMap
@@ -481,18 +524,13 @@ class TemplateContent {
 		// this.templateRender is guaranteed here
 		let tr = await this.getTemplateRender();
 		if (engineOverride !== undefined) {
-			debugDev("%o overriding template engine to use %o", this.inputPath, engineOverride);
-			await tr.setEngineOverride(engineOverride, bypassMarkdown);
-		} else {
-			tr.setUseMarkdown(!bypassMarkdown);
+			await tr.setEngineOverride(engineOverride);
 		}
-		if (bypassMarkdown && !this.engine.needsCompilation(str)) {
+		if (templateOnly && !this.engine.needsCompilation(str)) {
 			return function () {
 				return str;
 			};
 		}
-
-		debugDev("%o compile() using engine: %o", this.inputPath, tr.engineName);
 
 		try {
 			let res;
@@ -510,7 +548,7 @@ class TemplateContent {
 
 					// Compilation is async, so we eagerly cache a Promise that eventually
 					// resolves to the compiled function
-					let withRes = withResolvers();
+					let withRes = Promise.withResolvers();
 					res = withRes.resolve;
 
 					cache.set(key, withRes.promise);
@@ -523,10 +561,10 @@ class TemplateContent {
 			templateBenchmark.before();
 			inputPathBenchmark.before();
 
-			let fn = await tr.getCompiledTemplate(str);
+			let fn = await tr.getCompiledTemplate(str, { templateOnly });
 			inputPathBenchmark.after();
 			templateBenchmark.after();
-			debugDev("%o getCompiledTemplate function created", this.inputPath);
+
 			if (this.config.useTemplateCache && res) {
 				res(fn);
 			}
@@ -540,33 +578,32 @@ class TemplateContent {
 			throw new TemplateContentCompileError(
 				`Having trouble compiling template ${this.inputPath}`,
 				e,
-			);
+			).setFilePath(this.inputPath);
 		}
 	}
 
-	getParseForSymbolsFunction(str) {
-		let engine = this.engine;
+	// The engine computed data renders with (e.g. Liquid for Markdown), Issue #2131
+	async getComputedDataEngine(data) {
+		let tr = await this.getTemplateRender();
+		return tr.getTemplateOnlyEngine(this.getEngineOverride(data));
+	}
 
-		// Don’t use markdown as the engine to parse for symbols
-		// TODO pass in engineOverride here
-		if (this.#renderPreprocessorEngine) {
-			engine = this.#renderPreprocessorEngine;
+	// Returns `undefined` when the engine can’t parse for symbols.
+	parseForSymbols(str, engine) {
+		if (!engine || !("parseForSymbols" in engine)) {
+			return;
 		}
 
-		if ("parseForSymbols" in engine) {
-			return () => {
-				if (Array.isArray(str)) {
-					return str
-						.filter((entry) => typeof entry === "string")
-						.map((entry) => engine.parseForSymbols(entry))
-						.flat();
-				}
-				if (typeof str === "string") {
-					return engine.parseForSymbols(str);
-				}
-				return [];
-			};
+		if (Array.isArray(str)) {
+			return str
+				.filter((entry) => typeof entry === "string")
+				.map((entry) => engine.parseForSymbols(entry))
+				.flat();
 		}
+		if (typeof str === "string") {
+			return engine.parseForSymbols(str);
+		}
+		return [];
 	}
 
 	// used by computed data or for permalink functions
@@ -589,7 +626,7 @@ class TemplateContent {
 
 		return this._render(str, data, {
 			type: "Computed Data",
-			bypassMarkdown: true,
+			templateOnly: true,
 		});
 	}
 
@@ -625,20 +662,21 @@ class TemplateContent {
 
 		return this._render(permalink, data, {
 			type: "Permalink",
-			bypassMarkdown: true,
+			templateOnly: true,
 		});
 	}
 
-	async render(str, data, bypassMarkdown) {
+	async render(str, data, templateOnly, renderContext) {
 		return this._render(str, data, {
 			type: "Content",
-			bypassMarkdown,
+			templateOnly,
+			renderContext,
 		});
 	}
 
 	_getPaginationLogSuffix(data) {
 		let suffix = [];
-		if ("pagination" in data) {
+		if (data.pagination) {
 			suffix.push(" (");
 			if (data.pagination.pages) {
 				suffix.push(
@@ -653,16 +691,16 @@ class TemplateContent {
 	}
 
 	async _render(str, data, options = {}) {
-		let { bypassMarkdown, type } = options;
+		let { templateOnly, type, renderContext } = options;
 
 		try {
-			if (bypassMarkdown && !this.engine.needsCompilation(str)) {
+			if (templateOnly && !this.engine.needsCompilation(str)) {
 				return str;
 			}
 
 			let fn = await this.compile(str, {
-				bypassMarkdown,
-				engineOverride: data[this.config.keys.engineOverride],
+				templateOnly,
+				engineOverride: this.getEngineOverride(data),
 				type,
 			});
 
@@ -683,16 +721,17 @@ class TemplateContent {
 				inputPathBenchmark.before();
 			}
 
-			let rendered = await fn(data);
+			// `renderContext` collects intermediate output between pipeline steps
+			let rendered = await (renderContext ? fn(data, renderContext) : fn(data));
 
 			if (inputPathBenchmark) {
 				inputPathBenchmark.after();
 			}
 			templateBenchmark.after();
-			debugDev("%o getCompiledTemplate called, rendered content created", this.inputPath);
+
 			return rendered;
 		} catch (e) {
-			if (EleventyErrorUtil.isPrematureTemplateContentError(e)) {
+			if (ErrorUtil.isPrematureTemplateContentError(e)) {
 				return Promise.reject(e);
 			} else {
 				let tr = await this.getTemplateRender();
@@ -702,7 +741,7 @@ class TemplateContent {
 					new TemplateContentRenderError(
 						`Having trouble rendering ${engine} template ${this.inputPath}`,
 						e,
-					),
+					).setFilePath(this.inputPath),
 				);
 			}
 		}
@@ -767,24 +806,5 @@ class TemplateContent {
 		return false;
 	}
 }
-
-TemplateContent._inputCache = new Map();
-TemplateContent._compileCache = new Map();
-eventBus.on("eleventy.resourceModified", (path) => {
-	// delete from input cache
-	TemplateContent.deleteFromInputCache(path);
-
-	// delete from compile cache
-	let normalized = TemplatePath.addLeadingDotSlash(path);
-	let compileCache = TemplateContent._compileCache.get(normalized);
-	if (compileCache) {
-		compileCache.clear();
-	}
-});
-
-// Used when the configuration file reset https://github.com/11ty/eleventy/issues/2147
-eventBus.on("eleventy.compileCacheReset", () => {
-	TemplateContent._compileCache = new Map();
-});
 
 export default TemplateContent;

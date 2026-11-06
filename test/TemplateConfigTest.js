@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import md from "markdown-it";
 
 import TemplateConfig from "../src/TemplateConfig.js";
@@ -12,16 +12,16 @@ test("Template Config local config overrides base config", async (t) => {
 
   let cfg = templateCfg.getConfig();
 
-  t.is(cfg.markdownTemplateEngine, "njk");
-  t.is(cfg.templateFormats.join(","), "md,njk");
+  t.assert.strictEqual(cfg.markdownTemplateEngine, "njk");
+  t.assert.strictEqual(cfg.templateFormats.join(","), "md,njk");
 
   // merged, not overwritten
-  t.true(Object.keys(cfg.keys).length > 1);
-  t.truthy(Object.keys(cfg.nunjucksFilters).length);
+  t.assert.strictEqual(Object.keys(cfg.keys).length > 1, true);
+  t.assert.ok(Object.keys(cfg.nunjucksFilters).length);
 
-  t.is(Object.keys(cfg.transforms).length, 4);
+  t.assert.strictEqual(Object.keys(cfg.transforms).length, 4);
 
-  t.is(
+  t.assert.strictEqual(
     cfg.transforms.prettyHtml(`<html><body><div></div></body></html>`, "test.html"),
     `<html>
   <body>
@@ -38,7 +38,7 @@ test("Add liquid tag", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.liquidTags).indexOf("myTagName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.liquidTags).indexOf("myTagName"), -1);
 });
 
 test("Add nunjucks tag", async (t) => {
@@ -48,7 +48,7 @@ test("Add nunjucks tag", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.nunjucksTags).indexOf("myNunjucksTag"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksTags).indexOf("myNunjucksTag"), -1);
 });
 
 test("Add nunjucks global", async (t) => {
@@ -59,8 +59,8 @@ test("Add nunjucks global", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.nunjucksGlobals).indexOf("myNunjucksGlobal1"), -1);
-  t.not(Object.keys(cfg.nunjucksGlobals).indexOf("myNunjucksGlobal2"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksGlobals).indexOf("myNunjucksGlobal1"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksGlobals).indexOf("myNunjucksGlobal2"), -1);
 });
 
 test("Add liquid filter", async (t) => {
@@ -72,7 +72,7 @@ test("Add liquid filter", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.liquidFilters).indexOf("myFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.liquidFilters).indexOf("myFilterName"), -1);
 });
 
 test("Add nunjucks filter", async (t) => {
@@ -82,7 +82,7 @@ test("Add nunjucks filter", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.nunjucksFilters).indexOf("myFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksFilters).indexOf("myFilterName"), -1);
 });
 
 test("Add universal filter", async (t) => {
@@ -92,8 +92,8 @@ test("Add universal filter", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.liquidFilters).indexOf("myFilterName"), -1);
-  t.not(Object.keys(cfg.nunjucksFilters).indexOf("myFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.liquidFilters).indexOf("myFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksFilters).indexOf("myFilterName"), -1);
 });
 
 test("Add namespaced universal filter", async (t) => {
@@ -105,8 +105,8 @@ test("Add namespaced universal filter", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.liquidFilters).indexOf("testNamespaceMyFilterName"), -1);
-  t.not(Object.keys(cfg.nunjucksFilters).indexOf("testNamespaceMyFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.liquidFilters).indexOf("testNamespaceMyFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksFilters).indexOf("testNamespaceMyFilterName"), -1);
 });
 
 test("Add namespaced universal filter using underscore", async (t) => {
@@ -118,24 +118,24 @@ test("Add namespaced universal filter using underscore", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.liquidFilters).indexOf("testNamespace_myFilterName"), -1);
-  t.not(Object.keys(cfg.nunjucksFilters).indexOf("testNamespace_myFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.liquidFilters).indexOf("testNamespace_myFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksFilters).indexOf("testNamespace_myFilterName"), -1);
 });
 
 test("Add namespaced plugin", async (t) => {
   let templateCfg = new TemplateConfig();
 
   templateCfg.userConfig.namespace("testNamespace", function () {
-    templateCfg.userConfig.addPlugin(function (eleventyConfig) {
-      eleventyConfig.addFilter("MyFilterName", function () {});
+    templateCfg.userConfig.addPlugin(function ($config) {
+      $config.addFilter("MyFilterName", function () {});
     });
   });
 
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.liquidFilters).indexOf("testNamespaceMyFilterName"), -1);
-  t.not(Object.keys(cfg.nunjucksFilters).indexOf("testNamespaceMyFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.liquidFilters).indexOf("testNamespaceMyFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksFilters).indexOf("testNamespaceMyFilterName"), -1);
 });
 
 test("Add namespaced plugin using underscore", async (t) => {
@@ -149,8 +149,8 @@ test("Add namespaced plugin using underscore", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.liquidFilters).indexOf("testNamespace_myFilterName"), -1);
-  t.not(Object.keys(cfg.nunjucksFilters).indexOf("testNamespace_myFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.liquidFilters).indexOf("testNamespace_myFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksFilters).indexOf("testNamespace_myFilterName"), -1);
 });
 
 test("Empty namespace", async (t) => {
@@ -162,7 +162,7 @@ test("Empty namespace", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.nunjucksFilters).indexOf("myFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksFilters).indexOf("myFilterName"), -1);
 });
 
 test("Nested Empty Inner namespace", async (t) => {
@@ -177,7 +177,7 @@ test("Nested Empty Inner namespace", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.nunjucksFilters).indexOf("testNsmyFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksFilters).indexOf("testNsmyFilterName"), -1);
 });
 
 test("Nested Empty Outer namespace", async (t) => {
@@ -191,11 +191,11 @@ test("Nested Empty Outer namespace", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.nunjucksFilters).indexOf("testNsmyFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksFilters).indexOf("testNsmyFilterName"), -1);
 });
 
 // important for backwards compatibility with old
-// `module.exports = function (eleventyConfig, pluginNamespace) {`
+// `module.exports = function ($config, pluginNamespace) {`
 // plugin code
 test("Non-string namespaces are ignored", async (t) => {
   let templateCfg = new TemplateConfig(defaultConfig, "./test/stubs/config.cjs");
@@ -206,22 +206,22 @@ test("Non-string namespaces are ignored", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.nunjucksFilters).indexOf("myFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksFilters).indexOf("myFilterName"), -1);
 });
 
 test(".addPlugin oddity: I don’t think pluginNamespace was ever passed in here, but we don’t want this to break", async (t) => {
   let templateCfg = new TemplateConfig(defaultConfig, "./test/stubs/config.cjs");
 
-  templateCfg.userConfig.addPlugin(function (eleventyConfig, pluginNamespace) {
-    eleventyConfig.namespace(pluginNamespace, () => {
-      eleventyConfig.addNunjucksFilter("myFilterName", function () {});
+  templateCfg.userConfig.addPlugin(function ($config, pluginNamespace) {
+    $config.namespace(pluginNamespace, () => {
+      $config.addNunjucksFilter("myFilterName", function () {});
     });
   });
 
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.nunjucksFilters).indexOf("myFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksFilters).indexOf("myFilterName"), -1);
 });
 
 test("Test url universal filter with custom pathPrefix (no slash)", async (t) => {
@@ -231,7 +231,7 @@ test("Test url universal filter with custom pathPrefix (no slash)", async (t) =>
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.is(cfg.pathPrefix, "/testdirectory/");
+  t.assert.strictEqual(cfg.pathPrefix, "/testdirectory/");
 });
 
 test("setTemplateFormats(string)", async (t) => {
@@ -242,7 +242,7 @@ test("setTemplateFormats(string)", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.deepEqual(cfg.templateFormats, ["njk", "liquid"]);
+  t.assert.deepStrictEqual(cfg.templateFormats, ["njk", "liquid"]);
 });
 
 test("setTemplateFormats(array)", async (t) => {
@@ -252,7 +252,7 @@ test("setTemplateFormats(array)", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.deepEqual(cfg.templateFormats, ["njk", "liquid"]);
+  t.assert.deepStrictEqual(cfg.templateFormats, ["njk", "liquid"]);
 });
 
 test("setTemplateFormats(array, size 1)", async (t) => {
@@ -262,7 +262,7 @@ test("setTemplateFormats(array, size 1)", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.deepEqual(cfg.templateFormats, ["liquid"]);
+  t.assert.deepStrictEqual(cfg.templateFormats, ["liquid"]);
 });
 
 test("setTemplateFormats(empty array)", async (t) => {
@@ -272,7 +272,7 @@ test("setTemplateFormats(empty array)", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.deepEqual(cfg.templateFormats, []);
+  t.assert.deepStrictEqual(cfg.templateFormats, []);
 });
 
 test("setTemplateFormats(null)", async (t) => {
@@ -282,7 +282,7 @@ test("setTemplateFormats(null)", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.deepEqual([...cfg.templateFormats].sort(), ["md", "njk"]);
+  t.assert.deepStrictEqual([...cfg.templateFormats].sort(), ["md", "njk"]);
 });
 
 test("setTemplateFormats(undefined)", async (t) => {
@@ -292,7 +292,7 @@ test("setTemplateFormats(undefined)", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.deepEqual([...cfg.templateFormats].sort(), ["md", "njk"]);
+  t.assert.deepStrictEqual([...cfg.templateFormats].sort(), ["md", "njk"]);
 });
 
 test("multiple setTemplateFormats calls", async (t) => {
@@ -303,7 +303,7 @@ test("multiple setTemplateFormats calls", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.deepEqual(cfg.templateFormats, ["pug"]);
+  t.assert.deepStrictEqual(cfg.templateFormats, ["pug"]);
 });
 
 test("addTemplateFormats()", async (t) => {
@@ -313,7 +313,7 @@ test("addTemplateFormats()", async (t) => {
 
   let cfg = templateCfg.getConfig();
   // should have ALL of the original defaults
-  t.deepEqual(cfg.templateFormats, ["md", "njk", "vue"]);
+  t.assert.deepStrictEqual(cfg.templateFormats, ["md", "njk", "vue"]);
 });
 
 test("addTemplateFormats() via Plugin", async (t) => {
@@ -325,7 +325,7 @@ test("addTemplateFormats() via Plugin", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.deepEqual(cfg.templateFormats, ["liquid", "md", "njk", "html", "11ty.js", "pug", "webc"]);
+  t.assert.deepStrictEqual(cfg.templateFormats, ["liquid", "md", "njk", "html", "11ty.js", "pug", "webc"]);
 });
 
 
@@ -342,7 +342,7 @@ test("both setTemplateFormats and addTemplateFormats", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.deepEqual(cfg.templateFormats, ["pug", "vue"]);
+  t.assert.deepStrictEqual(cfg.templateFormats, ["pug", "vue"]);
 });
 
 test("addTemplateFormats() Array", async (t) => {
@@ -354,7 +354,7 @@ test("addTemplateFormats() Array", async (t) => {
 
   let cfg = templateCfg.getConfig();
   // should have ALL of the original defaults
-  t.deepEqual(cfg.templateFormats, ["md", "njk", "vue2", "vue", "text", "txt"]);
+  t.assert.deepStrictEqual(cfg.templateFormats, ["md", "njk", "vue2", "vue", "text", "txt"]);
 });
 
 test("libraryOverrides", async (t) => {
@@ -364,10 +364,10 @@ test("libraryOverrides", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.falsy(cfg.libraryOverrides.ldkja);
-  t.falsy(cfg.libraryOverrides.njk);
-  t.truthy(cfg.libraryOverrides.md);
-  t.deepEqual(mdLib, cfg.libraryOverrides.md);
+  t.assert.ok(!cfg.libraryOverrides.ldkja);
+  t.assert.ok(!cfg.libraryOverrides.njk);
+  t.assert.ok(cfg.libraryOverrides.md);
+  t.assert.deepStrictEqual(mdLib, cfg.libraryOverrides.md);
 });
 
 test("addGlobalData", async (t) => {
@@ -377,11 +377,11 @@ test("addGlobalData", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.globalData).indexOf("function"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.globalData).indexOf("function"), -1);
 });
 
 test("Properly throws error on missing module #182", async (t) => {
-  await t.throwsAsync(async () => {
+  await t.assert.rejects(async () => {
     let templateCfg = new TemplateConfig(defaultConfig, "./test/stubs/broken-config.cjs");
 
     await templateCfg.init();
@@ -391,7 +391,7 @@ test("Properly throws error on missing module #182", async (t) => {
 });
 
 test("Properly throws error when config returns a Promise", async (t) => {
-  await t.throwsAsync(async () => {
+  await t.assert.rejects(async () => {
     let templateCfg = new TemplateConfig(defaultConfig, "./test/stubs/config-promise.js");
     await templateCfg.init();
 
@@ -406,18 +406,18 @@ test(".addWatchTarget adds a watch target", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.deepEqual(cfg.additionalWatchTargets, ["/testdirectory/"]);
+  t.assert.deepStrictEqual(cfg.additionalWatchTargets, ["/testdirectory/"]);
 });
 
 test("Nested .addPlugin calls", async (t) => {
   t.plan(2);
   let templateCfg = new TemplateConfig();
 
-  templateCfg.userConfig.addPlugin(function OuterPlugin(eleventyConfig) {
-    t.truthy(true);
+  templateCfg.userConfig.addPlugin(function OuterPlugin($config) {
+    t.assert.ok(true);
 
-    eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
-      t.truthy(true);
+    $config.addPlugin(function InnerPlugin($config) {
+      t.assert.ok(true);
     });
   });
 
@@ -430,14 +430,14 @@ test("Nested .addPlugin calls (×3)", async (t) => {
   t.plan(3);
   let templateCfg = new TemplateConfig();
 
-  templateCfg.userConfig.addPlugin(function OuterPlugin(eleventyConfig) {
-    t.truthy(true);
+  templateCfg.userConfig.addPlugin(function OuterPlugin($config) {
+    t.assert.ok(true);
 
-    eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
-      t.truthy(true);
+    $config.addPlugin(function InnerPlugin($config) {
+      t.assert.ok(true);
 
-      eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
-        t.truthy(true);
+      $config.addPlugin(function InnerPlugin($config) {
+        t.assert.ok(true);
       });
     });
   });
@@ -452,17 +452,17 @@ test("Nested .addPlugin calls order", async (t) => {
   let templateCfg = new TemplateConfig();
   let order = [];
 
-  templateCfg.userConfig.addPlugin(function OuterPlugin(eleventyConfig) {
+  templateCfg.userConfig.addPlugin(function OuterPlugin($config) {
     order.push(1);
-    t.deepEqual(order, [1]);
+    t.assert.deepStrictEqual(order, [1]);
 
-    eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+    $config.addPlugin(function InnerPlugin($config) {
       order.push(2);
-      t.deepEqual(order, [1, 2]);
+      t.assert.deepStrictEqual(order, [1, 2]);
 
-      eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+      $config.addPlugin(function InnerPlugin($config) {
         order.push(3);
-        t.deepEqual(order, [1, 2, 3]);
+        t.assert.deepStrictEqual(order, [1, 2, 3]);
       });
     });
   });
@@ -477,28 +477,28 @@ test("Nested .addPlugin calls. More complex order", async (t) => {
   let templateCfg = new TemplateConfig();
   let order = [];
 
-  templateCfg.userConfig.addPlugin(function OuterPlugin(eleventyConfig) {
+  templateCfg.userConfig.addPlugin(function OuterPlugin($config) {
     order.push("1");
-    t.deepEqual(order, ["1"]);
+    t.assert.deepStrictEqual(order, ["1"]);
 
-    eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+    $config.addPlugin(function InnerPlugin($config) {
       order.push("2");
-      t.deepEqual(order, ["1", "2"]);
+      t.assert.deepStrictEqual(order, ["1", "2"]);
 
-      eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+      $config.addPlugin(function InnerPlugin($config) {
         order.push("3a");
-        t.deepEqual(order, ["1", "2", "3a"]);
+        t.assert.deepStrictEqual(order, ["1", "2", "3a"]);
       });
 
-      eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+      $config.addPlugin(function InnerPlugin($config) {
         order.push("3b");
-        t.deepEqual(order, ["1", "2", "3a", "3b"]);
+        t.assert.deepStrictEqual(order, ["1", "2", "3a", "3b"]);
       });
     });
 
-    eleventyConfig.addPlugin(function InnerPlugin(eleventyConfig) {
+    $config.addPlugin(function InnerPlugin($config) {
       order.push("2b");
-      t.deepEqual(order, ["1", "2", "3a", "3b", "2b"]);
+      t.assert.deepStrictEqual(order, ["1", "2", "3a", "3b", "2b"]);
     });
   });
 
@@ -511,8 +511,8 @@ test(".addPlugin has access to pathPrefix", async (t) => {
   t.plan(1);
   let templateCfg = new TemplateConfig();
 
-  templateCfg.userConfig.addPlugin(function (eleventyConfig) {
-    t.is(eleventyConfig.pathPrefix, "/");
+  templateCfg.userConfig.addPlugin(function ($config) {
+    t.assert.strictEqual($config.pathPrefix, "/");
   });
 
   await templateCfg.init();
@@ -525,8 +525,8 @@ test(".addPlugin has access to pathPrefix (override method)", async (t) => {
   let templateCfg = new TemplateConfig();
   templateCfg.setPathPrefix("/test/");
 
-  templateCfg.userConfig.addPlugin(function (eleventyConfig) {
-    t.is(eleventyConfig.pathPrefix, "/test/");
+  templateCfg.userConfig.addPlugin(function ($config) {
+    t.assert.strictEqual($config.pathPrefix, "/test/");
   });
 
   await templateCfg.init();
@@ -538,8 +538,8 @@ test("falsy pathPrefix should fall back to default", async (t) => {
   t.plan(1);
   let templateCfg = new TemplateConfig(defaultConfig, "./test/stubs/config-empty-pathprefix.cjs");
 
-  templateCfg.userConfig.addPlugin(function (eleventyConfig) {
-    t.is(eleventyConfig.pathPrefix, "/");
+  templateCfg.userConfig.addPlugin(function ($config) {
+    t.assert.strictEqual($config.pathPrefix, "/");
   });
 
   await templateCfg.init();
@@ -550,10 +550,10 @@ test("falsy pathPrefix should fall back to default", async (t) => {
 test("Add async plugin", async (t) => {
   let templateCfg = new TemplateConfig();
 
-  await templateCfg.userConfig.addPlugin(async (eleventyConfig) => {
+  await templateCfg.userConfig.addPlugin(async ($config) => {
     await new Promise((resolve) => {
       setTimeout(() => {
-        eleventyConfig.addFilter("myFilterName", function () {});
+        $config.addFilter("myFilterName", function () {});
         resolve();
       }, 10);
     });
@@ -562,17 +562,17 @@ test("Add async plugin", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.liquidFilters).indexOf("myFilterName"), -1);
-  t.not(Object.keys(cfg.nunjucksFilters).indexOf("myFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.liquidFilters).indexOf("myFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksFilters).indexOf("myFilterName"), -1);
 });
 
 test("Async namespace", async (t) => {
   let templateCfg = new TemplateConfig();
 
-  await templateCfg.userConfig.namespace("testNamespace", async (eleventyConfig) => {
+  await templateCfg.userConfig.namespace("testNamespace", async ($config) => {
     await new Promise((resolve) => {
       setTimeout(() => {
-        eleventyConfig.addFilter("MyFilterName", function () {});
+        $config.addFilter("MyFilterName", function () {});
         resolve();
       }, 10);
     });
@@ -581,34 +581,34 @@ test("Async namespace", async (t) => {
   await templateCfg.init();
 
   let cfg = templateCfg.getConfig();
-  t.not(Object.keys(cfg.liquidFilters).indexOf("testNamespaceMyFilterName"), -1);
-  t.not(Object.keys(cfg.nunjucksFilters).indexOf("testNamespaceMyFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.liquidFilters).indexOf("testNamespaceMyFilterName"), -1);
+  t.assert.notStrictEqual(Object.keys(cfg.nunjucksFilters).indexOf("testNamespaceMyFilterName"), -1);
 });
 
 test("ProjectDirectories instance exists in user accessible config", async (t) => {
-	let eleventyConfig = await getTemplateConfigInstance();
-  let cfg = eleventyConfig.getConfig();
+	let $config = await getTemplateConfigInstance();
+  let cfg = $config.getConfig();
 
-  t.truthy(cfg.directories);
-  t.is(cfg.directories.input, "./");
-  t.is(cfg.directories.data, "./_data/");
-  t.is(cfg.directories.includes, "./_includes/");
-  t.is(cfg.directories.layouts, undefined);
-  t.is(cfg.directories.output, "./_site/");
+  t.assert.ok(cfg.directories);
+  t.assert.strictEqual(cfg.directories.input, "./");
+  t.assert.strictEqual(cfg.directories.data, "./_data/");
+  t.assert.strictEqual(cfg.directories.includes, "./_includes/");
+  t.assert.strictEqual(cfg.directories.layouts, undefined);
+  t.assert.strictEqual(cfg.directories.output, "./_site/");
 
-	t.throws(() => {
+	t.assert.throws(() => {
 		cfg.directories.input = "should not work";
 	});
-	t.throws(() => {
+	t.assert.throws(() => {
 		cfg.directories.data = "should not work";
 	});
-	t.throws(() => {
+	t.assert.throws(() => {
 		cfg.directories.includes = "should not work";
 	});
-	t.throws(() => {
+	t.assert.throws(() => {
 		cfg.directories.layouts = "should not work";
 	});
-	t.throws(() => {
+	t.assert.throws(() => {
 		cfg.directories.output = "should not work";
 	});
 });
@@ -625,58 +625,58 @@ test("Test getters #3310", async (t) => {
 
   userCfg.addFilter("myFilter", function () {});
   userCfg.addFilter("myAsyncFilter", async function () {});
-  userCfg.addPlugin(function (eleventyConfig) {
-    eleventyConfig.addFilter("myPluginFilter", function () {});
+  userCfg.addPlugin(function ($config) {
+    $config.addFilter("myPluginFilter", function () {});
   });
 
   await templateCfg.init();
 
   let filterNames = Object.keys(userCfg.getFilters());
-  t.true(filterNames.includes("myFilter"));
-  t.true(filterNames.includes("myAsyncFilter"));
-  t.true(filterNames.includes("myPluginFilter"));
+  t.assert.strictEqual(filterNames.includes("myFilter"), true);
+  t.assert.strictEqual(filterNames.includes("myAsyncFilter"), true);
+  t.assert.strictEqual(filterNames.includes("myPluginFilter"), true);
 
   let filterNamesSync = Object.keys(userCfg.getFilters({ type: "sync" }));
-  t.true(filterNamesSync.includes("myFilter"));
-  t.false(filterNamesSync.includes("myAsyncFilter"));
-  t.true(filterNamesSync.includes("myPluginFilter"));
+  t.assert.strictEqual(filterNamesSync.includes("myFilter"), true);
+  t.assert.strictEqual(filterNamesSync.includes("myAsyncFilter"), false);
+  t.assert.strictEqual(filterNamesSync.includes("myPluginFilter"), true);
 
   let filterNamesAsync = Object.keys(userCfg.getFilters({ type: "async" }));
-  t.false(filterNamesAsync.includes("myFilter"));
-  t.true(filterNamesAsync.includes("myAsyncFilter"));
-  t.false(filterNamesAsync.includes("myPluginFilter"));
+  t.assert.strictEqual(filterNamesAsync.includes("myFilter"), false);
+  t.assert.strictEqual(filterNamesAsync.includes("myAsyncFilter"), true);
+  t.assert.strictEqual(filterNamesAsync.includes("myPluginFilter"), false);
 
-  t.truthy(userCfg.getFilter("myFilter"));
-  t.truthy(userCfg.getFilter("myAsyncFilter"));
-  t.truthy(userCfg.getFilter("myPluginFilter"));
+  t.assert.ok(userCfg.getFilter("myFilter"));
+  t.assert.ok(userCfg.getFilter("myAsyncFilter"));
+  t.assert.ok(userCfg.getFilter("myPluginFilter"));
 
   let shortcodeNames = Object.keys(userCfg.getShortcodes());
-  t.true(shortcodeNames.includes("myShortcode"));
-  t.true(shortcodeNames.includes("myAsyncShortcode"));
+  t.assert.strictEqual(shortcodeNames.includes("myShortcode"), true);
+  t.assert.strictEqual(shortcodeNames.includes("myAsyncShortcode"), true);
 
   let shortcodeNamesSync = Object.keys(userCfg.getShortcodes({ type: "sync" }));
-  t.true(shortcodeNamesSync.includes("myShortcode"));
-  t.false(shortcodeNamesSync.includes("myAsyncShortcode"));
+  t.assert.strictEqual(shortcodeNamesSync.includes("myShortcode"), true);
+  t.assert.strictEqual(shortcodeNamesSync.includes("myAsyncShortcode"), false);
 
   let shortcodeNamesAsync = Object.keys(userCfg.getShortcodes({ type: "async" }));
-  t.false(shortcodeNamesAsync.includes("myShortcode"));
-  t.true(shortcodeNamesAsync.includes("myAsyncShortcode"));
+  t.assert.strictEqual(shortcodeNamesAsync.includes("myShortcode"), false);
+  t.assert.strictEqual(shortcodeNamesAsync.includes("myAsyncShortcode"), true);
 
-  t.truthy(userCfg.getShortcode("myShortcode"));
-  t.truthy(userCfg.getShortcode("myAsyncShortcode"));
+  t.assert.ok(userCfg.getShortcode("myShortcode"));
+  t.assert.ok(userCfg.getShortcode("myAsyncShortcode"));
 
   let pairedShortcodeNames = Object.keys(userCfg.getPairedShortcodes());
-  t.true(pairedShortcodeNames.includes("myPairedShortcode"));
-  t.true(pairedShortcodeNames.includes("myPairedAsyncShortcode"));
+  t.assert.strictEqual(pairedShortcodeNames.includes("myPairedShortcode"), true);
+  t.assert.strictEqual(pairedShortcodeNames.includes("myPairedAsyncShortcode"), true);
 
   let pairedShortcodeNamesSync = Object.keys(userCfg.getPairedShortcodes({ type: "sync" }));
-  t.true(pairedShortcodeNamesSync.includes("myPairedShortcode"));
-  t.false(pairedShortcodeNamesSync.includes("myPairedAsyncShortcode"));
+  t.assert.strictEqual(pairedShortcodeNamesSync.includes("myPairedShortcode"), true);
+  t.assert.strictEqual(pairedShortcodeNamesSync.includes("myPairedAsyncShortcode"), false);
 
   let pairedShortcodeNamesAsync = Object.keys(userCfg.getPairedShortcodes({ type: "async" }));
-  t.false(pairedShortcodeNamesAsync.includes("myPairedShortcode"));
-  t.true(pairedShortcodeNamesAsync.includes("myPairedAsyncShortcode"));
+  t.assert.strictEqual(pairedShortcodeNamesAsync.includes("myPairedShortcode"), false);
+  t.assert.strictEqual(pairedShortcodeNamesAsync.includes("myPairedAsyncShortcode"), true);
 
-  t.truthy(userCfg.getPairedShortcode("myPairedShortcode"));
-  t.truthy(userCfg.getPairedShortcode("myPairedAsyncShortcode"));
+  t.assert.ok(userCfg.getPairedShortcode("myPairedShortcode"));
+  t.assert.ok(userCfg.getPairedShortcode("myPairedAsyncShortcode"));
 });

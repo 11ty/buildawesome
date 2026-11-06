@@ -6,7 +6,7 @@ import { isDynamicPattern } from "../Util/GlobMatcher.js";
 import DirContains from "./DirContains.js";
 
 /* Directories internally should always use *nix forward slashes */
-class ProjectDirectories {
+export default class ProjectDirectories {
 	static defaults = {
 		input: "./",
 		data: "./_data/", // Relative to input directory
@@ -24,6 +24,10 @@ class ProjectDirectories {
 
 	inputFile = undefined;
 	inputGlob = undefined;
+
+	static relativeToProjectRoot(fileOrDir) {
+		return this.normalizePath(TemplatePath.relativePath(fileOrDir));
+	}
 
 	// Add leading dot slash
 	// Use forward slashes
@@ -257,23 +261,17 @@ class ProjectDirectories {
 		return this.#dirs.output || ProjectDirectories.defaults.output;
 	}
 
+	// `filePath` is relative to the project root (e.g. a watched file) or absolute
 	isTemplateFile(filePath) {
-		let inputPath = this.getInputPath(filePath);
-		// TODO use DirContains
-		if (this.layouts && inputPath.startsWith(this.layouts)) {
-			return false;
-		}
-
-		// if this.includes is "" (and thus is the same directory as this.input)
-		// we don’t actually know if this is a template file, so defer
-		if (this.includes && this.includes !== this.input) {
-			if (inputPath.startsWith(this.includes)) {
+		let projectPath = ProjectDirectories.relativeToProjectRoot(filePath);
+		for (let dir of [this.layouts, this.includes, this.data]) {
+			// A directory that is also the input directory can’t tell us anything, so defer
+			if (dir && dir !== this.input && projectPath.startsWith(dir)) {
 				return false;
 			}
 		}
 
-		// TODO use DirContains
-		return inputPath.startsWith(this.input);
+		return projectPath.startsWith(this.input);
 	}
 
 	// for a hypothetical template file
@@ -287,10 +285,25 @@ class ProjectDirectories {
 	// Inverse of getInputPath
 	// Removes input dir from path
 	getInputPathRelativeToInputDirectory(filePathRelativeToInputDir) {
+		// Paths outside the input directory keep their `../` prefix to match `addTemplate` keys, #4409
+		if (!DirContains(this.input, filePathRelativeToInputDir)) {
+			return TemplatePath.standardizeFilePath(
+				path.relative(this.input, filePathRelativeToInputDir),
+			);
+		}
+
 		let inputDir = TemplatePath.addLeadingDotSlash(TemplatePath.join(this.input));
 
 		// No leading dot slash
 		return TemplatePath.stripLeadingSubPath(filePathRelativeToInputDir, inputDir);
+	}
+
+	// Removes output dir from path
+	getOutputPathRelativeToOutputDirectory(filePathRelativeToRootDir) {
+		let filePath = TemplatePath.addLeadingDotSlash(filePathRelativeToRootDir);
+		let outputDir = TemplatePath.addLeadingDotSlash(TemplatePath.join(this.output));
+
+		return "/" + TemplatePath.stripLeadingSubPath(filePath, outputDir);
 	}
 
 	// for a hypothetical Eleventy layout file
@@ -305,11 +318,9 @@ class ProjectDirectories {
 
 	// Removes layout dir from path
 	getLayoutPathRelativeToInputDirectory(filePathRelativeToLayoutDir) {
-		let layoutPath = this.getLayoutPath(filePathRelativeToLayoutDir);
-		let inputDir = TemplatePath.addLeadingDotSlash(TemplatePath.join(this.input));
-
-		// No leading dot slash
-		return TemplatePath.stripLeadingSubPath(layoutPath, inputDir);
+		return this.getInputPathRelativeToInputDirectory(
+			this.getLayoutPath(filePathRelativeToLayoutDir),
+		);
 	}
 
 	getProjectPath(filePath) {
@@ -371,5 +382,3 @@ class ProjectDirectories {
 		};
 	}
 }
-
-export default ProjectDirectories;

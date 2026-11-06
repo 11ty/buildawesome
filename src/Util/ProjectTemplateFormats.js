@@ -1,5 +1,6 @@
-import debugUtil from "debug";
-const debug = debugUtil("Eleventy:Util:ProjectTemplateFormats");
+import { createDebug } from "./DebugLogUtil.js";
+
+const debug = createDebug("Util:ProjectTemplateFormats");
 
 class ProjectTemplateFormats {
 	#useAll = {};

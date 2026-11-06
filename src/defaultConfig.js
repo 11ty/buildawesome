@@ -1,4 +1,6 @@
 import fullBundleDefaultConfig from "./defaultConfigExtended.js";
+import { IsoDate } from "@11ty/parse-date-strings";
+
 import TransformsUtil from "./Util/TransformsUtil.js";
 
 /**
@@ -27,15 +29,15 @@ import TransformsUtil from "./Util/TransformsUtil.js";
  * @property {string} [markdownTemplateEngine='liquid'] - Template engine to process markdown files with.
  * @property {string} [htmlTemplateEngine='liquid'] - Template engine to process html files with.
  * @property {boolean} [dataTemplateEngine=false] - Changed in v1.0
- * @property {string} [jsDataFileSuffix='.11tydata'] - File suffix for jsData files.
  * @property {object} keys
  * @property {string} [keys.package='pkg'] - Global data property for package.json data
  * @property {string} [keys.layout='layout']
+ * @property {string|false} [keys.tags='tags'] - Data key used to create collections, `false` to skip
  * @property {string} [keys.permalink='permalink']
  * @property {string} [keys.permalinkRoot='permalinkBypassOutputDir']
  * @property {string} [keys.engineOverride='templateEngineOverride']
- * @property {string} [keys.computed='eleventyComputed']
- * @property {string} [keys.dataSchema='eleventyDataSchema']
+ * @property {string} [keys.computed='buildawesomeComputed']
+ * @property {string} [keys.dataSchema='buildawesomeDataSchema']
  * @property {object} dir
  * @property {string} [dir.input='.']
  * @property {string} [dir.includes='_includes']
@@ -56,9 +58,22 @@ export default function (config) {
 	fullBundleDefaultConfig.call(this, config);
 
 	config.addFilter("log", (input, ...messages) => {
-		console.log(input, ...messages);
+		let entries = [input, ...messages];
+		if (entries.some((entry) => entry instanceof Promise)) {
+			// Stays sync (Nunjucks throws on returned promises), so async logs may be out of order
+			Promise.all(entries).then(
+				(resolved) => console.log(...resolved),
+				// Rejections surface wherever the template awaits the original promise
+				() => {},
+			);
+		} else {
+			console.log(...entries);
+		}
 		return input;
 	});
+
+	// Same parser used for `date` in the data cascade
+	config.addFilter("parseDateString", (dateString) => IsoDate.parse(dateString));
 
 	// Process arbitrary content with transforms
 	config.addFilter(
@@ -73,6 +88,7 @@ export default function (config) {
 
 	return {
 		templateFormats: ["liquid", "md", "njk", "html", "11ty.js"],
+
 		// to add a parent directory structure to URLs (not reflected on the file system), change this
 		pathPrefix: "/",
 		markdownTemplateEngine: "liquid",
@@ -80,7 +96,7 @@ export default function (config) {
 
 		// Renamed from `jsDataFileSuffix` in 2.0 (and swapped to an Array)
 		// If you remove "" we won’t look for dir/dir.json or file.json
-		dataFileSuffixes: [".11tydata", ""],
+		dataFileSuffixes: [".data", ".11tydata", ""],
 
 		// "index" will look for `directory/index.*` directory data files instead of `directory/directory.*`
 		dataFileDirBaseNameOverride: false,
@@ -89,11 +105,13 @@ export default function (config) {
 			// TODO breaking: use `false` by default
 			package: "pkg", // supports `false`
 			layout: "layout",
+			tags: "tags", // supports `false`
 			permalink: "permalink",
 			permalinkRoot: "permalinkBypassOutputDir",
 			engineOverride: "templateEngineOverride",
-			computed: "eleventyComputed",
-			dataSchema: "eleventyDataSchema",
+			computed: "buildawesomeComputed",
+			dataSchema: "buildawesomeDataSchema",
+			import: "buildawesomeImport",
 		},
 
 		// Deprecated, define using `export const directories = {}` instead.

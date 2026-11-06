@@ -1,24 +1,23 @@
-import test from "ava";
+import test from "node:test";
 import fs from "node:fs";
-import Eleventy from "../../src/Eleventy.js";
-import { withResolvers } from "../../src/Util/PromiseUtil.js";
+import Eleventy from "../../src/Core.js";
 
 // This tests Eleventy Watch and the file system!
 
 test("#3807 Nunjucks cacheable should be reused when Nunjucks is the preprocessor language", async (t) => {
   let runs = [
     {
-      ...withResolvers(),
+      ...Promise.withResolvers(),
       input: `<html>first{% block main %}{{ content | safe }}{% endblock %}</html>`,
       expected: `<html>firstHome<p>Index</p></html>`,
     },
     {
-      ...withResolvers(),
+      ...Promise.withResolvers(),
       input: `<html>second{% block main %}{{ content | safe }}{% endblock %}</html>`,
       expected: `<html>secondHome<p>Index</p></html>`,
     },
     {
-      ...withResolvers(),
+      ...Promise.withResolvers(),
       input: `<html>third{% block main %}{{ content | safe }}{% endblock %}</html>`,
       expected: `<html>thirdHome<p>Index</p></html>`,
     }
@@ -33,8 +32,8 @@ test("#3807 Nunjucks cacheable should be reused when Nunjucks is the preprocesso
   let index = 0;
   let elev = new Eleventy("test/stubs-3807/", "test/stubs-3807/_site", {
     configPath: "test/stubs-3807/eleventy.config.js",
-    config(eleventyConfig) {
-      eleventyConfig.on("eleventy.afterwatch", () => {
+    config($config) {
+      $config.on("buildawesome.afterwatch", () => {
         let {resolve} = runs[index];
         index++;
         resolve();
@@ -48,7 +47,7 @@ test("#3807 Nunjucks cacheable should be reused when Nunjucks is the preprocesso
 
   // Control
   let content = fs.readFileSync("test/stubs-3807/_site/index.html", "utf8");
-  t.is(content, `<html>Home<p>Index</p></html>`);
+  t.assert.strictEqual(content, `<html>Home<p>Index</p></html>`);
 
   // Stop after all runs are complete
   Promise.all(runs.map(entry => entry.promise)).then(async () => {
@@ -60,7 +59,7 @@ test("#3807 Nunjucks cacheable should be reused when Nunjucks is the preprocesso
     await run.promise;
 
     let content = fs.readFileSync("test/stubs-3807/_site/index.html", "utf8");
-    t.is(content, run.expected);
+    t.assert.strictEqual(content, run.expected);
   }
 
   fs.writeFileSync("test/stubs-3807/_layouts/base.html", ORIGINAL_CONTENT, "utf8");

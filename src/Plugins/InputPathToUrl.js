@@ -84,7 +84,7 @@ function parseFilePath(filepath) {
 
 function FilterPlugin(eleventyConfig) {
 	let contentMap;
-	eleventyConfig.on("eleventy.contentMap", function ({ inputPathToUrl }) {
+	eleventyConfig.on("buildawesome.contentmap", function ({ inputPathToUrl }) {
 		contentMap = inputPathToUrl;
 	});
 
@@ -98,7 +98,7 @@ function FilterPlugin(eleventyConfig) {
 		}
 
 		let inputDir = eleventyConfig.directories.input;
-		let suffix = "";
+		let suffix;
 		[suffix, targetFilePath] = parseFilePath(targetFilePath);
 		if (targetFilePath) {
 			targetFilePath = normalizeInputPath(
@@ -129,8 +129,9 @@ function TransformPlugin(eleventyConfig, defaultOptions = {}) {
 		defaultOptions,
 	);
 
+	/** @type {Record<string, string[]> | null} */
 	let contentMap = null;
-	eleventyConfig.on("eleventy.contentMap", function ({ inputPathToUrl }) {
+	eleventyConfig.on("buildawesome.contentmap", function ({ inputPathToUrl }) {
 		contentMap = inputPathToUrl;
 	});
 
@@ -144,7 +145,7 @@ function TransformPlugin(eleventyConfig, defaultOptions = {}) {
 
 		let inputDir = eleventyConfig.directories.input;
 
-		let suffix = "";
+		let suffix;
 		[suffix, targetFilepathOrUrl] = parseFilePath(targetFilepathOrUrl);
 		if (targetFilepathOrUrl) {
 			targetFilepathOrUrl = normalizeInputPath(

@@ -1,7 +1,7 @@
 import { satisfies } from "../Adapters/Packages/semver.js";
-import { getEleventyPackageJson, getWorkingProjectPackageJson } from "./ImportJsonSync.js";
+import { getCorePackageJson, getWorkingProjectPackageJson } from "./ImportJsonSync.js";
 
-const pkg = getEleventyPackageJson();
+const pkg = getCorePackageJson();
 
 // Used in user config versionCheck method.
 class Compatibility {

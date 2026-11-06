@@ -1,19 +1,19 @@
-import { existsSync } from "node:fs";
+import { EventEmitter } from "node:events";
 import { Merge, TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
 
 import chalk from "./Adapters/Packages/chalk.js";
 import getDefaultConfig from "./Adapters/getDefaultConfig.js";
-import { EleventyImportRaw } from "./Util/Require.js";
-import EleventyBaseError from "./Errors/EleventyBaseError.js";
+import { createDebug } from "./Util/DebugLogUtil.js";
+import { DynamicImportRaw } from "./Util/Require.js";
+import BaseError from "./Errors/BaseError.js";
 import UserConfig from "./UserConfig.js";
 import GlobalDependencyMap from "./GlobalDependencyMap.js";
+import { TemplateQueryRegistry } from "./Util/TemplateQuery.js";
 import ExistsCache from "./Util/ExistsCache.js";
-import eventBus from "./EventBus.js";
 import ProjectTemplateFormats from "./Util/ProjectTemplateFormats.js";
+import { expandEligibleJavaScriptFilePaths } from "./Util/FilePathUtil.js";
 
-const debug = debugUtil("Eleventy:TemplateConfig");
-const debugDev = debugUtil("Dev:Eleventy:TemplateConfig");
+const debug = createDebug("TemplateConfig");
 
 /**
  * @module 11ty/eleventy/TemplateConfig
@@ -29,13 +29,13 @@ const debugDev = debugUtil("Dev:Eleventy:TemplateConfig");
  * Errors in eleventy config.
  * @ignore
  */
-class EleventyConfigError extends EleventyBaseError {}
+class ConfigError extends BaseError {}
 
 /**
  * Errors in eleventy plugins.
  * @ignore
  */
-class EleventyPluginError extends EleventyBaseError {}
+class PluginError extends BaseError {}
 
 /**
  * Config for a template.
@@ -51,17 +51,20 @@ class TemplateConfig {
 	#userConfig = new UserConfig();
 	#existsCache = new ExistsCache();
 	#usesGraph;
-	#previousBuildModifiedFile;
+	#queryRegistry = new TemplateQueryRegistry();
 	#activeConfigPath;
 
 	constructor(customRootConfig, projectConfigPath) {
 		/** @type {object} */
 		this.overrides = {};
 
+		// Internal synchronous events, scoped to this instance (not cleared on config reset).
+		this.eventBus = new EventEmitter();
+
 		/**
 		 * @type {String}
 		 * @description Path to local project config.
-		 * @default .eleventy.js
+		 * @default buildawesome.config.js
 		 */
 		if (projectConfigPath !== undefined) {
 			this.#configManuallyDefined = true;
@@ -74,10 +77,9 @@ class TemplateConfig {
 			}
 		} else {
 			this.projectConfigPaths = [
-				".eleventy.js",
-				"eleventy.config.js",
-				"eleventy.config.mjs",
-				"eleventy.config.cjs",
+				...expandEligibleJavaScriptFilePaths("buildawesome.config"),
+				".eleventy.js", // intentionally has never included other JS extensions
+				...expandEligibleJavaScriptFilePaths("eleventy.config"),
 			];
 		}
 
@@ -100,21 +102,10 @@ class TemplateConfig {
 			return this.existsCache.exists(filePath);
 		};
 
-		this.userConfig.events.on("eleventy#templateModified", (inputPath, metadata = {}) => {
-			// Might support multiple at some point
-			this.setPreviousBuildModifiedFile(inputPath, metadata);
-
-			// Issue #3569, set that this file exists in the cache
-			this.#existsCache.set(inputPath, true);
+		this.userConfig.events.on("buildawesome#templatemodified", (inputPath, metadata = {}) => {
+			// Issue #3569, the file may have been added (or deleted)
+			this.#existsCache.delete(inputPath);
 		});
-	}
-
-	setPreviousBuildModifiedFile(inputPath, metadata = {}) {
-		this.#previousBuildModifiedFile = inputPath;
-	}
-
-	getPreviousBuildModifiedFile() {
-		return this.#previousBuildModifiedFile;
 	}
 
 	get userConfig() {
@@ -158,12 +149,13 @@ class TemplateConfig {
 		this.#runMode = runMode;
 	}
 
+	isWatchOrServe() {
+		return this.#runMode === "watch" || this.#runMode === "serve";
+	}
+
 	shouldSpiderJavaScriptDependencies() {
 		// not for a standard build
-		return (
-			(this.#runMode === "watch" || this.#runMode === "serve") &&
-			this.userConfig.watchJavaScriptDependencies
-		);
+		return this.isWatchOrServe() && this.userConfig.watchJavaScriptDependencies;
 	}
 
 	/**
@@ -197,7 +189,6 @@ class TemplateConfig {
 
 	setProjectUsingEsm(isEsmProject) {
 		this.isEsm = !!isEsmProject;
-		this.usesGraph.setIsEsm(isEsmProject);
 	}
 
 	getIsProjectUsingEsm() {
@@ -209,8 +200,6 @@ class TemplateConfig {
 	 */
 	async reset() {
 		this.#existsCache.reset();
-
-		debugDev("Resetting configuration: TemplateConfig and UserConfig.");
 		this.userConfig.reset();
 		this.usesGraph.reset(); // needs to be before forceReloadConfig #3711
 
@@ -218,7 +207,7 @@ class TemplateConfig {
 		await this.forceReloadConfig();
 
 		// Clear the compile cache
-		eventBus.emit("eleventy.compileCacheReset");
+		this.eventBus.emit("buildawesome.compilecachereset");
 	}
 
 	/**
@@ -287,7 +276,6 @@ class TemplateConfig {
 
 		if (this.hasConfigMerged) {
 			// merge it again
-			debugDev("Merging in getConfig again after setting the local project config path.");
 			await this.forceReloadConfig();
 		}
 	}
@@ -373,7 +361,7 @@ class TemplateConfig {
 					namespaceStr = ` (namespace: ${namespaces.join(".")})`;
 				}
 
-				throw new EleventyPluginError(
+				throw new PluginError(
 					`Error processing ${name ? `the \`${name}\`` : "a"} plugin${namespaceStr}`,
 					e,
 				);
@@ -397,7 +385,7 @@ class TemplateConfig {
 		let path = this.getActiveConfigPath();
 
 		if (this.projectConfigPaths.length > 0 && this.#configManuallyDefined && !path) {
-			throw new EleventyConfigError(
+			throw new ConfigError(
 				"A configuration file was specified but not found: " + this.projectConfigPaths.join(", "),
 			);
 		}
@@ -405,8 +393,10 @@ class TemplateConfig {
 		debug(`Merging default config with ${path}`);
 		if (path) {
 			try {
-				let { default: configDefaultReturn, config: exportedConfigObject } =
-					await EleventyImportRaw(path, this.isEsm ? "esm" : "cjs");
+				let { default: configDefaultReturn, config: exportedConfigObject } = await DynamicImportRaw(
+					path,
+					this.isEsm ? "esm" : "cjs",
+				);
 
 				exportedConfig = exportedConfigObject || {};
 
@@ -431,7 +421,7 @@ class TemplateConfig {
 
 				// TODO the error message here is bad and I feel bad (needs more accurate info)
 				return Promise.reject(
-					new EleventyConfigError(
+					new ConfigError(
 						`Error in your Eleventy config file '${path}'.` +
 							(isModuleError ? chalk.cyan(" You may need to run `npm install`.") : ""),
 						err,
@@ -534,7 +524,7 @@ class TemplateConfig {
 		// But BEFORE the rest of the config options are merged
 		// this way we can pass directories and other template information to plugins
 
-		await this.userConfig.events.emit("eleventy.beforeConfig", this.userConfig);
+		await this.userConfig.events.emit("buildawesome.beforeconfig", this.userConfig);
 
 		let pluginsBench = this.aggregateBenchmark.get("Processing plugins in config");
 		pluginsBench.before();
@@ -561,6 +551,13 @@ class TemplateConfig {
 
 		debug("Current configuration: %o", mergedConfig);
 
+		let tagsKey = mergedConfig.keys?.tags;
+		if (typeof tagsKey === "string" && tagsKey.includes(".")) {
+			throw new ConfigError(
+				`Nested properties are not supported in \`keys.tags\`, received: ${JSON.stringify(tagsKey)}`,
+			);
+		}
+
 		// Add to the merged config too
 		mergedConfig.uses = this.usesGraph;
 
@@ -573,10 +570,14 @@ class TemplateConfig {
 	get usesGraph() {
 		if (!this.#usesGraph) {
 			this.#usesGraph = new GlobalDependencyMap();
-			this.#usesGraph.setIsEsm(this.isEsm);
 			this.#usesGraph.setTemplateConfig(this);
 		}
 		return this.#usesGraph;
+	}
+
+	// `query`/`queryAll` calls from JavaScript front matter
+	get queryRegistry() {
+		return this.#queryRegistry;
 	}
 
 	/**

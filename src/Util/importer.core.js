@@ -2,13 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { importFromString } from "import-module-string";
 
 import { fileURLToPath } from "../Adapters/Packages/url.js";
-import { EleventyLoadContent } from "./Require.js";
+import { LoadContent } from "./Require.js";
 
 export default function importer(relPath) {
 	let filePath = fileURLToPath(relPath);
 
 	// `import-module-string` can now `import()` so we avoid needing to esbuild these
-	let code = EleventyLoadContent(filePath);
+	let code = LoadContent(filePath);
 	return importFromString(code, {
 		implicitExports: false,
 		filePath,

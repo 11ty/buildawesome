@@ -1,12 +1,12 @@
-import test from "ava";
-import Eleventy from "../src/Eleventy.js";
+import test from "node:test";
+import Eleventy from "../src/Core.js";
 
 test("Empty collections api #3467 (return undefined)", async (t) => {
 	let elev = new Eleventy("./test/stubs-virtual", "./test/stubs-virtual/_site", {
-		config: function (eleventyConfig) {
-			eleventyConfig.addTemplate("virtual.md", `# Hello`);
+		config: function ($config) {
+			$config.addTemplate("virtual.md", `# Hello`);
 
-      eleventyConfig.addCollection("brokenCollection", function(collection) {
+      $config.addCollection("brokenCollection", function(collection) {
         // returns nothing
       });
 		},
@@ -14,17 +14,17 @@ test("Empty collections api #3467 (return undefined)", async (t) => {
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `<h1>Hello</h1>`);
-	t.deepEqual(results[0].rawInput, `# Hello`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<h1>Hello</h1>`);
+	t.assert.deepStrictEqual(results[0].rawInput, `# Hello`);
 });
 
 test("Empty collections api #3467 (return false)", async (t) => {
 	let elev = new Eleventy("./test/stubs-virtual", "./test/stubs-virtual/_site", {
-		config: function (eleventyConfig) {
-			eleventyConfig.addTemplate("virtual.md", `# Hello`);
+		config: function ($config) {
+			$config.addTemplate("virtual.md", `# Hello`);
 
-      eleventyConfig.addCollection("brokenCollection", function(collection) {
+      $config.addCollection("brokenCollection", function(collection) {
         return false;
       });
 		},
@@ -32,17 +32,17 @@ test("Empty collections api #3467 (return false)", async (t) => {
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `<h1>Hello</h1>`);
-	t.deepEqual(results[0].rawInput, `# Hello`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<h1>Hello</h1>`);
+	t.assert.deepStrictEqual(results[0].rawInput, `# Hello`);
 });
 
 test("Empty collections api #3467 (return empty string)", async (t) => {
 	let elev = new Eleventy("./test/stubs-virtual", "./test/stubs-virtual/_site", {
-		config: function (eleventyConfig) {
-			eleventyConfig.addTemplate("virtual.md", `# Hello`);
+		config: function ($config) {
+			$config.addTemplate("virtual.md", `# Hello`);
 
-      eleventyConfig.addCollection("brokenCollection", function(collection) {
+      $config.addCollection("brokenCollection", function(collection) {
         return "";
       });
 		},
@@ -50,7 +50,7 @@ test("Empty collections api #3467 (return empty string)", async (t) => {
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `<h1>Hello</h1>`);
-	t.deepEqual(results[0].rawInput, `# Hello`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<h1>Hello</h1>`);
+	t.assert.deepStrictEqual(results[0].rawInput, `# Hello`);
 });

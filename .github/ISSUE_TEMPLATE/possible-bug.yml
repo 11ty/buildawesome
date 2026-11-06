@@ -1,4 +1,4 @@
-name: I’m having trouble with Eleventy
+name: I’m having trouble with Build Awesome or Eleventy
 description: Have a problem? It might be a bug! Create a report to help us improve.
 labels: [needs-triage]
 body:
@@ -22,8 +22,8 @@ body:
     id: eleventy
     attributes:
       label: Eleventy
-      description: Which version of Eleventy do you use?
-      placeholder: eleventy --version or npx @11ty/eleventy --version
+      description: Which version of Build Awesome or Eleventy do you use?
+      placeholder: npx @awesome.me/buildawesome --version or npx @11ty/eleventy --version
     validations:
       required: true
   - type: textarea

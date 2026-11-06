@@ -3,7 +3,6 @@ class Sortable {
 		this.isSortAscending = true;
 		this.isSortNumeric = false;
 		this.items = [];
-		this._dirty = true;
 
 		this.sortFunctionStringMap = {
 			"A-Z": "sortFunctionAscending",
@@ -18,7 +17,6 @@ class Sortable {
 	}
 
 	add(item) {
-		this._dirty = true;
 		this.items.push(item);
 	}
 

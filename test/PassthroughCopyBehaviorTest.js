@@ -1,8 +1,8 @@
-import test from "ava";
+import test from "node:test";
 import checkPassthroughCopyBehavior from "../src/Util/PassthroughCopyBehaviorCheck.js";
 
 test("Standard use", (t) => {
-  t.is(
+  t.assert.strictEqual(
     checkPassthroughCopyBehavior(
       {
         serverPassthroughCopyBehavior: "passthrough",
@@ -15,7 +15,7 @@ test("Standard use", (t) => {
 });
 
 test("Config fallback", (t) => {
-  t.is(
+  t.assert.strictEqual(
     checkPassthroughCopyBehavior(
       {
         serverPassthroughCopyBehavior: "copy",
@@ -28,7 +28,7 @@ test("Config fallback", (t) => {
 });
 
 test("Other dev server", (t) => {
-  t.is(
+  t.assert.strictEqual(
     checkPassthroughCopyBehavior(
       {
         serverPassthroughCopyBehavior: "passthrough",
@@ -43,7 +43,7 @@ test("Other dev server", (t) => {
 });
 
 test("Non --serve run modes", (t) => {
-  t.is(
+  t.assert.strictEqual(
     checkPassthroughCopyBehavior(
       {
         serverPassthroughCopyBehavior: "passthrough",
@@ -54,7 +54,7 @@ test("Non --serve run modes", (t) => {
     false
   );
 
-  t.is(
+  t.assert.strictEqual(
     checkPassthroughCopyBehavior(
       {
         serverPassthroughCopyBehavior: "passthrough",

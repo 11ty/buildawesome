@@ -2,17 +2,22 @@ import { isPlainObject } from "@11ty/eleventy-utils";
 import lodash from "@11ty/lodash-custom";
 import { DeepCopy } from "@11ty/eleventy-utils";
 
-import EleventyBaseError from "../Errors/EleventyBaseError.js";
+import BaseError from "../Errors/BaseError.js";
 import { ProxyWrap } from "../Util/Objects/ProxyWrap.js";
+import PathPrefixer from "../Util/PathPrefixer.js";
 // import { DeepFreeze } from "../Util/Objects/DeepFreeze.js";
 import TemplateData from "../Data/TemplateData.js";
+import { ResolveConfigurationData } from "../Data/ResolveConfigurationData.js";
+import { withoutTracking } from "../Data/InternalReads.js";
 
 const { set: lodashSet, get: lodashGet, chunk: lodashChunk } = lodash;
 
-class PaginationConfigError extends EleventyBaseError {}
-class PaginationError extends EleventyBaseError {}
+class PaginationConfigError extends BaseError {}
+export class PaginationError extends BaseError {}
 
 class Pagination {
+	static NOT_FOUND_VALUE = "__NOT_FOUND_ERROR__";
+
 	constructor(tmpl, data, config) {
 		if (!config) {
 			throw new PaginationConfigError("Expected `config` argument to Pagination class.");
@@ -31,8 +36,9 @@ class Pagination {
 		return "";
 	}
 
+	// Falsy values (e.g. from computed data) mean no pagination
 	static hasPagination(data) {
-		return "pagination" in data;
+		return Boolean(data.pagination);
 	}
 
 	hasPagination() {
@@ -46,7 +52,10 @@ class Pagination {
 
 	circularReferenceCheck(data) {
 		let key = data.pagination.data;
-		let includedTags = TemplateData.getIncludedTagNames(data);
+		// Computed `tags` reading pagination data aren’t resolved yet, Issue #1952
+		let includedTags = withoutTracking(() =>
+			TemplateData.getIncludedTagNames(data, this.config.keys.tags),
+		);
 
 		for (let tag of includedTags) {
 			if (`collections.${tag}` === key) {
@@ -65,11 +74,7 @@ class Pagination {
 			return;
 		}
 
-		if (!data.pagination) {
-			throw new Error(
-				`Misconfigured pagination data in template front matter${this.inputPathForErrorMessages} (YAML front matter precaution: did you use tabs and not spaces for indentation?).`,
-			);
-		} else if (!("size" in data.pagination)) {
+		if (!("size" in data.pagination)) {
 			throw new Error(
 				`Missing pagination size in front matter data${this.inputPathForErrorMessages}`,
 			);
@@ -113,15 +118,13 @@ class Pagination {
 	}
 
 	_has(target, key) {
-		let notFoundValue = "__NOT_FOUND_ERROR__";
-		let data = lodashGet(target, key, notFoundValue);
-		return data !== notFoundValue;
+		let data = lodashGet(target, key, Pagination.NOT_FOUND_VALUE);
+		return data !== Pagination.NOT_FOUND_VALUE;
 	}
 
 	_get(target, key) {
-		let notFoundValue = "__NOT_FOUND_ERROR__";
-		let data = lodashGet(target, key, notFoundValue);
-		if (data === notFoundValue) {
+		let data = lodashGet(target, key, Pagination.NOT_FOUND_VALUE);
+		if (data === Pagination.NOT_FOUND_VALUE) {
 			throw new Error(
 				`Could not find pagination data${this.inputPathForErrorMessages}, went looking for: ${key}`,
 			);
@@ -271,9 +274,15 @@ class Pagination {
 		let links = [];
 		let hrefs = [];
 
-		let hasPermalinkField =
-			Boolean(this.data[this.config.keys.permalink]) ||
-			Boolean(this.data.eleventyComputed?.[this.config.keys.permalink]);
+		let hasPermalinkField = withoutTracking(
+			() =>
+				Boolean(this.data[this.config.keys.permalink]) ||
+				Boolean(
+					ResolveConfigurationData.getValue(this.data, this.config.keys.computed)?.[
+						this.config.keys.permalink
+					],
+				),
+		);
 
 		// Do *not* pass collections through DeepCopy, we’ll re-add them back in later.
 		let collections = this.data.collections;
@@ -281,17 +290,21 @@ class Pagination {
 			delete this.data.collections;
 		}
 
-		let parentData = DeepCopy(
-			{
-				pagination: {
-					data: this.data.pagination.data,
-					size: this.data.pagination.size,
-					alias: this.alias,
-					pages,
+		// Copying reads every key, so global data reads are tracked again on the copy
+		let parentData = withoutTracking(() =>
+			DeepCopy(
+				{
+					pagination: {
+						data: this.data.pagination.data,
+						size: this.data.pagination.size,
+						alias: this.alias,
+						pages,
+					},
 				},
-			},
-			this.data,
+				this.data,
+			),
 		);
+		this.template?.trackGlobalDataReads(parentData);
 
 		// Restore skipped collections
 		if (collections) {
@@ -319,13 +332,30 @@ class Pagination {
 				cloned.setExtraOutputSubdirectory(pageNumber);
 			}
 
+			let { page } = this.getOverrideDataPages(items, pageNumber);
 			let paginationData = {
+				// All keys up front (links and hrefs are filled in below) so the object keeps a compact shape
 				pagination: {
 					items: items[pageNumber],
+					page,
+					pageNumber,
+					previousPageLink: undefined,
+					previous: undefined,
+					nextPageLink: undefined,
+					next: undefined,
+					firstPageLink: undefined,
+					lastPageLink: undefined,
+					links: undefined,
+					pageLinks: undefined,
+					previousPageHref: undefined,
+					nextPageHref: undefined,
+					firstPageHref: undefined,
+					lastPageHref: undefined,
+					hrefs: undefined,
+					href: undefined,
 				},
 				page: {},
 			};
-			Object.assign(paginationData.pagination, this.getOverrideDataPages(items, pageNumber));
 
 			if (this.alias) {
 				lodashSet(paginationData, this.alias, this.getNormalizedItems(items[pageNumber]));
@@ -341,7 +371,7 @@ class Pagination {
 				await cloned.getOutputLocations(clonedData);
 			// TODO subdirectory to links if the site doesn’t live at /
 			if (rawPath) {
-				links.push("/" + rawPath);
+				links.push(PathPrefixer.joinUrlParts("/", rawPath));
 			}
 
 			hrefs.push(href);
@@ -349,7 +379,6 @@ class Pagination {
 			// page.url and page.outputPath are used to avoid another getOutputLocations call later, see Template->addComputedData
 			clonedData.page.url = href;
 			clonedData.page.outputPath = path;
-			clonedData.page.dir = dir;
 
 			entries.push({
 				pageNumber,

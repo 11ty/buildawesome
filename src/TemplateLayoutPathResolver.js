@@ -1,6 +1,4 @@
 import { TemplatePath } from "@11ty/eleventy-utils";
-// import debugUtil from "debug";
-// const debug = debugUtil("Eleventy:TemplateLayoutPathResolver");
 
 class TemplateLayoutPathResolver {
 	constructor(path, extensionMap, templateConfig) {

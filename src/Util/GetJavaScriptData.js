@@ -1,6 +1,6 @@
-import EleventyBaseError from "../Errors/EleventyBaseError.js";
+import BaseError from "../Errors/BaseError.js";
 
-class JavaScriptInvalidDataFormatError extends EleventyBaseError {}
+class JavaScriptInvalidDataFormatError extends BaseError {}
 
 export default async function (inst, inputPath, key = "data", options = {}) {
 	let { mixins, isObjectRequired } = Object.assign(

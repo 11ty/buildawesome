@@ -1,0 +1,5 @@
+---
+dynamicPermalink: false
+permalink: /custom-raw/
+---
+With permalink

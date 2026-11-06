@@ -1,26 +1,31 @@
-import debugUtil from "debug";
-
+/// <reference path="./UserConfigExtended.ts" preserve="true" />
 import { DeepCopy, TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 
-import chalk from "./Adapters/Packages/chalk.js";
+import { createDebug } from "./Util/DebugLogUtil.js";
 import { resolvePlugin } from "./Util/ResolvePlugin.js";
 import isAsyncFunction from "./Util/IsAsyncFunction.js";
 import objectFilter from "./Util/Objects/ObjectFilter.js";
 import EventEmitter from "./Util/AsyncEventEmitter.js";
-import EleventyCompatibility from "./Util/Compatibility.js";
-import EleventyBaseError from "./Errors/EleventyBaseError.js";
+import Compatibility from "./Util/Compatibility.js";
+import BaseError from "./Errors/BaseError.js";
 import BenchmarkManager from "./Benchmark/BenchmarkManager.js";
 import { augmentFunction } from "./Engines/Util/ContextAugmenter.js";
+import { getTimeZoneParser } from "./Util/DateParse.js";
 
-const debug = debugUtil("Eleventy:UserConfig");
+const debug = createDebug("UserConfig");
 
-class UserConfigError extends EleventyBaseError {}
+class UserConfigError extends BaseError {
+	// TypeScript slop
+	constructor(message, originalError) {
+		super(message, originalError);
+	}
+}
 
 /**
  * Eleventy’s user-land Configuration API
  * @module 11ty/eleventy/UserConfig
  */
-class UserConfig {
+export default class UserConfig {
 	/** @type {boolean} */
 	#pluginExecution = false;
 	/** @type {boolean} */
@@ -30,6 +35,7 @@ class UserConfig {
 	/** @type {number} */
 	#concurrency = 1;
 	// Before using os.availableParallelism(); see https://github.com/11ty/eleventy/issues/3596
+	#experimentalFlags = [];
 
 	constructor() {
 		// These are completely unnecessary lines to satisfy TypeScript
@@ -42,18 +48,19 @@ class UserConfig {
 		this.dataExtensions = new Map();
 		this.urlTransforms = [];
 		this.customDateParsingCallbacks = new Set();
+		this.dateTimeZone = undefined;
 		this.ignores = new Set();
 		this.events = new EventEmitter();
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.directories = {};
-		/** @type {undefined} */
-		this.logger;
-		/** @type {string} */
-		this.dir;
-		/** @type {string} */
-		this.pathPrefix;
-		/** @type {object} */
+		/** @type {any} */
+		this.logger = undefined;
+		/** @type {string|undefined} */
+		this.dir = undefined;
+		/** @type {string|undefined} */
+		this.pathPrefix = undefined;
+		/** @type {Record<string, any>} */
 		this.errorReporting = {};
 
 		this.reset();
@@ -75,31 +82,33 @@ class UserConfig {
 		/** @type {BenchmarkManager} */
 		this.benchmarkManager = new BenchmarkManager();
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.benchmarks = {
-			/** @type {import('./Benchmark/BenchmarkGroup.js')} */
+			/** @type {import('./Benchmark/BenchmarkGroup.js').default} */
 			config: this.benchmarkManager.get("Configuration"),
-			/** @type {import('./Benchmark/BenchmarkGroup.js')} */
+			/** @type {import('./Benchmark/BenchmarkGroup.js').default} */
 			aggregate: this.benchmarkManager.get("Aggregate"),
 		};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.directoryAssignments = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.collections = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
+		this.collectionOptions = {};
+		/** @type {Record<string, any>} */
 		this.precompiledCollections = {};
 		this.templateFormats = undefined;
 		this.templateFormatsAdded = [];
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.universal = {
 			filters: {},
 			shortcodes: {},
 			pairedShortcodes: {},
 		};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.liquid = {
 			options: {},
 			tags: {},
@@ -109,7 +118,7 @@ class UserConfig {
 			parameterParsing: "builtin", // or legacy (Breaking: default swapped in v4.0.0)
 		};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.nunjucks = {
 			// `dev: true` gives us better error messaging
 			environmentOptions: { dev: true },
@@ -125,7 +134,7 @@ class UserConfig {
 			asyncPairedShortcodes: {},
 		};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.javascript = {
 			functions: {},
 			filters: {},
@@ -135,22 +144,23 @@ class UserConfig {
 
 		this.markdownHighlighter = null;
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.libraryOverrides = {};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.passthroughCopies = {};
 		this.passthroughCopiesHtmlRelative = new Set();
+		this.passthroughCopyOptions = {};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.layoutAliases = {};
 		this.layoutResolution = true; // extension-less layout files
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.linters = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.transforms = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.preprocessors = {};
 
 		this.activeNamespace = "";
@@ -166,18 +176,18 @@ class UserConfig {
 
 		this.extensionMap = new Set();
 		this.extensionMapClasses = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.extensionConflictMap = {};
 		this.watchJavaScriptDependencies = true;
 		this.additionalWatchTargets = [];
 		this.watchTargetsConfigReset = new Set();
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.serverOptions = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.globalData = {};
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.chokidarConfig = {};
-		this.watchThrottleWaitTime = 0; //ms
+		this.watchThrottleWaitTime = 100; //ms
 
 		// using Map to preserve insertion order
 		this.dataExtensions = new Map();
@@ -189,25 +199,27 @@ class UserConfig {
 		this.useTemplateCache = true;
 		this.dataFilterSelectors = new Set();
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.libraryAmendments = {};
 		this.serverPassthroughCopyBehavior = "copy"; // or "passthrough"
+		this.skipUnchangedWrites = true;
 		this.urlTransforms = [];
 
 		// Defaults in `defaultConfig.js`
 		this.dataFileSuffixesOverride = false;
 		this.dataFileDirBaseNameOverride = false;
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		// Moved into TemplateContent->getFrontMatterParsingOptions
 		this.frontMatterParsingOptions = {};
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.virtualTemplates = {};
 		this.freezeReservedData = true;
 		this.customDateParsingCallbacks = new Set();
+		this.dateTimeZone = undefined;
 
-		/** @type {object} */
+		/** @type {Record<string, any>} */
 		this.errorReporting = {};
 
 		// Before using os.availableParallelism(); see https://github.com/11ty/eleventy/issues/3596
@@ -216,7 +228,7 @@ class UserConfig {
 
 	// compatibleRange is optional in 2.0.0-beta.2
 	versionCheck(compatibleRange) {
-		let compat = new EleventyCompatibility(compatibleRange);
+		let compat = new Compatibility(compatibleRange);
 
 		if (!compat.isCompatible()) {
 			throw new UserConfigError(compat.getErrorMessage());
@@ -307,7 +319,7 @@ class UserConfig {
 
 		if (target[name]) {
 			debug(
-				chalk.yellow(`Warning, overwriting previous ${description} "%o" via \`%o(%o)\``),
+				`Warning, overwriting previous ${description} "%o" via \`%o(%o)\``,
 				name,
 				functionName,
 				originalName,
@@ -627,12 +639,14 @@ class UserConfig {
 	}
 
 	/**
-	 * @typedef {function|Promise<function>|object} PluginDefinition
+	 * @typedef {object} PluginObject
 	 * @property {Function} [configFunction]
 	 * @property {string} [eleventyPackage]
 	 * @property {object} [eleventyPluginOptions={}]
 	 * @property {boolean} [eleventyPluginOptions.unique]
 	 */
+
+	/** @typedef {Function & PluginObject | Promise<Function> & PluginObject | PluginObject} PluginDefinition */
 
 	/**
 	 * addPlugin: async friendly in 3.0
@@ -751,7 +765,7 @@ class UserConfig {
 	 *
 	 * @param {string|object} fileOrDir The path to the file or directory that should
 	 * be copied. OR an object where the key is the input glob and the property is the output directory
-	 * @param {object} copyOptions options for recursive-copy.
+	 * @param {Record<string, any>} copyOptions options for recursive-copy.
 	 * see https://www.npmjs.com/package/recursive-copy#arguments
 	 * default options are defined in TemplatePassthrough copyOptionsDefault
 	 * @returns {any} a reference to the `EleventyConfig` object.
@@ -775,12 +789,31 @@ class UserConfig {
 			});
 		} else if (typeof fileOrDir === "string") {
 			this.passthroughCopies[fileOrDir] = { outputPath: true, copyOptions };
+		} else if (Array.isArray(fileOrDir)) {
+			for (let inputPath of fileOrDir) {
+				this.passthroughCopies[inputPath] = { outputPath: true, copyOptions };
+			}
 		} else {
 			for (let [inputPath, outputPath] of Object.entries(fileOrDir)) {
 				this.passthroughCopies[inputPath] = { outputPath, copyOptions };
 			}
 		}
 
+		return this;
+	}
+
+	// Default options for every `addPassthroughCopy()` call (per-call options win)
+	setPassthroughCopyOptions(copyOptions = {}) {
+		if (!isPlainObject(copyOptions)) {
+			throw new Error("`setPassthroughCopyOptions` expects an object of options.");
+		}
+		if (copyOptions.mode) {
+			throw new Error(
+				"`mode` is not supported in `setPassthroughCopyOptions`, use `addPassthroughCopy` instead.",
+			);
+		}
+
+		this.passthroughCopyOptions = copyOptions;
 		return this;
 	}
 
@@ -919,12 +952,12 @@ class UserConfig {
 	addExtension(fileExtension, options = {}) {
 		let extensions;
 
-		// Array support added in 2.0.0-canary.19
+		// Array support 2.0.0-canary.19+
 		if (Array.isArray(fileExtension)) {
 			extensions = fileExtension;
 		} else {
-			// single string
-			extensions = [fileExtension];
+			// Comma separated support 4.0.0-alpha.7+
+			extensions = (fileExtension || "").split(",");
 		}
 
 		for (let extension of extensions) {
@@ -935,7 +968,7 @@ class UserConfig {
 			}
 			this.extensionConflictMap[extension] = true;
 
-			/** @type {object} */
+			/** @type {Record<string, any>} */
 			let extensionOptions = Object.assign(
 				{
 					// Might be overridden for aliasing in options.key
@@ -989,6 +1022,11 @@ class UserConfig {
 	// but opt-out via "copy" is suggested
 	setServerPassthroughCopyBehavior(behavior) {
 		this.serverPassthroughCopyBehavior = behavior;
+	}
+
+	// During --watch and --serve, skip writing template output that is unchanged from the previous build
+	setSkipUnchangedWrites(skip = true) {
+		this.skipUnchangedWrites = Boolean(skip);
 	}
 
 	// Url transforms change page.url and work good with server side content-negotiation (e.g. i18n plugin)
@@ -1069,6 +1107,11 @@ class UserConfig {
 		}
 	}
 
+	// IANA time zone used for `date` strings without an offset (Temporal by default, or an `adapter` function).
+	setDateTimeZone(zone, options) {
+		this.dateTimeZone = getTimeZoneParser(zone, options);
+	}
+
 	// 3.0.0-alpha.18 started merging conflicts here (when possible), issue #3389
 	addGlobalData(name, data) {
 		name = this.getNamespacedName(name);
@@ -1089,10 +1132,7 @@ class UserConfig {
 		name = this.getNamespacedName(name);
 
 		if (this.nunjucks.globals[name]) {
-			debug(
-				chalk.yellow("Warning, overwriting a Nunjucks global with `addNunjucksGlobal(%o)`"),
-				name,
-			);
+			debug("Warning, overwriting a Nunjucks global with `addNunjucksGlobal(%o)`", name);
 		}
 
 		if (typeof globalType === "function") {
@@ -1150,7 +1190,17 @@ class UserConfig {
 		return this.collections;
 	}
 
-	addCollection(name, callback) {
+	getCollectionOptions(name) {
+		return this.collectionOptions[name] || {};
+	}
+
+	/**
+	 * @param {string} name
+	 * @param {Function} callback
+	 * @param {object} [options]
+	 * @param {boolean} [options.defer] Run after templates are added to collections (but before templates that paginate over `collections`), for collections that include their own consumers (#4182)
+	 */
+	addCollection(name, callback, options = {}) {
 		name = this.getNamespacedName(name);
 
 		if (this.collections[name]) {
@@ -1160,6 +1210,7 @@ class UserConfig {
 		}
 
 		this.collections[name] = callback;
+		this.collectionOptions[name] = options;
 	}
 
 	augmentFunctionContext(fn, options) {
@@ -1185,6 +1236,13 @@ class UserConfig {
 		return this.#concurrency;
 	}
 
+	addExperimentalBehavior(flag) {
+		this.logger?.warn(
+			`Experimental behavior enabled: ${flag}. Experimental APIs can change at any time.`,
+		);
+		this.#experimentalFlags.push(flag);
+	}
+
 	getMergingConfigObject() {
 		let obj = {
 			// filters removed in 1.0 (use addTransform instead)
@@ -1196,6 +1254,7 @@ class UserConfig {
 			layoutResolution: this.layoutResolution,
 			passthroughCopiesHtmlRelative: this.passthroughCopiesHtmlRelative,
 			passthroughCopies: this.passthroughCopies,
+			passthroughCopyOptions: this.passthroughCopyOptions,
 
 			// Liquid
 			liquidOptions: this.liquid.options,
@@ -1251,12 +1310,15 @@ class UserConfig {
 			dataFilterSelectors: this.dataFilterSelectors,
 			libraryAmendments: this.libraryAmendments,
 			serverPassthroughCopyBehavior: this.serverPassthroughCopyBehavior,
+			skipUnchangedWrites: this.skipUnchangedWrites,
 			urlTransforms: this.urlTransforms,
 			virtualTemplates: this.virtualTemplates,
 			// `directories` and `directoryAssignments` are merged manually prior to plugin processing
 			freezeReservedData: this.freezeReservedData,
 			customDateParsing: this.customDateParsingCallbacks,
+			dateTimeZone: this.dateTimeZone,
 			errorReporting: this.errorReporting,
+			experimentalFlags: this.#experimentalFlags,
 		};
 
 		if (Array.isArray(this.dataFileSuffixesOverride)) {
@@ -1273,8 +1335,9 @@ class UserConfig {
 		return obj;
 	}
 
-	// Removed features
+	// Throws an error (no backwards compat)
 	get DateTime() {
+		// this.DateTime removed in v4
 		throw new Error(
 			'Luxon’s DateTime property in configuration was removed in Eleventy v4. Please `import { DateTime } from "luxon"` directly.',
 		);
@@ -1284,14 +1347,7 @@ class UserConfig {
 		throw new Error("The internal _normalizeTemplateFormats() method was removed in Eleventy v3");
 	}
 
-	setBrowserSyncConfig() {
-		this._attemptedBrowserSyncUse = true;
-		debug(
-			"The `setBrowserSyncConfig` method was removed in Eleventy v2. Use `setServerOptions` with the new Eleventy development server or the `@11ty/eleventy-browser-sync` plugin moving forward.",
-		);
-	}
-
-	configureTemplateHandling(options = {}) {
+	configureTemplateHandling() {
 		// Was used for sync/async swapping on file write operations
 		throw new Error("Internal configuration API method `configureTemplateHandling` was removed.");
 	}
@@ -1314,6 +1370,7 @@ class UserConfig {
 	// Used by the Upgrade Helper Plugin v1 (no longer relevant)
 	// https://github.com/11ty/eleventy-upgrade-help/blob/v1.x/src/data-deep-merge.js#L5-L9
 	isDataDeepMergeModified() {}
-}
 
-export default UserConfig;
+	// No-op from v2
+	setBrowserSyncConfig() {}
+}

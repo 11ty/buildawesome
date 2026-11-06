@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import { TemplateDepGraph } from "../src/Util/TemplateDepGraph.js";
 
 test("Using new Template DepGraph", async (t) => {
@@ -11,7 +11,7 @@ test("Using new Template DepGraph", async (t) => {
   graph.addTemplate("template-paginated-collections.njk", ["[keys]"], []);
   graph.addConfigCollectionName("myCollection");
 
-  t.deepEqual(graph.unfilteredOrder(), [
+  t.assert.deepStrictEqual(graph.unfilteredOrder(), [
     "template-1.njk",
     "template-2.njk",
     "__collection:posts",
@@ -26,7 +26,7 @@ test("Using new Template DepGraph", async (t) => {
     "template-paginated-over-all.njk",
   ]);
 
-  t.deepEqual(graph.overallOrder(), [
+  t.assert.deepStrictEqual(graph.overallOrder(), [
     "template-1.njk",
     "template-2.njk",
     "__collection:posts",

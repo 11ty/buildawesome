@@ -1,8 +1,7 @@
 import { spawn } from "node:child_process";
-import { withResolvers } from "./PromiseUtil.js";
 
 export function spawnAsync(command, args, options) {
-	let { promise, resolve, reject } = withResolvers();
+	let { promise, resolve, reject } = Promise.withResolvers();
 
 	const cmd = spawn(command, args, options);
 	let res = [];

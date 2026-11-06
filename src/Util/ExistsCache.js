@@ -27,6 +27,14 @@ class ExistsCache {
 		this.#exists.set(TemplatePath.addLeadingDotSlash(path), Boolean(isExist));
 	}
 
+	// Looked up again next time, e.g. a file added or deleted while watching
+	delete(path) {
+		for (let key of [path, TemplatePath.addLeadingDotSlash(path)]) {
+			this.#exists.delete(key);
+			this.#dirs.delete(key);
+		}
+	}
+
 	// Not yet needed
 	// setDirectory(path, isExist) {}
 

@@ -2,58 +2,70 @@ import { TemplatePath } from "@11ty/eleventy-utils";
 
 import PathNormalizer from "./Util/PathNormalizer.js";
 
-/* Decides when to watch and in what mode to watch
- * Incremental builds don’t batch changes, they queue.
- * Nonincremental builds batch.
+/*
+ * Decides when to watch and in what mode to watch
  */
 
 class WatchQueue {
+	static normalizePath(path) {
+		if (!path) {
+			return;
+		}
+		return PathNormalizer.normalizeSeperator(
+			TemplatePath.addLeadingDotSlash(TemplatePath.normalize(path)),
+		);
+	}
+
 	constructor() {
-		this.incremental = false;
-		this.isActive = false;
+		this.activeQueue = [];
+	}
+
+	// on SIGINT
+	reset() {
+		this.pendingQueue = [];
 		this.activeQueue = [];
 	}
 
 	isBuildRunning() {
-		return this.isActive;
+		return this.activeQueue.length > 0;
 	}
 
-	setBuildRunning() {
-		this.isActive = true;
+	startBuild() {
+		if (this.isBuildRunning()) {
+			throw new Error(
+				"Internal error: build already running. Use finishBuild() before calling startBuild() again.",
+			);
+		}
 
 		// pop waiting queue into the active queue
 		this.activeQueue = this.popNextActiveQueue();
 	}
 
-	setBuildFinished() {
-		this.isActive = false;
+	finishBuild() {
 		this.activeQueue = [];
 	}
 
-	getIncrementalFile() {
-		if (this.incremental) {
-			return this.activeQueue.length ? this.activeQueue[0] : false;
+	setActiveQueue(queue) {
+		if (!queue || !Array.isArray(queue)) {
+			return;
 		}
 
-		return false;
+		for (let path of queue) {
+			let normalized = WatchQueue.normalizePath(path);
+			if (!this.activeQueue.includes(normalized)) {
+				this.activeQueue.push(normalized);
+			}
+		}
 	}
 
-	/* Returns the changed files currently being operated on in the current `watch` build
-	 * Works with or without incremental (though in incremental only one file per time will be processed)
+	/*
+	 * Returns the changed files currently being operated on in the current `watch` build
 	 */
 	getActiveQueue() {
-		if (!this.isActive) {
-			return [];
-		} else if (this.incremental && this.activeQueue.length === 0) {
-			return [];
-		} else if (this.incremental) {
-			return [this.activeQueue[0]];
-		}
-
 		return this.activeQueue;
 	}
 
-	_queueMatches(file) {
+	#queueMatches(file) {
 		let filterCallback;
 		if (typeof file === "function") {
 			filterCallback = file;
@@ -66,13 +78,13 @@ class WatchQueue {
 
 	hasAllQueueFiles(file) {
 		return (
-			this.activeQueue.length > 0 && this.activeQueue.length === this._queueMatches(file).length
+			this.activeQueue.length > 0 && this.activeQueue.length === this.#queueMatches(file).length
 		);
 	}
 
 	hasQueuedFile(file) {
 		if (file) {
-			return this._queueMatches(file).length > 0;
+			return this.#queueMatches(file).length > 0;
 		}
 		return false;
 	}
@@ -98,9 +110,13 @@ class WatchQueue {
 	}
 
 	addToPendingQueue(path) {
-		if (path) {
-			path = PathNormalizer.normalizeSeperator(TemplatePath.addLeadingDotSlash(path));
-			this.pendingQueue.push(path);
+		if (!path) {
+			return;
+		}
+
+		let normalized = WatchQueue.normalizePath(path);
+		if (!this.pendingQueue.includes(normalized)) {
+			this.pendingQueue.push(normalized);
 		}
 	}
 
@@ -116,12 +132,12 @@ class WatchQueue {
 		return this.activeQueue.length;
 	}
 
+	clearPendingQueue() {
+		this.pendingQueue = [];
+	}
+
 	// returns array
 	popNextActiveQueue() {
-		if (this.incremental) {
-			return this.pendingQueue.length ? [this.pendingQueue.shift()] : [];
-		}
-
 		let ret = this.pendingQueue.slice();
 		this.pendingQueue = [];
 		return ret;

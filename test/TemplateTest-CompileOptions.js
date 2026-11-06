@@ -1,7 +1,7 @@
-import test from "ava";
+import test from "node:test";
 
 import TemplateData from "../src/Data/TemplateData.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 
 import getNewTemplate from "./_getNewTemplateForTests.js";
 import { renderTemplate } from "./_getRenderedTemplates.js";
@@ -19,8 +19,8 @@ test("Custom extension (.txt) with custom permalink compile function", async (t)
         cache: false,
         // pass in your own custom permalink function.
         permalink: async function (permalinkString, inputPath) {
-          t.is(permalinkString, "custom-extension.lit");
-          t.is(inputPath, "./test/stubs/custom-extension.txt");
+          t.assert.strictEqual(permalinkString, "custom-extension.lit");
+          t.assert.strictEqual(inputPath, "./test/stubs/custom-extension.txt");
           return async function () {
             return "HAHA_THIS_ALWAYS_GOES_HERE.txt";
           };
@@ -36,7 +36,7 @@ test("Custom extension (.txt) with custom permalink compile function", async (t)
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -49,11 +49,11 @@ test("Custom extension (.txt) with custom permalink compile function", async (t)
   );
 
   let data = await tmpl.getData();
-  t.is(await renderTemplate(tmpl, data), "Sample content");
+  t.assert.strictEqual(await renderTemplate(tmpl, data), "Sample content");
   let testObj = await tmpl.getOutputLocations(data);
-  t.is(testObj.href, "/HAHA_THIS_ALWAYS_GOES_HERE.txt");
-  t.is(testObj.path, "./dist/HAHA_THIS_ALWAYS_GOES_HERE.txt");
-  t.is(testObj.rawPath, "HAHA_THIS_ALWAYS_GOES_HERE.txt");
+  t.assert.strictEqual(testObj.href, "/HAHA_THIS_ALWAYS_GOES_HERE.txt");
+  t.assert.strictEqual(testObj.path, "./dist/HAHA_THIS_ALWAYS_GOES_HERE.txt");
+  t.assert.strictEqual(testObj.rawPath, "HAHA_THIS_ALWAYS_GOES_HERE.txt");
 });
 
 test("Custom extension with and compileOptions.permalink = false", async (t) => {
@@ -78,7 +78,7 @@ test("Custom extension with and compileOptions.permalink = false", async (t) => 
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -91,11 +91,11 @@ test("Custom extension with and compileOptions.permalink = false", async (t) => 
   );
 
   let data = await tmpl.getData();
-  t.is(await renderTemplate(tmpl, data), "Sample content");
+  t.assert.strictEqual(await renderTemplate(tmpl, data), "Sample content");
   let testObj = await tmpl.getOutputLocations(data);
-  t.is(testObj.href, false);
-  t.is(testObj.path, false);
-  t.is(testObj.rawPath, false);
+  t.assert.strictEqual(testObj.href, false);
+  t.assert.strictEqual(testObj.path, false);
+  t.assert.strictEqual(testObj.rawPath, false);
 });
 
 test("Custom extension with and opt-out of permalink compilation", async (t) => {
@@ -120,7 +120,7 @@ test("Custom extension with and opt-out of permalink compilation", async (t) => 
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -133,11 +133,11 @@ test("Custom extension with and opt-out of permalink compilation", async (t) => 
   );
 
   let data = await tmpl.getData();
-  t.is(await renderTemplate(tmpl, data), "Sample content");
+  t.assert.strictEqual(await renderTemplate(tmpl, data), "Sample content");
   let testObj = await tmpl.getOutputLocations(data);
-  t.is(testObj.href, "/custom-extension.lit");
-  t.is(testObj.path, "./dist/custom-extension.lit");
-  t.is(testObj.rawPath, "custom-extension.lit");
+  t.assert.strictEqual(testObj.href, "/custom-extension.lit");
+  t.assert.strictEqual(testObj.path, "./dist/custom-extension.lit");
+  t.assert.strictEqual(testObj.rawPath, "custom-extension.lit");
 });
 
 test("Custom extension (.txt) with custom permalink compile function but no permalink in the data cascade", async (t) => {
@@ -152,8 +152,8 @@ test("Custom extension (.txt) with custom permalink compile function but no perm
         cache: false,
         // pass in your own custom permalink function.
         permalink: async function (permalinkString, inputPath) {
-          t.is(permalinkString, undefined);
-          t.is(inputPath, "./test/stubs/custom-extension-no-permalink.txt");
+          t.assert.strictEqual(permalinkString, undefined);
+          t.assert.strictEqual(inputPath, "./test/stubs/custom-extension-no-permalink.txt");
 
           return async function () {
             return "HAHA_THIS_ALWAYS_GOES_HERE.txt";
@@ -170,7 +170,7 @@ test("Custom extension (.txt) with custom permalink compile function but no perm
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -183,11 +183,11 @@ test("Custom extension (.txt) with custom permalink compile function but no perm
   );
 
   let data = await tmpl.getData();
-  t.is(await renderTemplate(tmpl, data), "Sample content");
+  t.assert.strictEqual(await renderTemplate(tmpl, data), "Sample content");
   let testObj = await tmpl.getOutputLocations(data);
-  t.is(testObj.href, "/HAHA_THIS_ALWAYS_GOES_HERE.txt");
-  t.is(testObj.path, "./dist/HAHA_THIS_ALWAYS_GOES_HERE.txt");
-  t.is(testObj.rawPath, "HAHA_THIS_ALWAYS_GOES_HERE.txt");
+  t.assert.strictEqual(testObj.href, "/HAHA_THIS_ALWAYS_GOES_HERE.txt");
+  t.assert.strictEqual(testObj.path, "./dist/HAHA_THIS_ALWAYS_GOES_HERE.txt");
+  t.assert.strictEqual(testObj.rawPath, "HAHA_THIS_ALWAYS_GOES_HERE.txt");
 });
 
 test("Custom extension (.txt) with custom permalink compile function (that returns a string not a function) but no permalink in the data cascade", async (t) => {
@@ -201,8 +201,8 @@ test("Custom extension (.txt) with custom permalink compile function (that retur
       compileOptions: {
         cache: false,
         permalink: async function (permalinkString, inputPath) {
-          t.is(permalinkString, undefined);
-          t.is(inputPath, "./test/stubs/custom-extension-no-permalink.txt");
+          t.assert.strictEqual(permalinkString, undefined);
+          t.assert.strictEqual(inputPath, "./test/stubs/custom-extension-no-permalink.txt");
 
           // unique part of this test: this is a string, not a function
           return "HAHA_THIS_ALWAYS_GOES_HERE.txt";
@@ -218,7 +218,7 @@ test("Custom extension (.txt) with custom permalink compile function (that retur
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -231,11 +231,11 @@ test("Custom extension (.txt) with custom permalink compile function (that retur
   );
 
   let data = await tmpl.getData();
-  t.is(await renderTemplate(tmpl, data), "Sample content");
+  t.assert.strictEqual(await renderTemplate(tmpl, data), "Sample content");
   let testObj = await tmpl.getOutputLocations(data);
-  t.is(testObj.href, "/HAHA_THIS_ALWAYS_GOES_HERE.txt");
-  t.is(testObj.path, "./dist/HAHA_THIS_ALWAYS_GOES_HERE.txt");
-  t.is(testObj.rawPath, "HAHA_THIS_ALWAYS_GOES_HERE.txt");
+  t.assert.strictEqual(testObj.href, "/HAHA_THIS_ALWAYS_GOES_HERE.txt");
+  t.assert.strictEqual(testObj.path, "./dist/HAHA_THIS_ALWAYS_GOES_HERE.txt");
+  t.assert.strictEqual(testObj.rawPath, "HAHA_THIS_ALWAYS_GOES_HERE.txt");
 });
 
 test("Custom extension (.txt) with custom permalink compile function that returns false", async (t) => {
@@ -249,8 +249,8 @@ test("Custom extension (.txt) with custom permalink compile function that return
       compileOptions: {
         cache: false,
         permalink: async function (permalinkString, inputPath) {
-          t.is(permalinkString, undefined);
-          t.is(inputPath, "./test/stubs/custom-extension-no-permalink.txt");
+          t.assert.strictEqual(permalinkString, undefined);
+          t.assert.strictEqual(inputPath, "./test/stubs/custom-extension-no-permalink.txt");
 
           // unique part of this test: this returns false
           return false;
@@ -266,7 +266,7 @@ test("Custom extension (.txt) with custom permalink compile function that return
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -279,11 +279,11 @@ test("Custom extension (.txt) with custom permalink compile function that return
   );
 
   let data = await tmpl.getData();
-  t.is(await renderTemplate(tmpl, data), "Sample content");
+  t.assert.strictEqual(await renderTemplate(tmpl, data), "Sample content");
   let testObj = await tmpl.getOutputLocations(data);
-  t.is(testObj.href, false);
-  t.is(testObj.path, false);
-  t.is(testObj.rawPath, false);
+  t.assert.strictEqual(testObj.href, false);
+  t.assert.strictEqual(testObj.path, false);
+  t.assert.strictEqual(testObj.rawPath, false);
 });
 
 test("Custom extension (.txt) that returns undefined from compile", async (t) => {
@@ -298,7 +298,7 @@ test("Custom extension (.txt) that returns undefined from compile", async (t) =>
         cache: false,
       },
       compile: function (str, inputPath) {
-        t.is(str, "Sample content");
+        t.assert.strictEqual(str, "Sample content");
         return function (data) {
           return undefined;
         };
@@ -307,7 +307,7 @@ test("Custom extension (.txt) that returns undefined from compile", async (t) =>
   });
 
   let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
   let tmpl = await getNewTemplate(
@@ -320,10 +320,10 @@ test("Custom extension (.txt) that returns undefined from compile", async (t) =>
   );
 
   let data = await tmpl.getData();
-  t.is(await renderTemplate(tmpl, data), undefined);
+  t.assert.strictEqual(await renderTemplate(tmpl, data), undefined);
   let pages = await tmpl.getTemplates(data);
   for (let page of pages) {
     page.templateContent = undefined;
-    t.is(page.templateContent, undefined); // shouldn’t throw an error
+    t.assert.strictEqual(page.templateContent, undefined); // shouldn’t throw an error
   }
 });

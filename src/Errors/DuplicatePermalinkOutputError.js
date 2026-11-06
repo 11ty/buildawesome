@@ -1,9 +1,7 @@
-import EleventyBaseError from "./EleventyBaseError.js";
+import BaseError from "./BaseError.js";
 
-class DuplicatePermalinkOutputError extends EleventyBaseError {
+export default class DuplicatePermalinkOutputError extends BaseError {
 	get removeDuplicateErrorStringFromOutput() {
 		return true;
 	}
 }
-
-export default DuplicatePermalinkOutputError;

@@ -1,6 +1,8 @@
 const DATA_KEYS = ["page", "eleventy"];
 
-function augmentFunction(fn, options = {}) {
+export { DATA_KEYS as augmentKeys };
+
+export function augmentFunction(fn, options = {}) {
 	let t = typeof fn;
 	if (t !== "function") {
 		throw new Error(
@@ -11,11 +13,12 @@ function augmentFunction(fn, options = {}) {
 	/** @this {object} */
 	return function (...args) {
 		let context = augmentObject(this || {}, options);
+
 		return fn.call(context, ...args);
 	};
 }
 
-function augmentObject(targetObject, options = {}) {
+export function augmentObject(targetObject, options = {}) {
 	options = Object.assign(
 		{
 			source: undefined, // where to copy from
@@ -63,5 +66,3 @@ function augmentObject(targetObject, options = {}) {
 
 	return targetObject;
 }
-
-export { DATA_KEYS as augmentKeys, augmentFunction, augmentObject };

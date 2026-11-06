@@ -4,16 +4,17 @@ import { Merge, TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 // TODO add a first-class Markdown component to expose this using Markdown-only syntax (will need to be synchronous for markdown-it)
 
 import { ProxyWrap } from "../Util/Objects/ProxyWrap.js";
-import TemplateDataInitialGlobalData from "../Data/TemplateDataInitialGlobalData.js";
-import EleventyBaseError from "../Errors/EleventyBaseError.js";
+import ConfigurationGlobalData from "../Data/ConfigurationGlobalData.js";
+import BaseError from "../Errors/BaseError.js";
 import TemplateRender from "../TemplateRender.js";
 import ProjectDirectories from "../Util/ProjectDirectories.js";
 import TemplateConfig from "../TemplateConfig.js";
-import EleventyExtensionMap from "../EleventyExtensionMap.js";
+import ExtensionMap from "../ExtensionMap.js";
 import TemplateEngineManager from "../Engines/TemplateEngineManager.js";
 import Liquid from "../Adapters/Engines/Liquid.js";
+import memoize from "../Util/MemoizeFunction.js";
 
-class EleventyNunjucksError extends EleventyBaseError {}
+class NunjucksError extends BaseError {}
 
 /** @this {object} */
 async function compile(content, templateLang, options = {}) {
@@ -28,14 +29,14 @@ async function compile(content, templateLang, options = {}) {
 
 	// Breaking change in 2.0+, previous default was `html` and now we default to the page template syntax
 	if (!templateLang) {
-		templateLang = this.page.templateSyntax;
+		templateLang = this?.page?.templateSyntax;
 	}
 
 	if (!extensionMap) {
 		if (strictMode) {
 			throw new Error("Internal error: missing `extensionMap` in RenderPlugin->compile.");
 		}
-		extensionMap = new EleventyExtensionMap(templateConfig);
+		extensionMap = new ExtensionMap(templateConfig);
 		extensionMap.engineManager = new TemplateEngineManager(templateConfig);
 	}
 	let tr = new TemplateRender(templateLang, templateConfig);
@@ -51,7 +52,11 @@ async function compile(content, templateLang, options = {}) {
 	if (
 		tr.engine.name === "11ty.js" ||
 		tr.engine.name === "11ty.cjs" ||
-		tr.engine.name === "11ty.mjs"
+		tr.engine.name === "11ty.mjs" ||
+		// TODO Node 22+
+		tr.engine.name === "11ty.ts" ||
+		tr.engine.name === "11ty.cts" ||
+		tr.engine.name === "11ty.mts"
 	) {
 		throw new Error(
 			"11ty.js is not yet supported as a template engine for `renderTemplate`. Use `renderFile` instead!",
@@ -95,7 +100,7 @@ async function compileFile(inputPath, options = {}, templateLang) {
 			throw new Error("Internal error: missing `extensionMap` in RenderPlugin->compileFile.");
 		}
 
-		extensionMap = new EleventyExtensionMap(templateConfig);
+		extensionMap = new ExtensionMap(templateConfig);
 		extensionMap.engineManager = new TemplateEngineManager(templateConfig);
 	}
 	let tr = new TemplateRender(inputPath, templateConfig);
@@ -116,6 +121,21 @@ async function compileFile(inputPath, options = {}, templateLang) {
 	return tr.getCompiledTemplate(content);
 }
 
+const memoizedCompiles = new WeakMap();
+
+function memoizeCompile(templateConfig, key, compileFn) {
+	let memoized = memoizedCompiles.get(templateConfig);
+	if (!memoized) {
+		memoized = memoize((key, compileFn) => compileFn(), { getCacheKey: (key) => key });
+		// Clearing everything also covers changes to a rendered template’s includes.
+		templateConfig.eventBus.on("buildawesome.resourcemodified", memoized.clear);
+		templateConfig.eventBus.on("buildawesome.compilecachereset", memoized.clear);
+		memoizedCompiles.set(templateConfig, memoized);
+	}
+
+	return memoized(key, compileFn);
+}
+
 /** @this {object} */
 async function renderShortcodeFn(fn, data) {
 	if (fn === undefined) {
@@ -131,15 +151,19 @@ async function renderShortcodeFn(fn, data) {
 		};
 	}
 
-	if ("data" in this && isPlainObject(this.data)) {
+	if (this && "data" in this && isPlainObject(this.data)) {
 		// when options.accessGlobalData is true, this allows the global data
 		// to be accessed inside of the shortcode as a fallback
 
 		data = ProxyWrap(data, this.data);
 	} else {
-		// save `page` and `eleventy` for reuse
-		data.page = this.page;
-		data.eleventy = this.eleventy;
+		// Context values are fallbacks; a copy avoids leaking one page’s context into a reused data object.
+		data = {
+			page: this?.page,
+			eleventy: this?.eleventy,
+			buildawesome: this?.buildawesome,
+			...data,
+		};
 	}
 
 	return fn(data);
@@ -154,17 +178,17 @@ async function renderShortcodeFn(fn, data) {
  * string (or file) inside of another template. {@link https://v3.11ty.dev/docs/plugins/render/}
  *
  * @since 1.0.0
- * @param {module:11ty/eleventy/UserConfig} eleventyConfig - User-land configuration instance.
+ * @param {module:11ty/eleventy/UserConfig} $config - User-land configuration instance.
  * @param {object} options - Plugin options
  */
-function RenderPlugin(eleventyConfig, options = {}) {
+function RenderPlugin($config, options = {}) {
 	let templateConfig;
-	eleventyConfig.on("eleventy.config", (tmplConfigInstance) => {
+	$config.on("buildawesome.config", (tmplConfigInstance) => {
 		templateConfig = tmplConfigInstance;
 	});
 
 	let extensionMap;
-	eleventyConfig.on("eleventy.extensionmap", (map) => {
+	$config.on("buildawesome.extensionmap", (map) => {
 		extensionMap = map;
 	});
 
@@ -174,13 +198,23 @@ function RenderPlugin(eleventyConfig, options = {}) {
 	 * @property {string} [tagNameFile] - The shortcode name to render a template file.
 	 * @property {module:11ty/eleventy/TemplateConfig} [templateConfig] - Configuration object
 	 * @property {boolean} [accessGlobalData] - Whether or not the template has access to the page’s data.
+	 * @property {string} [memoize] - Comma-separated list (`file`, `string`) to reuse compiled `renderFile` and `renderTemplate`/`renderContent` templates across pages.
 	 */
+
+	// For incremental builds, the page uses what it renders
+	function addDependency(page, ...nodes) {
+		let uses = (options.templateConfig || templateConfig)?.usesGraph;
+		if (uses && page?.inputPath) {
+			uses.addDependency(page.inputPath, nodes.filter(Boolean));
+		}
+	}
 
 	options.tagName ??= "renderTemplate";
 	options.tagNameFile ??= "renderFile";
 	options.filterName ??= "renderContent";
 	options.templateConfig ??= null;
 	options.accessGlobalData ??= false;
+	let memoize = new Set((options.memoize || "").split(",").map((entry) => entry.trim()));
 
 	function liquidTemplateTag(liquidEngine, tagName, extras) {
 		const { evalToken } = extras;
@@ -189,7 +223,7 @@ function RenderPlugin(eleventyConfig, options = {}) {
 			parse: function (tagToken, remainTokens) {
 				this.name = tagToken.name;
 
-				if (eleventyConfig.liquid.parameterParsing === "builtin") {
+				if ($config.liquid.parameterParsing === "builtin") {
 					this.orderedArgs = Liquid.parseArgumentsBuiltin(tagToken.args);
 					// note that Liquid does have a Hash class for name-based argument parsing but offers no easy to support both modes in one class
 				} else {
@@ -220,11 +254,12 @@ function RenderPlugin(eleventyConfig, options = {}) {
 
 					normalizedContext.page = ctx.get(["page"]);
 					normalizedContext.eleventy = ctx.get(["eleventy"]);
+					normalizedContext.buildawesome = ctx.get(["buildawesome"]);
 				}
 
 				let argArray = [];
 				if (this.legacyArgs) {
-					let rawArgs = Liquid.parseArguments(null, this.legacyArgs);
+					let rawArgs = Liquid.parseArguments(this.legacyArgs);
 					for (let arg of rawArgs) {
 						let b = yield liquidEngine.evalValue(arg, ctx);
 						argArray.push(b);
@@ -271,7 +306,7 @@ function RenderPlugin(eleventyConfig, options = {}) {
 				);
 				let rawLevel = 1;
 				let str = "";
-				let matches = null;
+				let matches;
 
 				// Exit when there's nothing to match
 				// or when we've found the matching "endraw" block
@@ -320,13 +355,12 @@ function RenderPlugin(eleventyConfig, options = {}) {
 
 					normalizedContext.page = context.ctx.page;
 					normalizedContext.eleventy = context.ctx.eleventy;
+					normalizedContext.buildawesome = context.ctx.buildawesome;
 				}
 
 				body(function (e, bodyContent) {
 					if (e) {
-						resolve(
-							new EleventyNunjucksError(`Error with Nunjucks paired shortcode \`${tagName}\``, e),
-						);
+						resolve(new NunjucksError(`Error with Nunjucks paired shortcode \`${tagName}\``, e));
 					}
 
 					Promise.resolve(
@@ -342,7 +376,7 @@ function RenderPlugin(eleventyConfig, options = {}) {
 						},
 						function (e) {
 							resolve(
-								new EleventyNunjucksError(`Error with Nunjucks paired shortcode \`${tagName}\``, e),
+								new NunjucksError(`Error with Nunjucks paired shortcode \`${tagName}\``, e),
 								null,
 							);
 						},
@@ -360,11 +394,28 @@ function RenderPlugin(eleventyConfig, options = {}) {
 			templateLang = false;
 		}
 
-		// TODO Render plugin `templateLang` is feeding bad input paths to the addDependencies call in Custom.js
-		let fn = await compile.call(this, content, templateLang, {
+		// Engines record a string template’s dependencies under the engine name (e.g. `njk` or `webc`)
+		let lang = templateLang || this?.page?.templateSyntax;
+		if (typeof lang === "string") {
+			addDependency(this?.page, lang, ...lang.split(","));
+		}
+
+		let compileOptions = {
 			templateConfig: options.templateConfig || templateConfig,
 			extensionMap,
-		});
+		};
+		let compileFn = () => compile.call(this, content, templateLang, compileOptions);
+
+		let fn;
+		if (memoize.has("string") && compileOptions.templateConfig) {
+			fn = await memoizeCompile(
+				compileOptions.templateConfig,
+				`string:${lang || ""}:${content}`,
+				compileFn,
+			);
+		} else {
+			fn = await compileFn();
+		}
 
 		return renderShortcodeFn.call(this, fn, data);
 	}
@@ -376,7 +427,19 @@ function RenderPlugin(eleventyConfig, options = {}) {
 			extensionMap,
 		};
 
-		let fn = await compileFile.call(this, inputPath, renderFileOptions, templateLang);
+		addDependency(this?.page, inputPath);
+
+		let fn;
+		let compileFn = () => compileFile(inputPath, renderFileOptions, templateLang);
+		if (memoize.has("file") && renderFileOptions.templateConfig) {
+			fn = await memoizeCompile(
+				renderFileOptions.templateConfig,
+				`file:${templateLang || ""}:${inputPath}`,
+				compileFn,
+			);
+		} else {
+			fn = await compileFn();
+		}
 
 		return renderShortcodeFn.call(this, fn, data);
 	}
@@ -384,26 +447,26 @@ function RenderPlugin(eleventyConfig, options = {}) {
 	// Render strings
 	if (options.tagName) {
 		// use falsy to opt-out
-		eleventyConfig.addJavaScriptFunction(options.tagName, _renderStringShortcodeFn);
+		$config.addJavaScriptFunction(options.tagName, _renderStringShortcodeFn);
 
-		eleventyConfig.addLiquidTag(options.tagName, function (liquidEngine, extras) {
+		$config.addLiquidTag(options.tagName, function (liquidEngine, extras) {
 			return liquidTemplateTag(liquidEngine, options.tagName, extras);
 		});
 
-		eleventyConfig.addNunjucksTag(options.tagName, function (nunjucksLib) {
+		$config.addNunjucksTag(options.tagName, function (nunjucksLib) {
 			return nunjucksTemplateTag(nunjucksLib, options.tagName);
 		});
 	}
 
 	// Filter for rendering strings
 	if (options.filterName) {
-		eleventyConfig.addAsyncFilter(options.filterName, _renderStringShortcodeFn);
+		$config.addAsyncFilter(options.filterName, _renderStringShortcodeFn);
 	}
 
 	// Render File
 	// use `false` to opt-out
 	if (options.tagNameFile) {
-		eleventyConfig.addAsyncShortcode(options.tagNameFile, _renderFileShortcodeFn);
+		$config.addAsyncShortcode(options.tagNameFile, _renderFileShortcodeFn);
 	}
 }
 
@@ -436,7 +499,7 @@ class RenderManager {
 			accessGlobalData: true,
 		});
 
-		this.#extensionMap = new EleventyExtensionMap(this.#templateConfig);
+		this.#extensionMap = new ExtensionMap(this.#templateConfig);
 		this.#extensionMap.engineManager = new TemplateEngineManager(this.#templateConfig);
 	}
 
@@ -455,7 +518,7 @@ class RenderManager {
 
 	// `callback` is async-friendly but requires await upstream
 	config(callback) {
-		// run an extra `function(eleventyConfig)` configuration callbacks
+		// run an extra `function($config)` configuration callbacks
 		if (callback && typeof callback === "function") {
 			return callback(this.templateConfig.userConfig);
 		}
@@ -463,7 +526,7 @@ class RenderManager {
 
 	get initialGlobalData() {
 		if (!this._data) {
-			this._data = new TemplateDataInitialGlobalData(this.templateConfig);
+			this._data = new ConfigurationGlobalData(this.templateConfig);
 		}
 		return this._data;
 	}

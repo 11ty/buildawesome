@@ -1,198 +1,99 @@
-import test from "ava";
+import test from "node:test";
 import WatchQueue from "../src/WatchQueue.js";
 
 test("Standard", (t) => {
   let watch = new WatchQueue();
-  t.is(watch.isBuildRunning(), false);
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 
-  watch.setBuildRunning();
-  t.is(watch.isBuildRunning(), true);
+  watch.startBuild();
+  t.assert.strictEqual(watch.isBuildRunning(), false); // nothing in the queue
 
-  watch.setBuildFinished();
-  t.is(watch.isBuildRunning(), false);
+  watch.finishBuild(); // still nothing in the queue
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 });
 
-test("Incremental", (t) => {
+test("Queue 1", (t) => {
   let watch = new WatchQueue();
-  t.is(watch.getIncrementalFile(), false);
-
-  watch.incremental = true;
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 
   watch.addToPendingQueue("test.md");
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 1);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 
-  watch.setBuildRunning();
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 1);
-  t.is(watch.getIncrementalFile(), "./test.md");
-  t.deepEqual(watch.getActiveQueue(), ["./test.md"]);
+  watch.startBuild();
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 1);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), ["./test.md"]);
 
-  watch.setBuildFinished();
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), []);
-  t.deepEqual(watch.getPendingQueue(), []);
+  watch.finishBuild();
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 });
 
-test("Incremental queue 2", (t) => {
+test("Queue 2", (t) => {
   let watch = new WatchQueue();
-  t.is(watch.getIncrementalFile(), false);
-
-  watch.incremental = true;
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 
   watch.addToPendingQueue("test.md");
   watch.addToPendingQueue("test2.md");
-  t.is(watch.getPendingQueueSize(), 2);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 2);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 
-  watch.setBuildRunning();
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 1);
-  t.is(watch.getIncrementalFile(), "./test.md");
-  t.deepEqual(watch.getActiveQueue(), ["./test.md"]);
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 
-  watch.setBuildFinished();
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getPendingQueue(), ["./test2.md"]);
-  t.deepEqual(watch.getActiveQueue(), []);
+  watch.startBuild();
+  t.assert.strictEqual(watch.isBuildRunning(), true);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 2);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), ["./test.md", "./test2.md"]);
+
+  t.assert.strictEqual(watch.isBuildRunning(), true);
+  watch.finishBuild();
+  t.assert.strictEqual(watch.isBuildRunning(), false);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getPendingQueue(), []);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 });
 
-test("Incremental add while active", (t) => {
+test("Add while active", (t) => {
   let watch = new WatchQueue();
-  t.is(watch.getIncrementalFile(), false);
-
-  watch.incremental = true;
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
 
   watch.addToPendingQueue("test.md");
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 1);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 
-  watch.setBuildRunning();
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 1);
-  t.is(watch.getIncrementalFile(), "./test.md");
-  t.deepEqual(watch.getActiveQueue(), ["./test.md"]);
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 
-  watch.addToPendingQueue("test2.md");
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 1);
-  t.is(watch.getIncrementalFile(), "./test.md");
-  t.deepEqual(watch.getActiveQueue(), ["./test.md"]);
-
-  watch.setBuildFinished();
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getPendingQueue(), ["./test2.md"]);
-  t.deepEqual(watch.getActiveQueue(), []);
-});
-
-test("Non-incremental", (t) => {
-  let watch = new WatchQueue();
-  t.is(watch.getIncrementalFile(), false);
-
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), []);
+  watch.startBuild();
+  t.assert.strictEqual(watch.isBuildRunning(), true);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 1);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), ["./test.md"]);
 
   watch.addToPendingQueue("test.md");
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), []);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 1);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 1);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), ["./test.md"]);
+  t.assert.strictEqual(watch.isBuildRunning(), true);
 
-  watch.setBuildRunning();
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 1);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), ["./test.md"]);
-
-  watch.setBuildFinished();
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), []);
-});
-
-test("Non-incremental queue 2", (t) => {
-  let watch = new WatchQueue();
-  t.is(watch.getIncrementalFile(), false);
-
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), []);
-
-  watch.addToPendingQueue("test.md");
-  watch.addToPendingQueue("test2.md");
-  t.is(watch.getPendingQueueSize(), 2);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), []);
-
-  watch.setBuildRunning();
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 2);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), ["./test.md", "./test2.md"]);
-
-  watch.setBuildFinished();
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getPendingQueue(), []);
-  t.deepEqual(watch.getActiveQueue(), []);
-});
-
-test("Non-incremental add while active", (t) => {
-  let watch = new WatchQueue();
-  t.is(watch.getIncrementalFile(), false);
-
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-
-  watch.addToPendingQueue("test.md");
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), []);
-
-  watch.setBuildRunning();
-  t.is(watch.getPendingQueueSize(), 0);
-  t.is(watch.getActiveQueueSize(), 1);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), ["./test.md"]);
-
-  watch.addToPendingQueue("test.md");
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 1);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getActiveQueue(), ["./test.md"]);
-
-  watch.setBuildFinished();
-  t.is(watch.getPendingQueueSize(), 1);
-  t.is(watch.getActiveQueueSize(), 0);
-  t.is(watch.getIncrementalFile(), false);
-  t.deepEqual(watch.getPendingQueue(), ["./test.md"]);
-  t.deepEqual(watch.getActiveQueue(), []);
+  watch.finishBuild();
+  t.assert.strictEqual(watch.isBuildRunning(), false);
+  t.assert.strictEqual(watch.getPendingQueueSize(), 1);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getPendingQueue(), ["./test.md"]);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 });
 
 test("Active queue tests", (t) => {
@@ -201,27 +102,31 @@ test("Active queue tests", (t) => {
   watch.addToPendingQueue("test2.md");
   watch.addToPendingQueue("test.css");
 
-  t.is(
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.startsWith("./test")),
     false
   );
 
-  watch.setBuildRunning();
-  t.is(watch.hasAllQueueFiles("slkdjflkjsdlkfj"), false);
-  t.is(
+  t.assert.strictEqual(watch.isBuildRunning(), false);
+
+  watch.startBuild();
+  t.assert.strictEqual(watch.hasAllQueueFiles("slkdjflkjsdlkfj"), false);
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.startsWith("./test")),
     true
   );
-  t.is(
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.endsWith(".css")),
     false
   );
 
-  t.is(watch.hasQueuedFile("./test.md"), true);
-  t.is(watch.hasQueuedFile("./testsdkljfklja.md"), false);
-  watch.setBuildFinished();
+  t.assert.strictEqual(watch.hasQueuedFile("./test.md"), true);
+  t.assert.strictEqual(watch.hasQueuedFile("./testsdkljfklja.md"), false);
+  t.assert.strictEqual(watch.isBuildRunning(), true);
+  watch.finishBuild();
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 
-  t.is(
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.startsWith("./test")),
     false
   );
@@ -233,20 +138,49 @@ test("Active queue tests, all CSS files", (t) => {
   watch.addToPendingQueue("test2.css");
   watch.addToPendingQueue("test3.css");
 
-  t.is(
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.endsWith(".css")),
     false
   );
 
-  watch.setBuildRunning();
-  t.is(
+  t.assert.strictEqual(watch.isBuildRunning(), false);
+
+  watch.startBuild();
+  t.assert.strictEqual(watch.isBuildRunning(), true);
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.endsWith(".css")),
     true
   );
-  watch.setBuildFinished();
+  t.assert.strictEqual(watch.isBuildRunning(), true);
+  watch.finishBuild();
+  t.assert.strictEqual(watch.isBuildRunning(), false);
 
-  t.is(
+  t.assert.strictEqual(
     watch.hasAllQueueFiles((path) => path.endsWith(".css")),
     false
   );
+});
+
+test("De-duplicate the entries in pending queue", (t) => {
+  let watch = new WatchQueue();
+
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+
+  watch.addToPendingQueue("test.md");
+  watch.addToPendingQueue("test.md");
+  watch.addToPendingQueue("test.md");
+
+  t.assert.strictEqual(watch.getPendingQueueSize(), 1);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
+
+  watch.startBuild();
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 1);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), ["./test.md"]);
+
+  watch.finishBuild();
+  t.assert.strictEqual(watch.getPendingQueueSize(), 0);
+  t.assert.strictEqual(watch.getActiveQueueSize(), 0);
+  t.assert.deepStrictEqual(watch.getActiveQueue(), []);
 });

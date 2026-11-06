@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 
 import TemplateMap from "../../../src/TemplateMap.js";
 import getNewTemplateForTests from "../../_getNewTemplateForTests.js";
@@ -50,12 +50,12 @@ test("Get ordered list of templates", async (t) => {
   await tm.cache();
 
   let order = tm.getTemplateOrder();
-  t.deepEqual(order, [
+  t.assert.deepStrictEqual(order, [
     "./test/_issues/975/post.md",
     "./test/_issues/975/another-post.md",
     "__collection:post",
-    "__collection:[keys]",
     "./test/_issues/975/index.md",
+    "__collection:[keys]",
     "__collection:all",
   ]);
 });
@@ -102,12 +102,12 @@ test("Get ordered list of templates (reverse add)", async (t) => {
   await tm.cache();
 
   let order = tm.getTemplateOrder();
-  t.deepEqual(order, [
+  t.assert.deepStrictEqual(order, [
     "./test/_issues/975/another-post.md",
     "./test/_issues/975/post.md",
     "__collection:post",
-    "__collection:[keys]",
     "./test/_issues/975/index.md",
+    "__collection:[keys]",
     "__collection:all",
   ]);
 });

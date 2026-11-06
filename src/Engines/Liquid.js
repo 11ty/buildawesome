@@ -1,21 +1,13 @@
-import moo from "moo";
-import { Tokenizer, TokenKind, evalToken, Liquid as LiquidJs } from "liquidjs";
+import { Tokenizer, TokenKind, LookupType, Parser, evalToken, Liquid as LiquidJs } from "liquidjs";
 import { TemplatePath } from "@11ty/eleventy-utils";
-// import debugUtil from "debug";
 
 import TemplateEngine from "./TemplateEngine.js";
 import { augmentObject } from "./Util/ContextAugmenter.js";
 
-// const debug = debugUtil("Eleventy:Liquid");
-
 export default class Liquid extends TemplateEngine {
-	static argumentLexerOptions = {
-		number: /[0-9]+\.*[0-9]*/,
-		doubleQuoteString: /"(?:\\["\\]|[^\n"\\])*"/,
-		singleQuoteString: /'(?:\\['\\]|[^\n'\\])*'/,
-		keyword: /[a-zA-Z0-9.\-_]+/,
-		"ignore:whitespace": /[, \t]+/, // includes comma separator
-	};
+	// Legacy argument tokens (number, double/single quoted string, keyword), separated by commas or whitespace.
+	static argumentLexer =
+		/([0-9]+\.*[0-9]*|"(?:\\["\\]|[^\n"\\])*"|'(?:\\['\\]|[^\n'\\])*'|[a-zA-Z0-9.\-_]+)|[, \t]+/y;
 
 	constructor(name, eleventyConfig) {
 		super(name, eleventyConfig);
@@ -23,8 +15,6 @@ export default class Liquid extends TemplateEngine {
 		this.liquidOptions = this.config.liquidOptions || {};
 
 		this.setLibrary(this.config.libraryOverrides.liquid);
-
-		this.argLexer = moo.compile(Liquid.argumentLexerOptions);
 	}
 
 	get cacheable() {
@@ -35,6 +25,7 @@ export default class Liquid extends TemplateEngine {
 		// warning, the include syntax supported here does not exactly match what Jekyll uses.
 		this.liquidLib = override || new LiquidJs(this.getLiquidOptions());
 		this.setEngineLib(this.liquidLib, Boolean(this.config.libraryOverrides.liquid));
+		this.#trackPartialFiles();
 
 		this.addFilters(this.config.liquidFilters);
 
@@ -51,6 +42,7 @@ export default class Liquid extends TemplateEngine {
 			strictFilters: true,
 			// cache: true,
 			jsTruthy: true, // Breaking in v4 #3507
+			timezoneOffset: this.config.dateTimeZone?.zone ?? 0, // Match `setDateTimeZone` (or UTC) when parsing dates, breaking in v4 #1905
 		};
 
 		let options = Object.assign(defaults, this.liquidOptions || {});
@@ -59,11 +51,45 @@ export default class Liquid extends TemplateEngine {
 		return options;
 	}
 
+	// Records `include`, `render`, and `layout` files in the dependency graph for incremental builds
+	#trackPartialFiles() {
+		let lib = this.liquidLib;
+		if (typeof lib._parsePartialFile !== "function" || typeof lib._parseLayoutFile !== "function") {
+			return;
+		}
+
+		let engine = this;
+		let track = (lookupType) =>
+			function (file, sync, currentFile) {
+				let parser = new Parser(this);
+				let lookup = parser.loader.lookup;
+				parser.loader.lookup = function* (...args) {
+					let filepath = yield* lookup.apply(this, args);
+					// String templates have no file, so use the engine name (e.g. includes in `renderTemplate`)
+					engine.addDependency(currentFile || engine.name, filepath);
+					return filepath;
+				};
+				// A cached parse skips the lookup
+				if (parser.cache) {
+					return (function* () {
+						yield parser.loader.lookup(file, lookupType, sync, currentFile);
+						return yield parser.parseFile(file, sync, lookupType, currentFile);
+					})();
+				}
+				return parser.parseFile(file, sync, lookupType, currentFile);
+			};
+
+		lib._parsePartialFile = track(LookupType.Partials);
+		lib._parseLayoutFile = track(LookupType.Layouts);
+	}
+
 	static wrapFilter(name, fn) {
 		/**
 		 * @this {object}
 		 */
 		return function (...args) {
+			// TODO ArgumentHelper.wrapFilter(fn);
+
 			// Set this.eleventy and this.page
 			if (typeof this.context?.get === "function") {
 				augmentObject(this, {
@@ -136,57 +162,72 @@ export default class Liquid extends TemplateEngine {
 		}
 	}
 
-	static parseArguments(lexer, str) {
+	static parseArguments(str) {
 		let argArray = [];
-
-		if (!lexer) {
-			lexer = moo.compile(Liquid.argumentLexerOptions);
+		if (typeof str !== "string") {
+			return argArray;
 		}
 
-		if (typeof str === "string") {
-			lexer.reset(str);
-
-			let arg = lexer.next();
-			while (arg) {
-				/*{
-					type: 'doubleQuoteString',
-					value: '"test 2"',
-					text: '"test 2"',
-					toString: [Function: tokenToString],
-					offset: 0,
-					lineBreaks: 0,
-					line: 1,
-					col: 1 }*/
-				if (arg.type.indexOf("ignore:") === -1) {
-					// Push the promise into an array instead of awaiting it here.
-					// This forces the promises to run in order with the correct scope value for each arg.
-					// Otherwise they run out of order and can lead to undefined values for arguments in layout template shortcodes.
-					// console.log( arg.value, scope, engine );
-					argArray.push(arg.value);
-				}
-				arg = lexer.next();
+		let lexer = new RegExp(Liquid.argumentLexer);
+		while (lexer.lastIndex < str.length) {
+			let index = lexer.lastIndex;
+			let match = lexer.exec(str);
+			if (!match) {
+				throw new Error(`Invalid Liquid shortcode argument syntax at col ${index + 1}: ${str}`);
+			}
+			if (match[1] !== undefined) {
+				argArray.push(match[1]);
 			}
 		}
 
 		return argArray;
 	}
 
+	// Reads a `key: value` keyword argument, falling back to a positional value
+	static readArgumentBuiltin(tokenizer) {
+		let begin = tokenizer.p;
+		let hash = tokenizer.readHash();
+		if (hash?.value) {
+			return hash;
+		}
+		tokenizer.p = begin;
+		return tokenizer.readValue();
+	}
+
 	static parseArgumentsBuiltin(args) {
 		let tokenizer = new Tokenizer(args);
 		let parsedArgs = [];
 
-		let value = tokenizer.readValue();
+		let value = Liquid.readArgumentBuiltin(tokenizer);
 		while (value) {
 			parsedArgs.push(value);
 			tokenizer.skipBlank();
 			if (tokenizer.peek() === ",") {
 				tokenizer.advance();
 			}
-			value = tokenizer.readValue();
+			value = Liquid.readArgumentBuiltin(tokenizer);
 		}
 		tokenizer.end();
 
 		return parsedArgs;
+	}
+
+	// Keyword arguments are passed as a trailing object marked with a non-enumerable `__keywords` (Nunjucks-compatible)
+	static *evalArgumentsBuiltin(tokens, ctx) {
+		let args = [];
+		let kwargs;
+		for (let token of tokens) {
+			if (token.kind === TokenKind.Hash) {
+				kwargs ??= Object.defineProperty({}, "__keywords", { value: true });
+				kwargs[token.name.content] = yield evalToken(token.value, ctx);
+			} else {
+				args.push(yield evalToken(token, ctx));
+			}
+		}
+		if (kwargs) {
+			args.push(kwargs);
+		}
+		return args;
 	}
 
 	addShortcode(shortcodeName, shortcodeFn) {
@@ -197,7 +238,6 @@ export default class Liquid extends TemplateEngine {
 					this.name = tagToken.name;
 					if (_t.config.liquidParameterParsing === "builtin") {
 						this.orderedArgs = Liquid.parseArgumentsBuiltin(tagToken.args);
-						// note that Liquid does have a Hash class for name-based argument parsing but offers no easy to support both modes in one class
 					} else {
 						this.legacyArgs = tagToken.args;
 					}
@@ -206,16 +246,13 @@ export default class Liquid extends TemplateEngine {
 					let argArray = [];
 
 					if (this.legacyArgs) {
-						let rawArgs = Liquid.parseArguments(_t.argLexer, this.legacyArgs);
+						let rawArgs = Liquid.parseArguments(this.legacyArgs);
 						for (let arg of rawArgs) {
 							let b = yield liquidEngine.evalValue(arg, ctx);
 							argArray.push(b);
 						}
 					} else if (this.orderedArgs) {
-						for (let arg of this.orderedArgs) {
-							let b = yield evalToken(arg, ctx);
-							argArray.push(b);
-						}
+						argArray = yield* Liquid.evalArgumentsBuiltin(this.orderedArgs, ctx);
 					}
 
 					let ret = yield shortcodeFn.call(Liquid.normalizeScope(ctx), ...argArray);
@@ -234,7 +271,6 @@ export default class Liquid extends TemplateEngine {
 
 					if (_t.config.liquidParameterParsing === "builtin") {
 						this.orderedArgs = Liquid.parseArgumentsBuiltin(tagToken.args);
-						// note that Liquid does have a Hash class for name-based argument parsing but offers no easy to support both modes in one class
 					} else {
 						this.legacyArgs = tagToken.args;
 					}
@@ -254,16 +290,13 @@ export default class Liquid extends TemplateEngine {
 				render: function* (ctx /*, emitter*/) {
 					let argArray = [];
 					if (this.legacyArgs) {
-						let rawArgs = Liquid.parseArguments(_t.argLexer, this.legacyArgs);
+						let rawArgs = Liquid.parseArguments(this.legacyArgs);
 						for (let arg of rawArgs) {
 							let b = yield liquidEngine.evalValue(arg, ctx);
 							argArray.push(b);
 						}
 					} else if (this.orderedArgs) {
-						for (let arg of this.orderedArgs) {
-							let b = yield evalToken(arg, ctx);
-							argArray.push(b);
-						}
+						argArray = yield* Liquid.evalArgumentsBuiltin(this.orderedArgs, ctx);
 					}
 
 					const html = yield liquidEngine.renderer.renderTemplates(this.templates, ctx);
@@ -330,6 +363,7 @@ export default class Liquid extends TemplateEngine {
 				{
 					page: data?.page,
 					eleventy: data?.eleventy,
+					buildawesome: data?.buildawesome,
 					collections: data?.collections,
 				},
 				liquidOptions?.globals,

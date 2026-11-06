@@ -1,4 +1,3 @@
-import debugUtil from "debug";
 import { TemplatePath } from "@11ty/eleventy-utils";
 
 // Direct reference to avoid use of `browser` Nunjucks variant in bundles
@@ -9,13 +8,13 @@ import {
 	Template,
 } from "@11ty/nunjucks/index.js";
 import TemplateEngine from "./TemplateEngine.js";
-import EleventyBaseError from "../Errors/EleventyBaseError.js";
+import BaseError from "../Errors/BaseError.js";
 import { augmentObject } from "./Util/ContextAugmenter.js";
-import { withResolvers } from "../Util/PromiseUtil.js";
+import { createDebug } from "../Util/DebugLogUtil.js";
 
-const debug = debugUtil("Eleventy:Nunjucks");
+const debug = createDebug("Nunjucks");
 
-class EleventyNunjucksError extends EleventyBaseError {}
+class BuildAwesomeNunjucksError extends BaseError {}
 
 export default class Nunjucks extends TemplateEngine {
 	constructor(name, eleventyConfig) {
@@ -29,10 +28,22 @@ export default class Nunjucks extends TemplateEngine {
 		this.setLibrary(this.config.libraryOverrides.njk);
 	}
 
-	// v3.1.0-alpha.1 we’ve moved to use Nunjucks’ internal cache instead of Eleventy’s
-	// get cacheable() {
-	// 	return false;
-	// }
+	// Nunjucks’ internal cache only covers loader templates (includes, layouts), not compiled strings
+	get cacheable() {
+		return true;
+	}
+
+	#recompiledKeys = new Set();
+
+	// A cached template keeps the environment (and included templates) of the build that compiled it
+	getCompileCacheKey(str, inputPath) {
+		let entry = super.getCompileCacheKey(str, inputPath);
+		if (!this.#recompiledKeys.has(entry.key) && this.config.uses.isChangedFileUsedBy(inputPath)) {
+			this.#recompiledKeys.add(entry.key);
+			entry.useCache = false;
+		}
+		return entry;
+	}
 
 	#getFileSystemDirs() {
 		let paths = new Set();
@@ -45,6 +56,11 @@ export default class Nunjucks extends TemplateEngine {
 
 	#setEnv(override) {
 		if (override) {
+			if (!(override instanceof Environment)) {
+				debug(
+					"WARNING: the Nunjucks environment passed to `setLibrary` was not created by `@11ty/nunjucks`. Import from `@11ty/nunjucks` instead of `nunjucks` to avoid mixing library versions.",
+				);
+			}
 			this.njkEnv = override;
 		} else if (this._usingPrecompiled) {
 			// Precompiled templates to avoid eval!
@@ -77,18 +93,50 @@ export default class Nunjucks extends TemplateEngine {
 			this.njkEnv = new Environment(loaders, this.nunjucksEnvironmentOptions);
 		}
 
-		this.config.events.emit("eleventy.engine.njk", {
+		this.#trackTemplates();
+
+		this.config.events.emit("buildawesome.engine.njk", {
 			nunjucks: NunjucksLib,
 			environment: this.njkEnv,
 		});
+	}
+
+	// Records `include`, `import`, `from`, and `extends` files in the dependency graph for incremental builds
+	#trackTemplates() {
+		let env = this.njkEnv;
+		let getTemplate = env.getTemplate;
+		if (typeof getTemplate !== "function") {
+			return;
+		}
+
+		let engine = this;
+		env.getTemplate = function (name, ...args) {
+			// (name, eagerCompile, parentName, ignoreMissing, cb), any trailing arguments optional
+			// String templates have no path, so use the engine name (e.g. includes in `renderTemplate`)
+			let parentName =
+				typeof args[1] === "string" ? args[1] : args.length > 1 ? engine.name : undefined;
+			let cbIndex = args.findIndex((arg) => typeof arg === "function");
+			if (parentName && cbIndex > -1) {
+				let cb = args[cbIndex];
+				args[cbIndex] = (error, tmpl) => {
+					engine.addDependency(parentName, tmpl?.path);
+					cb(error, tmpl);
+				};
+			}
+
+			let result = getTemplate.call(this, name, ...args);
+			if (parentName && cbIndex === -1) {
+				engine.addDependency(parentName, result?.path);
+			}
+			return result;
+		};
 	}
 
 	setLibrary(override) {
 		this.#setEnv(override);
 
 		// Note that a new Nunjucks engine instance is created for subsequent builds
-		// Eleventy Nunjucks is set to `cacheable` false above to opt out of Eleventy cache
-		this.config.events.on("eleventy#templateModified", (templatePath) => {
+		this.config.events.on("buildawesome#templatemodified", (templatePath) => {
 			// NunjucksEnvironment:
 			// loader.pathToNames: {'ABSOLUTE_PATH/src/_includes/components/possum-home.css': 'components/possum-home.css'}
 			// loader.cache: { 'components/possum-home.css': [Template] }
@@ -117,9 +165,8 @@ export default class Nunjucks extends TemplateEngine {
 		this.addFilters(this.config.nunjucksFilters);
 		this.addFilters(this.config.nunjucksAsyncFilters, true);
 
-		// TODO these all go to the same place (addTag), add warnings for overwrites
-		// TODO(zachleat): variableName should work with quotes or without quotes (same as {% set %})
-		// This was changed to be an async function in v4 but notably previous versions of synchronous paired shortcodes used CallExtensionAsync
+		// Changed from sync to async function in v4.0.0-alpha.9 (notably previous versions of synchronous paired shortcodes used CallExtensionAsync)
+		// Deprecated in v4.0.0-alpha.9. Use `{% set %}` which is now async-friendly
 		this.addPairedShortcode(
 			"setAsync",
 			async function (content, variableName) {
@@ -153,7 +200,7 @@ export default class Nunjucks extends TemplateEngine {
 
 				return fn.call(this, ...args);
 			} catch (e) {
-				throw new EleventyNunjucksError(
+				throw new BuildAwesomeNunjucksError(
 					`Error in Nunjucks Filter \`${name}\`${this.page ? ` (${this.page.inputPath})` : ""}`,
 					e,
 				);
@@ -217,51 +264,115 @@ export default class Nunjucks extends TemplateEngine {
 		}
 	}
 
-	_getShortcodeFn(shortcodeName, shortcodeFn, isAsync = false) {
+	_getShortcodeFn(shortcodeName, shortcodeFn) {
 		return function ShortcodeFunction() {
 			this.tags = [shortcodeName];
 
 			this.parse = function (parser, nodes) {
-				let args;
 				let tok = parser.nextToken();
-
-				args = parser.parseSignature(true, true);
+				let args = parser.parseSignature(true, true);
 
 				// Nunjucks bug with non-paired custom tags bug still exists even
 				// though this issue is closed. Works fine for paired.
 				// https://github.com/mozilla/nunjucks/issues/158
 				// https://github.com/11ty/eleventy/issues/372
-				if (args.children.length === 0) {
-					// Changed from an empty string to an empty NodeList
-					// https://github.com/11ty/eleventy/issues/3788
-					args.addChild(new nodes.NodeList());
-				}
+
+				// v4.0.0-alpha.1 changed from an empty string to an empty NodeList
+				// https://github.com/11ty/eleventy/issues/3788
+
+				// v4.0.0-alpha.9 fixed the issue upstream in Nunjucks core.
 
 				parser.advanceAfterBlockEnd(tok.value);
-				if (isAsync) {
-					return new nodes.CallExtensionAsync(this, "run", args);
-				}
-				return new nodes.CallExtension(this, "run", args);
+
+				return new nodes.CallExtensionAsync(this, "run", args, null);
 			};
 
 			this.run = function (...args) {
-				let resolve;
-				if (isAsync) {
-					resolve = args.pop();
-				}
-
+				let resolve = args.pop();
 				let [context, ...argArray] = args;
 
-				if (isAsync) {
-					let ret = shortcodeFn.call(Nunjucks.normalizeContext(context), ...argArray);
+				let ret;
 
-					// #3286 error messaging when the shortcode is not a promise
-					if (!ret?.then) {
+				try {
+					ret = shortcodeFn.call(Nunjucks.normalizeContext(context), ...argArray);
+				} catch (e) {
+					resolve(
+						new BuildAwesomeNunjucksError(`Error with Nunjucks shortcode \`${shortcodeName}\``, e),
+					);
+				}
+
+				// v4.0.0-alpha.9: reverts #3286 error messaging when the shortcode is not a promise to return content
+				if (!ret?.then) {
+					resolve(null, new NunjucksLib.runtime.SafeString("" + ret));
+					return;
+				}
+
+				ret.then(
+					function (returnValue) {
+						resolve(null, new NunjucksLib.runtime.SafeString("" + returnValue));
+					},
+					function (e) {
 						resolve(
-							new EleventyNunjucksError(
-								`Error with Nunjucks shortcode \`${shortcodeName}\`: it was defined as asynchronous but was actually synchronous. This is important for Nunjucks.`,
+							new BuildAwesomeNunjucksError(
+								`Error with Nunjucks shortcode \`${shortcodeName}\``,
+								e,
 							),
 						);
+					},
+				);
+			};
+		};
+	}
+
+	_getPairedShortcodeFn(shortcodeName, shortcodeFn) {
+		return function PairedShortcodeFunction() {
+			this.tags = [shortcodeName];
+
+			this.parse = function (parser, nodes) {
+				var tok = parser.nextToken();
+
+				var args = parser.parseSignature(true, true);
+				parser.advanceAfterBlockEnd(tok.value);
+
+				var body = parser.parseUntilBlocks("end" + shortcodeName);
+				parser.advanceAfterBlockEnd();
+
+				return new nodes.CallExtensionAsync(this, "run", args, [body]);
+			};
+
+			this.run = function (...args) {
+				let resolve = args.pop();
+				let body = args.pop();
+				let [context, ...argArray] = args;
+
+				body(function (e, bodyContent) {
+					if (e) {
+						resolve(
+							new BuildAwesomeNunjucksError(
+								`Error with Nunjucks paired shortcode \`${shortcodeName}\``,
+								e,
+							),
+						);
+					}
+
+					let ret;
+
+					try {
+						ret = shortcodeFn.call(Nunjucks.normalizeContext(context), bodyContent, ...argArray);
+					} catch (e) {
+						resolve(
+							new BuildAwesomeNunjucksError(
+								`Error with Nunjucks paired shortcode \`${shortcodeName}\``,
+								e,
+							),
+						);
+					}
+
+					// #3286 error messaging when the shortcode is not a promise
+					// v4.0.0-alpha.9 swapped to handle silently (async-everything)
+					if (!ret?.then) {
+						resolve(null, new NunjucksLib.runtime.SafeString("" + ret));
+						return;
 					}
 
 					ret.then(
@@ -270,115 +381,15 @@ export default class Nunjucks extends TemplateEngine {
 						},
 						function (e) {
 							resolve(
-								new EleventyNunjucksError(`Error with Nunjucks shortcode \`${shortcodeName}\``, e),
-							);
-						},
-					);
-				} else {
-					try {
-						let ret = shortcodeFn.call(Nunjucks.normalizeContext(context), ...argArray);
-						return new NunjucksLib.runtime.SafeString("" + ret);
-					} catch (e) {
-						throw new EleventyNunjucksError(
-							`Error with Nunjucks shortcode \`${shortcodeName}\``,
-							e,
-						);
-					}
-				}
-			};
-		};
-	}
-
-	_getPairedShortcodeFn(shortcodeName, shortcodeFn, isAsync = false) {
-		return function PairedShortcodeFunction() {
-			this.tags = [shortcodeName];
-
-			if (isAsync) {
-				this.parse = function (parser, nodes) {
-					var tok = parser.nextToken();
-
-					var args = parser.parseSignature(true, true);
-					parser.advanceAfterBlockEnd(tok.value);
-
-					var body = parser.parseUntilBlocks("end" + shortcodeName);
-					parser.advanceAfterBlockEnd();
-
-					return new nodes.CallExtensionAsync(this, "run", args, [body]);
-				};
-
-				this.run = function (...args) {
-					let resolve = args.pop();
-					let body = args.pop();
-					let [context, ...argArray] = args;
-
-					body(function (e, bodyContent) {
-						if (e) {
-							resolve(
-								new EleventyNunjucksError(
+								new BuildAwesomeNunjucksError(
 									`Error with Nunjucks paired shortcode \`${shortcodeName}\``,
 									e,
 								),
 							);
-						}
-
-						let ret = shortcodeFn.call(
-							Nunjucks.normalizeContext(context),
-							bodyContent,
-							...argArray,
-						);
-
-						// #3286 error messaging when the shortcode is not a promise
-						if (!ret?.then) {
-							throw new EleventyNunjucksError(
-								`Error with Nunjucks shortcode \`${shortcodeName}\`: it was defined as asynchronous but was actually synchronous. This is important for Nunjucks.`,
-							);
-						}
-
-						ret.then(
-							function (returnValue) {
-								resolve(null, new NunjucksLib.runtime.SafeString(returnValue));
-							},
-							function (e) {
-								resolve(
-									new EleventyNunjucksError(
-										`Error with Nunjucks paired shortcode \`${shortcodeName}\``,
-										e,
-									),
-								);
-							},
-						);
-					});
-				};
-			} else {
-				this.parse = function (parser, nodes) {
-					var tok = parser.nextToken();
-
-					var args = parser.parseSignature(true, true);
-					parser.advanceAfterBlockEnd(tok.value);
-
-					var body = parser.parseUntilBlocks("end" + shortcodeName);
-					parser.advanceAfterBlockEnd();
-
-					return new nodes.CallExtension(this, "run", args, [body]);
-				};
-
-				this.run = function (...args) {
-					let body = args.pop();
-					let [context, ...argArray] = args;
-					let bodyContent = body();
-
-					try {
-						return new NunjucksLib.runtime.SafeString(
-							shortcodeFn.call(Nunjucks.normalizeContext(context), bodyContent, ...argArray),
-						);
-					} catch (e) {
-						throw new EleventyNunjucksError(
-							`Error with Nunjucks paired shortcode \`${shortcodeName}\``,
-							e,
-						);
-					}
-				};
-			}
+						},
+					);
+				});
+			};
 		};
 	}
 
@@ -500,7 +511,7 @@ export default class Nunjucks extends TemplateEngine {
 		}
 
 		return function (data) {
-			let { promise, resolve, reject } = withResolvers();
+			let { promise, resolve, reject } = Promise.withResolvers();
 
 			tmpl.render(data, (error, result) => {
 				if (error) {

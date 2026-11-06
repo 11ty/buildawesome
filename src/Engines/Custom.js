@@ -106,6 +106,10 @@ export default class CustomEngine extends TemplateEngine {
 		return true;
 	}
 
+	async ready() {
+		await this._runningInit();
+	}
+
 	// If we init from multiple places, wait for the first init to finish before continuing on.
 	async _runningInit() {
 		if (this.needsInit) {
@@ -278,16 +282,10 @@ export default class CustomEngine extends TemplateEngine {
 		return true;
 	}
 
-	isFileRelevantTo(inputPath, comparisonFile, includeLayouts) {
-		return this.config.uses.isFileRelevantTo(inputPath, comparisonFile, includeLayouts);
-	}
-
 	getCompileCacheKey(str, inputPath) {
-		let lastModifiedFile = this.eleventyConfig.getPreviousBuildModifiedFile();
 		// Return this separately so we know whether or not to use the cached version
 		// but still return a key to cache this new render for next time
-		let isRelevant = this.isFileRelevantTo(inputPath, lastModifiedFile, false);
-		let useCache = !isRelevant;
+		let useCache = !this.config.uses.isChangedFileRelevantTo(inputPath);
 
 		if (this.entry.compileOptions && "getCacheKey" in this.entry.compileOptions) {
 			if (typeof this.entry.compileOptions.getCacheKey !== "function") {

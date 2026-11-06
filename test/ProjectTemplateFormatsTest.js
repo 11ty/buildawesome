@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import ProjectTemplateFormats from "../src/Util/ProjectTemplateFormats.js";
 
 function getTestInstance() {
@@ -8,13 +8,13 @@ function getTestInstance() {
 
 test("Empty formats", t => {
   let tf = new ProjectTemplateFormats();
-  t.deepEqual(tf.getTemplateFormats(), []);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), []);
 });
 
 test("Return all eligible on no config or CLI", t => {
   let tf = getTestInstance();
 
-  t.deepEqual(tf.getTemplateFormats(), []);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), []);
 });
 
 
@@ -23,21 +23,21 @@ test("CLI", t => {
   let tf = getTestInstance();
   tf.setViaCommandLine("md,html");
 
-  t.deepEqual(tf.getTemplateFormats(), ["md", "html"]);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), ["md", "html"]);
 });
 
 test("CLI empty", t => {
   let tf = getTestInstance();
   tf.setViaCommandLine("");
 
-  t.deepEqual(tf.getTemplateFormats(), []);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), []);
 });
 
 test("CLI *", t => {
   let tf = getTestInstance();
   tf.setViaCommandLine("*");
 
-  t.deepEqual(tf.getTemplateFormats(), []);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), []);
 });
 
 
@@ -46,21 +46,21 @@ test("Config", t => {
   let tf = getTestInstance();
   tf.setViaConfig("md,html");
 
-  t.deepEqual(tf.getTemplateFormats(), ["md", "html"]);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), ["md", "html"]);
 });
 
 test("Config empty", t => {
   let tf = getTestInstance();
   tf.setViaConfig("");
 
-  t.deepEqual(tf.getTemplateFormats(), []);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), []);
 });
 
 test("Config *", t => {
   let tf = getTestInstance();
   tf.setViaConfig("*");
 
-  t.deepEqual(tf.getTemplateFormats(), []);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), []);
 });
 
 
@@ -70,7 +70,7 @@ test("Config Add", t => {
   // add without set unions all with new
   tf.addViaConfig("md,html");
 
-  t.deepEqual(tf.getTemplateFormats(), ["md", "html"]);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), ["md", "html"]);
 });
 
 test("Config Add (not yet known)", t => {
@@ -78,19 +78,19 @@ test("Config Add (not yet known)", t => {
   // add without set unions all with new
   tf.addViaConfig("vue");
 
-  t.deepEqual(tf.getTemplateFormats(), ["vue"]);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), ["vue"]);
 });
 
 test("Config Add empty", t => {
   let tf = getTestInstance();
   tf.addViaConfig("");
 
-  t.deepEqual(tf.getTemplateFormats(), []);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), []);
 });
 
 test("Config Add *", t => {
   let tf = getTestInstance();
-  t.throws(() => {
+  t.assert.throws(() => {
     tf.addViaConfig("*");
   }, {
     message: '`addTemplateFormats("*")` is not supported for project template syntaxes.'
@@ -105,7 +105,7 @@ test("Config Add Multiple", t => {
   tf.addViaConfig("pug");
   tf.addViaConfig("zbbbbb");
 
-  t.deepEqual(tf.getTemplateFormats(), ["zbbbbb"]);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), ["zbbbbb"]);
 });
 
 
@@ -116,7 +116,7 @@ test("CLI + Config", t => {
   tf.setViaConfig("liquid");
   tf.addViaConfig("vue");
 
-  t.deepEqual(tf.getTemplateFormats(), ["md", "html"]);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), ["md", "html"]);
 });
 
 test("CLI + Config empty", t => {
@@ -125,7 +125,7 @@ test("CLI + Config empty", t => {
   tf.setViaConfig("liquid");
   tf.addViaConfig("vue");
 
-  t.deepEqual(tf.getTemplateFormats(), []);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), []);
 });
 
 test("CLI + Config *", t => {
@@ -134,7 +134,7 @@ test("CLI + Config *", t => {
   tf.setViaConfig("liquid");
   tf.addViaConfig("vue");
 
-  t.deepEqual(tf.getTemplateFormats(), ["liquid", "vue"]);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), ["liquid", "vue"]);
 });
 
 
@@ -144,7 +144,7 @@ test("Config set/add", t => {
   tf.setViaConfig("liquid");
   tf.addViaConfig("vue");
 
-  t.deepEqual(tf.getTemplateFormats(), ["liquid", "vue"]);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), ["liquid", "vue"]);
 });
 
 test("Config set/add set undefined", t => {
@@ -152,7 +152,7 @@ test("Config set/add set undefined", t => {
   tf.setViaConfig(undefined);
   tf.addViaConfig("vue");
 
-  t.deepEqual(tf.getTemplateFormats(), ["vue"]);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), ["vue"]);
 });
 
 test("Config set/add add undefined", t => {
@@ -160,7 +160,7 @@ test("Config set/add add undefined", t => {
   tf.setViaConfig("vue");
   tf.addViaConfig(undefined);
 
-  t.deepEqual(tf.getTemplateFormats(), ["vue"]);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), ["vue"]);
 });
 
 test("Config set/add set empty", t => {
@@ -168,7 +168,7 @@ test("Config set/add set empty", t => {
   tf.setViaConfig("");
   tf.addViaConfig("vue");
 
-  t.deepEqual(tf.getTemplateFormats(), ["vue"]);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), ["vue"]);
 });
 
 test("Config set/add add empty", t => {
@@ -176,7 +176,7 @@ test("Config set/add add empty", t => {
   tf.setViaConfig("vue");
   tf.addViaConfig("");
 
-  t.deepEqual(tf.getTemplateFormats(), ["vue"]);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), ["vue"]);
 });
 
 test("Config set/add both empty", t => {
@@ -184,7 +184,7 @@ test("Config set/add both empty", t => {
   tf.setViaConfig("");
   tf.addViaConfig("");
 
-  t.deepEqual(tf.getTemplateFormats(), []);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), []);
 });
 
 test("Config set *, add", t => {
@@ -192,5 +192,5 @@ test("Config set *, add", t => {
   tf.setViaConfig("*");
   tf.addViaConfig("vue");
 
-  t.deepEqual(tf.getTemplateFormats(), ["vue"]);
+  t.assert.deepStrictEqual(tf.getTemplateFormats(), ["vue"]);
 });

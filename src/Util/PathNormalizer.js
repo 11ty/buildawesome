@@ -52,21 +52,32 @@ export default class PathNormalizer {
 		return this.addTrailingSlashToDirectory(parsed.dir);
 	}
 
+	// Hot path for the dependency graph, which normalizes every node on every build
+	static #fullNormalizationCache = new Map();
+
 	static fullNormalization(inputPath) {
 		if (typeof inputPath !== "string") {
 			return inputPath;
 		}
 
+		let cached = this.#fullNormalizationCache.get(inputPath);
+		if (cached !== undefined) {
+			return cached;
+		}
+
+		let normalized = inputPath;
 		// Fix file:///Users/ or file:///C:/ paths passed in
-		if (inputPath.startsWith("file://")) {
-			inputPath = fileURLToPath(inputPath);
+		if (normalized.startsWith("file://")) {
+			normalized = fileURLToPath(normalized);
 		}
 
 		// Paths should not be absolute (we convert absolute paths to relative)
 		// Paths should not have a leading dot slash
 		// Paths should always be `/` independent of OS path separator
-		return TemplatePath.stripLeadingDotSlash(
-			this.normalizeSeperator(TemplatePath.relativePath(inputPath)),
+		normalized = TemplatePath.stripLeadingDotSlash(
+			this.normalizeSeperator(TemplatePath.relativePath(normalized)),
 		);
+		this.#fullNormalizationCache.set(inputPath, normalized);
+		return normalized;
 	}
 }

@@ -5,21 +5,23 @@ on:
 permissions: read-all
 jobs:
   release:
-    # see https://github.com/11ty/eleventy/settings/environments
+    # see https://github.com/11ty/buildawesome/settings/environments
     environment: GitHub Publish
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # 6.0.1
-      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # 6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # 7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # 7.1.0
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: 'https://registry.npmjs.org'
-      - run: npm install -g npm@latest
-      - if: ${{ github.event.release.tag_name != '' && env.NPM_PUBLISH_TAG != '' }}
+          # Explicit opt out of cache (tanstack cache poison vuln)
+          package-manager-cache: false
+      - if: ${{ github.event.release.tag_name != '' && env.NPM_ELEVENTY_PUBLISH_TAG != '' && env.NPM_BUILDAWESOME_PUBLISH_TAG != '' }}
         # Also runs npm ci and npm test
         run: ./scripts/release.sh
         env:
-          NPM_PUBLISH_TAG: ${{ contains(github.event.release.tag_name, '-beta.') && 'beta' || contains(github.event.release.tag_name, '-alpha.') && 'canary' || 'latest' }}
+          NPM_ELEVENTY_PUBLISH_TAG: ${{ contains(github.event.release.tag_name, '-beta.') && 'beta' || contains(github.event.release.tag_name, '-alpha.') && 'canary' || 'latest' }}
+          NPM_BUILDAWESOME_PUBLISH_TAG: ${{ contains(github.event.release.tag_name, '-beta.') && 'beta' || contains(github.event.release.tag_name, '-alpha.') && 'alpha' || 'latest' }}

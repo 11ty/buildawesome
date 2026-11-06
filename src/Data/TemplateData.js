@@ -1,28 +1,63 @@
 import path from "node:path";
 import lodash from "@11ty/lodash-custom";
 import { Merge, TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
 
 import { inspect } from "../Adapters/Packages/inspect.js";
 import unique from "../Util/Objects/Unique.js";
 import TemplateGlob from "../TemplateGlob.js";
-import EleventyBaseError from "../Errors/EleventyBaseError.js";
-import TemplateDataInitialGlobalData from "./TemplateDataInitialGlobalData.js";
-import { getEleventyPackageJson, getWorkingProjectPackageJson } from "../Util/ImportJsonSync.js";
-import { EleventyImport, EleventyLoadContent } from "../Util/Require.js";
+import BaseError from "../Errors/BaseError.js";
+import ConfigurationGlobalData from "./ConfigurationGlobalData.js";
+import {
+	getCorePackageJson,
+	importJsonSync,
+	getWorkingProjectPackageJsonPath,
+} from "../Util/ImportJsonSync.js";
+import { DynamicImport, LoadContent } from "../Util/Require.js";
 import { DeepFreeze } from "../Util/Objects/DeepFreeze.js";
 import { coerce } from "../Util/SemverCoerce.js";
 import ReservedData from "../Util/ReservedData.js";
+import { isTypeScriptSupported } from "../Util/TypeScriptFeatureTest.cjs";
+import { ResolveConfigurationData } from "../Data/ResolveConfigurationData.js";
+import { createDebug } from "../Util/DebugLogUtil.js";
 
 const { set: lodashSet, get: lodashGet } = lodash;
 
-const debugWarn = debugUtil("Eleventy:Warnings");
-const debug = debugUtil("Eleventy:TemplateData");
-const debugDev = debugUtil("Dev:Eleventy:TemplateData");
+const debugWarn = createDebug("Warnings");
+const debug = createDebug("TemplateData");
 
-class TemplateDataParseError extends EleventyBaseError {}
+class TemplateDataParseError extends BaseError {}
 
 class TemplateData {
+	static DEFAULT_TAGS_KEY = "tags";
+
+	// Would be nice if the priorities here matched (see also FilePathUtil used by config file paths)
+
+	// (json not included) priority is reverse order
+	#eligibleJavaScriptExtensions = [
+		...(isTypeScriptSupported() ? ["ts", "cts", "mts"] : []),
+		"js",
+		"cjs",
+		"mjs",
+	];
+
+	// in order of priority
+	#globalDataOrderedExtensions = [
+		"json",
+		"mjs",
+		"cjs",
+		"js",
+		...(isTypeScriptSupported() ? ["mts", "cts", "ts"] : []),
+	];
+
+	#rawImports;
+	#globalData;
+	#templateDirectoryData = {};
+	// Directory data files are shared by every template in the directory
+	#dataFileContents = new Map();
+	#directoryDataPaths = new Map();
+	// Global data files for each top-level key
+	#globalDataFilesByKey = new Map();
+
 	constructor(templateConfig) {
 		if (!templateConfig || templateConfig.constructor.name !== "TemplateConfig") {
 			throw new Error(
@@ -38,12 +73,8 @@ class TemplateData {
 			aggregate: this.config.benchmarkManager.get("Aggregate"),
 		};
 
-		this.rawImports = {};
-		this.globalData = null;
-		this.templateDirectoryData = {};
 		this.isEsm = false;
-
-		this.initialGlobalData = new TemplateDataInitialGlobalData(this.templateConfig);
+		this.initialGlobalData = new ConfigurationGlobalData(this.templateConfig);
 	}
 
 	get dirs() {
@@ -115,25 +146,36 @@ class TemplateData {
 			debug(
 				"Opted-out of package.json assignment for global data with falsy value for `keys.package` configuration.",
 			);
-			return this.rawImports;
-		} else if (Object.keys(this.rawImports).length > 0) {
-			return this.rawImports;
+			return;
 		}
 
-		let pkgJson = getWorkingProjectPackageJson();
-		this.rawImports[this.config.keys.package] = pkgJson;
+		if (this.#rawImports) {
+			return this.#rawImports;
+		}
+
+		let projectPackageJsonPath = getWorkingProjectPackageJsonPath();
+		let packageJson = {};
+		if (projectPackageJsonPath) {
+			packageJson = importJsonSync(projectPackageJsonPath);
+		}
+
+		this.#rawImports = {
+			[this.config.keys.package]: packageJson,
+		};
 
 		if (this.config.freezeReservedData) {
-			DeepFreeze(this.rawImports);
+			DeepFreeze(this.#rawImports);
 		}
 
-		return this.rawImports;
+		return this.#rawImports;
 	}
 
 	clearData() {
-		this.globalData = null;
+		this.#globalData = null;
 		this.configApiGlobalData = null;
-		this.templateDirectoryData = {};
+		this.#templateDirectoryData = {};
+		this.#dataFileContents = new Map();
+		this.#directoryDataPaths = new Map();
 	}
 
 	_getGlobalDataGlobByExtension(extension) {
@@ -141,7 +183,7 @@ class TemplateData {
 	}
 
 	// This is a backwards compatibility helper with the old `jsDataFileSuffix` configuration API
-	getDataFileSuffixes() {
+	getConfigurationDataFileSuffixes() {
 		// New API
 		if (Array.isArray(this.config.dataFileSuffixes)) {
 			return this.config.dataFileSuffixes;
@@ -150,67 +192,82 @@ class TemplateData {
 		// Backwards compatibility
 		if (this.config.jsDataFileSuffix) {
 			let suffixes = [];
-			suffixes.push(this.config.jsDataFileSuffix); // e.g. filename.11tydata.json
+			suffixes.push(this.config.jsDataFileSuffix); // e.g. filename.data.json
 			suffixes.push(""); // suffix-less for free with old API, e.g. filename.json
 			return suffixes;
 		}
+
 		return []; // if both of these entries are set to false, use no files
 	}
 
-	// This is used exclusively for --watch and --serve chokidar targets
-	async getTemplateDataFileGlob() {
-		let suffixes = this.getDataFileSuffixes();
-		let globSuffixesWithLeadingDot = new Set();
-		globSuffixesWithLeadingDot.add("json"); // covers .11tydata.json too
-		let globSuffixesWithoutLeadingDot = new Set();
+	getAllDataFileSuffixes() {
+		let suffixes = this.getConfigurationDataFileSuffixes();
+		let suffixesWithExtensions = new Set();
+		suffixesWithExtensions.add("json"); // covers .data.json too
 
-		// Typically using [ '.11tydata', '' ] suffixes to find data files
+		// Typically using [ '.data', '' ] suffixes to find data files
 		for (let suffix of suffixes) {
-			// TODO the `suffix` truthiness check is purely for backwards compat?
-			if (suffix && typeof suffix === "string") {
-				if (suffix.startsWith(".")) {
-					// .suffix.js
-					globSuffixesWithLeadingDot.add(`${suffix.slice(1)}.mjs`);
-					globSuffixesWithLeadingDot.add(`${suffix.slice(1)}.cjs`);
-					globSuffixesWithLeadingDot.add(`${suffix.slice(1)}.js`);
-				} else {
-					// "suffix.js" without leading dot
-					globSuffixesWithoutLeadingDot.add(`${suffix || ""}.mjs`);
-					globSuffixesWithoutLeadingDot.add(`${suffix || ""}.cjs`);
-					globSuffixesWithoutLeadingDot.add(`${suffix || ""}.js`);
-				}
+			if (!suffix || typeof suffix !== "string") {
+				continue;
+			}
+
+			// .suffix.js
+			if (suffix.startsWith(".")) {
+				suffix = suffix.slice(1);
+			}
+
+			suffixesWithExtensions.add(`${suffix || ""}.mjs`);
+			suffixesWithExtensions.add(`${suffix || ""}.cjs`);
+			suffixesWithExtensions.add(`${suffix || ""}.js`);
+
+			if (isTypeScriptSupported()) {
+				suffixesWithExtensions.add(`${suffix || ""}.mts`);
+				suffixesWithExtensions.add(`${suffix || ""}.cts`);
+				suffixesWithExtensions.add(`${suffix || ""}.ts`);
 			}
 		}
 
 		// Configuration Data Extensions e.g. yaml
 		if (this.hasUserDataExtensions()) {
 			for (let extension of this.getUserDataExtensions()) {
-				globSuffixesWithLeadingDot.add(extension); // covers .11tydata.{extension} too
+				if (extension.startsWith(".")) {
+					extension = extension.slice(1);
+				}
+
+				suffixesWithExtensions.add(extension); // covers .data.{extension} too
 			}
 		}
 
+		return suffixesWithExtensions;
+	}
+
+	// This is used exclusively for --watch and --serve chokidar targets
+	getTemplateDataFileGlob() {
+		let suffixesSet = this.getAllDataFileSuffixes();
+
 		let paths = [];
-		if (globSuffixesWithLeadingDot.size > 0) {
-			paths.push(`${this.inputDir}**/*.{${Array.from(globSuffixesWithLeadingDot).join(",")}}`);
-		}
-		if (globSuffixesWithoutLeadingDot.size > 0) {
-			paths.push(`${this.inputDir}**/*{${Array.from(globSuffixesWithoutLeadingDot).join(",")}}`);
+		if (suffixesSet.size > 0) {
+			paths.push(`${this.inputDir}**/*.{${Array.from(suffixesSet).join(",")}}`);
 		}
 
 		return TemplatePath.addLeadingDotSlashArray(paths);
 	}
 
 	// For spidering dependencies
-	// TODO Can we reuse getTemplateDataFileGlob instead? Maybe just filter off the .json files before scanning for dependencies
 	getTemplateJavaScriptDataFileGlob() {
-		let paths = [];
-		let suffixes = this.getDataFileSuffixes();
-		for (let suffix of suffixes) {
-			if (suffix) {
-				// TODO this check is purely for backwards compat and I kinda feel like it shouldn’t be here
-				// paths.push(`${this.inputDir}/**/*${suffix || ""}.cjs`); // Same as above
-				paths.push(`${this.inputDir}**/*${suffix || ""}.js`);
+		let suffixes = Array.from(this.getAllDataFileSuffixes()).filter((entry) => {
+			let lastDotIndex = entry.lastIndexOf(".");
+			if (lastDotIndex === -1) {
+				return false;
 			}
+			let ext = entry.slice(lastDotIndex + 1);
+			// prune out any non-JS extensions
+			return this.#eligibleJavaScriptExtensions.includes(ext);
+		});
+
+		let paths = [];
+		if (suffixes.length > 0) {
+			paths.push(`${this.inputDir}**/*.{${suffixes.join(",")}}`);
 		}
 
 		return TemplatePath.addLeadingDotSlashArray(paths);
@@ -226,7 +283,7 @@ class TemplateData {
 	}
 
 	getGlobalDataExtensionPriorities() {
-		return this.getUserDataExtensions().concat(["json", "mjs", "cjs", "js"]);
+		return this.getUserDataExtensions().concat(this.#globalDataOrderedExtensions);
 	}
 
 	static calculateExtensionPriority(path, priorities) {
@@ -282,15 +339,16 @@ class TemplateData {
 
 	async getAllGlobalData() {
 		let globalData = {};
+
 		let files = TemplatePath.addLeadingDotSlashArray(await this.getGlobalDataFiles());
 
-		this.config.events.emit("eleventy.globalDataFiles", files);
+		this.config.events.emit("buildawesome.globaldatafiles", files);
 
 		let dataFileConflicts = {};
 
-		for (let j = 0, k = files.length; j < k; j++) {
-			let data = await this.getDataValue(files[j]);
-			let objectPathTarget = this.getObjectPathForDataFile(files[j]);
+		for (let file of Object.values(files)) {
+			let data = await this.getDataValue(file);
+			let objectPathTarget = this.getObjectPathForDataFile(file);
 
 			// Since we're joining directory paths and an array is not usable as an objectkey since two identical arrays are not double equal,
 			// we can just join the array by a forbidden character ("/"" is chosen here, since it works on Linux, Mac and Windows).
@@ -302,57 +360,61 @@ class TemplateData {
 			// and conflict, let’s merge them.
 			if (dataFileConflicts[objectPathTargetString]) {
 				debugWarn(
-					`merging global data from ${files[j]} with an already existing global data file (${dataFileConflicts[objectPathTargetString]}). Overriding existing keys.`,
+					`merging global data from ${file} with an already existing global data file (${dataFileConflicts[objectPathTargetString]}). Overriding existing keys.`,
 				);
 
 				let oldData = lodashGet(globalData, objectPathTarget);
 				data = Merge(oldData, data);
 			}
 
-			dataFileConflicts[objectPathTargetString] = files[j];
-			debug(`Found global data file ${files[j]} and adding as: ${objectPathTarget}`);
+			dataFileConflicts[objectPathTargetString] = file;
+			debug(`Found global data file ${file} and adding as: ${objectPathTarget}`);
+
 			lodashSet(globalData, objectPathTarget, data);
 
+			let [key] = objectPathTarget;
+			if (!this.#globalDataFilesByKey.has(key)) {
+				this.#globalDataFilesByKey.set(key, []);
+			}
+			this.#globalDataFilesByKey.get(key).push(file);
+
 			if (this.config.freezeReservedData) {
-				ReservedData.check(globalData, files[j]);
+				ReservedData.check(globalData, file);
 			}
 		}
 
 		return globalData;
 	}
 
+	getCoreGlobal() {
+		// #2293 for meta[name=generator]
+		const pkg = getCorePackageJson();
+
+		let version = coerce(pkg.version).toString();
+		let global = {
+			version,
+			generator: `Eleventy (Build Awesome) v${version}`,
+		};
+		if (this.environmentVariables) {
+			global.env = Object.assign({}, this.environmentVariables);
+		}
+		if (this.dirs) {
+			global.directories = Object.assign({}, this.dirs.getUserspaceInstance());
+		}
+
+		if (this.config.freezeReservedData) {
+			DeepFreeze(global);
+		}
+
+		return global;
+	}
+
 	async #getInitialGlobalData() {
 		let globalData = await this.initialGlobalData.getData();
 
-		if (!("eleventy" in globalData)) {
-			globalData.eleventy = {};
-		}
-
-		// #2293 for meta[name=generator]
-		const pkg = getEleventyPackageJson();
-		globalData.eleventy.version = coerce(pkg.version).toString();
-		globalData.eleventy.generator = `Eleventy v${globalData.eleventy.version}`;
-
-		if (this.environmentVariables) {
-			if (!("env" in globalData.eleventy)) {
-				globalData.eleventy.env = {};
-			}
-
-			Object.assign(globalData.eleventy.env, this.environmentVariables);
-		}
-
-		if (this.dirs) {
-			if (!("directories" in globalData.eleventy)) {
-				globalData.eleventy.directories = {};
-			}
-
-			Object.assign(globalData.eleventy.directories, this.dirs.getUserspaceInstance());
-		}
-
-		// Reserved
-		if (this.config.freezeReservedData) {
-			DeepFreeze(globalData.eleventy);
-		}
+		let coreGlobal = this.getCoreGlobal();
+		globalData.eleventy = coreGlobal;
+		globalData.buildawesome = coreGlobal;
 
 		return globalData;
 	}
@@ -367,21 +429,31 @@ class TemplateData {
 
 	async #getGlobalData() {
 		let rawImports = this.getRawImports();
+
+		// Data from the configuration API eleventyConfig.addGLobalData and `eleventy` global
 		let configApiGlobalData = await this.getInitialGlobalData();
 
 		let globalJson = await this.getAllGlobalData();
-		let mergedGlobalData = Merge(globalJson, configApiGlobalData);
+		let mergedGlobalData = Merge(
+			ResolveConfigurationData.normalize(globalJson),
+			ResolveConfigurationData.normalize(configApiGlobalData),
+		);
 
 		// OK: Shallow merge when combining rawImports (pkg) with global data files
 		return Object.assign({}, mergedGlobalData, rawImports);
 	}
 
+	// Available after `getGlobalData()`
+	getGlobalDataFilesByKey() {
+		return this.#globalDataFilesByKey;
+	}
+
 	async getGlobalData() {
-		if (!this.globalData) {
-			this.globalData = this.#getGlobalData();
+		if (!this.#globalData) {
+			this.#globalData = this.#getGlobalData();
 		}
 
-		return this.globalData;
+		return this.#globalData;
 	}
 
 	/* Template and Directory data files */
@@ -392,11 +464,12 @@ class TemplateData {
 		}
 
 		// Filter out files we know don't exist to avoid overhead for checking
+		// June 2026 tested improvement from short-circuiting first match for any file filename.11tydata.cjs would skip remaining filename.11tydata.*
 		localDataPaths = localDataPaths.filter((path) => {
 			return this.exists(path);
 		});
 
-		this.config.events.emit("eleventy.dataFiles", localDataPaths);
+		this.config.events.emit("buildawesome.datafiles", localDataPaths);
 
 		if (!localDataPaths.length) {
 			return localData;
@@ -413,7 +486,7 @@ class TemplateData {
 				);
 			} else {
 				// clean up data for template/directory data files only.
-				let cleanedDataForPath = TemplateData.cleanupData(dataForPath, {
+				let cleanedDataForPath = TemplateData.cleanupData(dataForPath, this.config.keys.tags, {
 					file: path,
 				});
 				for (let key in cleanedDataForPath) {
@@ -427,20 +500,29 @@ class TemplateData {
 					}
 					dataSource[key] = path;
 				}
-				Merge(localData, cleanedDataForPath);
+
+				Merge(localData, ResolveConfigurationData.normalize(cleanedDataForPath));
 			}
 		}
+
 		return localData;
 	}
 
 	async getTemplateDirectoryData(templatePath) {
-		if (!this.templateDirectoryData[templatePath]) {
+		if (!this.#templateDirectoryData[templatePath]) {
 			let localDataPaths = await this.getLocalDataPaths(templatePath);
 			let importedData = await this.combineLocalData(localDataPaths);
 
-			this.templateDirectoryData[templatePath] = importedData;
+			// For incremental builds, a changed data file only affects the templates using it
+			this.config.uses?.addDataFiles(
+				templatePath,
+				localDataPaths.filter((path) => this.exists(path)),
+			);
+
+			this.#templateDirectoryData[templatePath] = importedData;
 		}
-		return this.templateDirectoryData[templatePath];
+
+		return this.#templateDirectoryData[templatePath];
 	}
 
 	getUserDataExtensions() {
@@ -465,12 +547,20 @@ class TemplateData {
 		return this.config.dataExtensions && this.config.dataExtensions.size > 0;
 	}
 
-	async _parseDataFile(path, parser, options = {}) {
+	async #parseDataFile(path, parser, options = {}) {
 		let readFile = !("read" in options) || options.read === true;
 		let rawInput;
 
 		if (readFile) {
-			rawInput = EleventyLoadContent(path, options);
+			let cacheKey = `${options.encoding}:${path}`;
+			rawInput = this.#dataFileContents.get(cacheKey);
+			if (rawInput === undefined) {
+				rawInput = LoadContent(path, options);
+				// Buffers are mutable, so only strings are shared
+				if (typeof rawInput === "string") {
+					this.#dataFileContents.set(cacheKey, rawInput);
+				}
+			}
 		}
 
 		if (readFile && !rawInput) {
@@ -478,24 +568,31 @@ class TemplateData {
 		}
 
 		try {
+			let result;
 			if (readFile) {
-				return parser(rawInput, path);
+				result = parser(rawInput, path);
 			} else {
 				// path as a first argument is when `read: false`
 				// path as a second argument is for consistency with `read: true` API
-				return parser(path, path);
+				result = parser(path, path);
 			}
+
+			// Await inside try so async parser rejections are wrapped too
+			if (typeof result?.then === "function") {
+				return await result;
+			}
+			return result;
 		} catch (e) {
-			throw new TemplateDataParseError(`Having trouble parsing data file ${path}`, e);
+			throw new TemplateDataParseError(`Having trouble parsing data file ${path}`, e).setFilePath(
+				path,
+			);
 		}
 	}
 
-	// ignoreProcessing = false for global data files
-	// ignoreProcessing = true for local data files
 	async getDataValue(path) {
 		let extension = TemplatePath.getExtension(path);
 
-		if (extension === "js" || extension === "cjs" || extension === "mjs") {
+		if (this.#eligibleJavaScriptExtensions.includes(extension)) {
 			// JS data file or require’d JSON (no preprocessing needed)
 			if (!this.exists(path)) {
 				return {};
@@ -507,19 +604,34 @@ class TemplateData {
 			dataBench.before();
 
 			let type = "cjs";
-			if (extension === "mjs" || (extension === "js" && this.isEsm)) {
+			if (
+				extension === "mjs" ||
+				(extension === "js" && this.isEsm) ||
+				extension === "mts" ||
+				(extension === "ts" && this.isEsm)
+			) {
 				type = "esm";
 			}
 
 			// We always need to use `import()`, as `require` isn’t available in ESM.
-			let returnValue = await EleventyImport(path, type);
+			let returnValue = await DynamicImport(path, type);
 
-			// TODO special exception for Global data `permalink.js`
+			// Returning a function is executed immediately (it has always done this for global data)
+
+			// TODO some API to allow returning a function without executing it immediately
+			// (e.g. `permalink.js` or `eleventyDataSchema.js` global data)
 			// module.exports = (data) => `${data.page.filePathStem}/`; // Does not work
 			// module.exports = () => ((data) => `${data.page.filePathStem}/`); // Works
 			if (typeof returnValue === "function") {
 				let configApiGlobalData = await this.getInitialGlobalData();
-				returnValue = await returnValue(configApiGlobalData || {});
+				try {
+					returnValue = await returnValue(configApiGlobalData || {});
+				} catch (e) {
+					if (this.config.freezeReservedData && ReservedData.isFrozenError(e)) {
+						throw ReservedData.getError({ cause: e, sourceLocation: path });
+					}
+					throw e;
+				}
 			}
 
 			dataBench.after();
@@ -530,11 +642,14 @@ class TemplateData {
 			// Other extensions
 			let { parser, options } = this.getUserDataParser(extension);
 
-			return this._parseDataFile(path, parser, options);
+			let returnValue = this.#parseDataFile(path, parser, options);
+
+			return returnValue;
 		} else if (extension === "json") {
 			// File to string, parse with JSON (preprocess)
-			const parser = (content) => JSON.parse(content);
-			return this._parseDataFile(path, parser);
+			let returnValue = this.#parseDataFile(path, (content) => JSON.parse(content));
+
+			return returnValue;
 		} else {
 			throw new TemplateDataParseError(
 				`Could not find an appropriate data parser for ${path}. Do you need to add a plugin to your config file?`,
@@ -549,7 +664,7 @@ class TemplateData {
 	}
 
 	_addBaseToPaths(paths, base, extensions, nonEmptySuffixesOnly = false) {
-		let suffixes = this.getDataFileSuffixes();
+		let suffixes = this.getConfigurationDataFileSuffixes();
 
 		for (let suffix of suffixes) {
 			suffix = suffix || "";
@@ -560,11 +675,11 @@ class TemplateData {
 
 			// data suffix
 			if (suffix) {
-				paths.push(base + suffix + ".js");
-				paths.push(base + suffix + ".cjs");
-				paths.push(base + suffix + ".mjs");
+				for (let extension of this.#eligibleJavaScriptExtensions) {
+					paths.push(base + suffix + "." + extension);
+				}
 			}
-			paths.push(base + suffix + ".json"); // default: .11tydata.json
+			paths.push(base + suffix + ".json"); // default: .data.json
 
 			// inject user extensions
 			this._pushExtensionsToPaths(paths, base + suffix, extensions);
@@ -574,81 +689,89 @@ class TemplateData {
 	async getLocalDataPaths(templatePath) {
 		let paths = [];
 		let parsed = path.parse(templatePath);
-		let inputDir = this.inputDir;
-
-		debugDev("getLocalDataPaths(%o)", templatePath);
-		debugDev("parsed.dir: %o", parsed.dir);
-
 		let userExtensions = this.getUserDataExtensions();
 
 		if (parsed.dir) {
 			let fileNameNoExt = this.extensionMap.removeTemplateExtension(parsed.base);
 
-			// default dataSuffix: .11tydata, is appended in _addBaseToPaths
-			debug("Using %o suffixes to find data files.", this.getDataFileSuffixes());
+			// default dataSuffix: .data, is appended in _addBaseToPaths
+			debug("Using %o suffixes to find data files.", this.getConfigurationDataFileSuffixes());
 
 			// Template data file paths
 			let filePathNoExt = parsed.dir + "/" + fileNameNoExt;
 			this._addBaseToPaths(paths, filePathNoExt, userExtensions);
 
-			// Directory data file paths
-			let allDirs = TemplatePath.getAllDirs(parsed.dir);
-
-			debugDev("allDirs: %o", allDirs);
-			for (let dir of allDirs) {
-				let lastDir = TemplatePath.getLastPathSegment(dir);
-				let dirPathNoExt = dir + "/" + lastDir;
-
-				if (inputDir) {
-					debugDev("dirStr: %o; inputDir: %o", dir, inputDir);
-				}
-				// TODO use DirContains
-				if (!inputDir || (dir.startsWith(inputDir) && dir !== inputDir)) {
-					if (this.config.dataFileDirBaseNameOverride) {
-						let indexDataFile = dir + "/" + this.config.dataFileDirBaseNameOverride;
-						this._addBaseToPaths(paths, indexDataFile, userExtensions, true);
-					} else {
-						this._addBaseToPaths(paths, dirPathNoExt, userExtensions);
-					}
-				}
-			}
-
-			// 0.11.0+ include root input dir files
-			// if using `docs/` as input dir, looks for docs/docs.json et al
-			if (inputDir) {
-				let lastInputDir = TemplatePath.addLeadingDotSlash(
-					TemplatePath.join(inputDir, TemplatePath.getLastPathSegment(inputDir)),
-				);
-
-				// in root input dir, search for index.11tydata.json et al
-				if (this.config.dataFileDirBaseNameOverride) {
-					let indexDataFile =
-						TemplatePath.getDirFromFilePath(lastInputDir) +
-						"/" +
-						this.config.dataFileDirBaseNameOverride;
-					this._addBaseToPaths(paths, indexDataFile, userExtensions, true);
-				} else if (lastInputDir !== "./") {
-					this._addBaseToPaths(paths, lastInputDir, userExtensions);
-				}
-			}
+			paths.push(...this.#getDirectoryDataPaths(parsed.dir, userExtensions));
 		}
 
 		debug("getLocalDataPaths(%o): %o", templatePath, paths);
 		return unique(paths).reverse();
 	}
 
+	// Shared by every template in the directory
+	#getDirectoryDataPaths(parsedDir, userExtensions) {
+		let cached = this.#directoryDataPaths.get(parsedDir);
+		if (cached) {
+			return cached;
+		}
+
+		let paths = [];
+		let inputDir = this.inputDir;
+
+		// Directory data file paths
+		let allDirs = TemplatePath.getAllDirs(parsedDir);
+
+		for (let dir of allDirs) {
+			let lastDir = TemplatePath.getLastPathSegment(dir);
+			let dirPathNoExt = dir + "/" + lastDir;
+
+			// TODO use DirContains
+			if (!inputDir || (dir.startsWith(inputDir) && dir !== inputDir)) {
+				if (this.config.dataFileDirBaseNameOverride) {
+					let indexDataFile = dir + "/" + this.config.dataFileDirBaseNameOverride;
+					this._addBaseToPaths(paths, indexDataFile, userExtensions, true);
+				} else {
+					this._addBaseToPaths(paths, dirPathNoExt, userExtensions);
+				}
+			}
+		}
+
+		// 0.11.0+ include root input dir files
+		// if using `docs/` as input dir, looks for docs/docs.json et al
+		if (inputDir) {
+			let lastInputDir = TemplatePath.addLeadingDotSlash(
+				TemplatePath.join(inputDir, TemplatePath.getLastPathSegment(inputDir)),
+			);
+
+			// in root input dir, search for index.data.json et al
+			if (this.config.dataFileDirBaseNameOverride) {
+				let indexDataFile =
+					TemplatePath.getDirFromFilePath(lastInputDir) +
+					"/" +
+					this.config.dataFileDirBaseNameOverride;
+				this._addBaseToPaths(paths, indexDataFile, userExtensions, true);
+			} else if (lastInputDir !== "./") {
+				this._addBaseToPaths(paths, lastInputDir, userExtensions);
+			}
+		}
+
+		this.#directoryDataPaths.set(parsedDir, paths);
+		return paths;
+	}
+
 	/* Like cleanupData() but does not mutate */
-	static getCleanedTagsImmutable(data, options = {}) {
+	static getCleanedTagsImmutable(data, tagsKey = TemplateData.DEFAULT_TAGS_KEY, options = {}) {
 		let tags = [];
 
-		if (isPlainObject(data) && data.tags) {
-			if (typeof data.tags === "string") {
-				tags = (data.tags || "").split(",");
-			} else if (Array.isArray(data.tags)) {
-				tags = data.tags;
-			} else if (data.tags) {
+		if (tagsKey && isPlainObject(data) && data[tagsKey]) {
+			let value = data[tagsKey];
+			if (typeof value === "string") {
+				tags = value.split(",");
+			} else if (Array.isArray(value)) {
+				tags = value;
+			} else {
 				throw new Error(
-					`String or Array expected for \`tags\`${options.file ? ` in ${options.isVirtualTemplate ? "virtual " : ""}template: ${options.file}` : ""}. Received: ${inspect(data.tags)}`,
+					`String or Array expected for \`${tagsKey}\`${options.file ? ` in ${options.isVirtualTemplate ? "virtual " : ""}template: ${options.file}` : ""}. Received: ${inspect(value)}`,
 				);
 			}
 
@@ -660,9 +783,9 @@ class TemplateData {
 		return tags;
 	}
 
-	static cleanupData(data, options = {}) {
-		if (isPlainObject(data) && "tags" in data) {
-			data.tags = this.getCleanedTagsImmutable(data, options);
+	static cleanupData(data, tagsKey = TemplateData.DEFAULT_TAGS_KEY, options = {}) {
+		if (tagsKey && isPlainObject(data) && tagsKey in data) {
+			data[tagsKey] = this.getCleanedTagsImmutable(data, tagsKey, options);
 		}
 
 		return data;
@@ -670,24 +793,26 @@ class TemplateData {
 
 	static getNormalizedExcludedCollections(data) {
 		let excludes = [];
-		let key = "eleventyExcludeFromCollections";
-
-		if (data?.[key] !== true) {
-			if (Array.isArray(data[key])) {
-				excludes = data[key];
-			} else if (typeof data[key] === "string") {
-				excludes = (data[key] || "").split(",");
+		let excludeValue = ResolveConfigurationData.getValue(
+			data,
+			ResolveConfigurationData.EXCLUDE_FROM_COLLECTIONS_KEY,
+		);
+		if (excludeValue !== true) {
+			if (Array.isArray(excludeValue)) {
+				excludes = excludeValue;
+			} else if (typeof excludeValue === "string") {
+				excludes = (excludeValue || "").split(",");
 			}
 		}
 
 		return {
 			excludes,
-			excludeAll: data?.eleventyExcludeFromCollections === true,
+			excludeAll: excludeValue === true,
 		};
 	}
 
-	static getIncludedCollectionNames(data) {
-		let tags = TemplateData.getCleanedTagsImmutable(data);
+	static getIncludedCollectionNames(data, tagsKey = TemplateData.DEFAULT_TAGS_KEY) {
+		let tags = TemplateData.getCleanedTagsImmutable(data, tagsKey);
 
 		let { excludes, excludeAll } = TemplateData.getNormalizedExcludedCollections(data);
 		if (excludeAll) {
@@ -697,8 +822,8 @@ class TemplateData {
 		return ["all", ...tags].filter((tag) => !excludes.includes(tag));
 	}
 
-	static getIncludedTagNames(data) {
-		return this.getIncludedCollectionNames(data).filter((tagName) => tagName !== "all");
+	static getIncludedTagNames(data, tagsKey = TemplateData.DEFAULT_TAGS_KEY) {
+		return this.getIncludedCollectionNames(data, tagsKey).filter((tagName) => tagName !== "all");
 	}
 }
 

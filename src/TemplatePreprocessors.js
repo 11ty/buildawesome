@@ -1,14 +1,11 @@
 export class TemplatePreprocessors {
-	constructor(preprocessors) {
-		this.preprocessors = preprocessors || [];
-	}
-
-	async runAll(template, data) {
+	static async runAll(preprocessors, template, data) {
 		let { inputPath } = template;
+
 		let content = await template.getPreRender();
 
 		let skippedVia = false;
-		for (let [name, preprocessor] of Object.entries(this.preprocessors)) {
+		for (let [name, preprocessor] of Object.entries(preprocessors || {})) {
 			let { filter, callback } = preprocessor;
 
 			let filters;

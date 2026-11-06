@@ -1,0 +1,11 @@
+---
+argData:
+  num: 2
+---
+{% set liquidOutput %}
+{% renderTemplate "liquid", argData %}
+{% assign liquidVar = num | times: 2 %}
+{{ liquidVar }}
+{% endrenderTemplate %}
+{% endset %}
+{{ liquidOutput }}

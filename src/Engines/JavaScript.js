@@ -1,19 +1,19 @@
 import { TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 
 import TemplateEngine from "./TemplateEngine.js";
-import EleventyBaseError from "../Errors/EleventyBaseError.js";
+import BaseError from "../Errors/BaseError.js";
 import getJavaScriptData from "../Util/GetJavaScriptData.js";
-import { EleventyImport } from "../Util/Require.js";
+import { DynamicImport } from "../Util/Require.js";
 import { augmentFunction, augmentObject } from "./Util/ContextAugmenter.js";
 
-class JavaScriptTemplateNotDefined extends EleventyBaseError {}
+class JavaScriptTemplateNotDefined extends BaseError {}
 
 export default class JavaScript extends TemplateEngine {
 	constructor(name, templateConfig) {
 		super(name, templateConfig);
 		this.instances = {};
 
-		this.config.events.on("eleventy#templateModified", (inputPath, metadata = {}) => {
+		this.config.events.on("buildawesome#templatemodified", (inputPath, metadata = {}) => {
 			let { usedByDependants, relevantLayouts } = metadata;
 			// Remove from cached instances when modified
 			let instancesToDelete = [
@@ -117,7 +117,7 @@ export default class JavaScript extends TemplateEngine {
 		} else {
 			let isEsm = this.eleventyConfig.getIsProjectUsingEsm();
 			let cacheBust = !this.cacheable || !this.config.useTemplateCache;
-			mod = await EleventyImport(inputPath, isEsm ? "esm" : "cjs", {
+			mod = await DynamicImport(inputPath, isEsm ? "esm" : "cjs", {
 				cacheBust,
 			});
 		}
@@ -180,6 +180,7 @@ export default class JavaScript extends TemplateEngine {
 
 	// Backwards compat
 	static wrapJavaScriptFunction(inst, fn) {
+		// TODO ArgumentHelper.wrapFilter(fn);
 		return augmentFunction(fn, {
 			source: inst,
 		});

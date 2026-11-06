@@ -17,9 +17,17 @@ api-docs/
 .vscode
 .idea
 
-# Ignore eleventy output when doing manual tests
+# Ignore build output when doing manual tests
 _site/
+
+# Don’t check-in generated types
+/types/*
+!/types/index.d.ts
 
 # Ignore test files
 .cache
 test/stubs-layout-cache/_includes/*.js
+
+# Reuse docs from root
+packages/build-awesome/README.md
+packages/build-awesome/docs/

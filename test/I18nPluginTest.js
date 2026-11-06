@@ -1,47 +1,47 @@
-import test from "ava";
+import test from "node:test";
 import { Comparator, LangUtils, default as I18nPlugin } from "../src/Plugins/I18nPlugin.js";
-import Eleventy from "../src/Eleventy.js";
+import Eleventy from "../src/Core.js";
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 
 test("Comparator.isLangCode", (t) => {
-  t.is(Comparator.isLangCode(null), false);
-  t.is(Comparator.isLangCode(undefined), false);
+  t.assert.strictEqual(Comparator.isLangCode(null), false);
+  t.assert.strictEqual(Comparator.isLangCode(undefined), false);
 
-  t.is(Comparator.isLangCode("en"), true);
-  t.is(Comparator.isLangCode("en-us"), true);
+  t.assert.strictEqual(Comparator.isLangCode("en"), true);
+  t.assert.strictEqual(Comparator.isLangCode("en-us"), true);
 
-  t.is(Comparator.isLangCode("dee"), false);
-  t.is(Comparator.isLangCode("en_us"), false);
-  t.is(Comparator.isLangCode("d"), false);
-  t.is(Comparator.isLangCode("deed"), false);
-  t.is(Comparator.isLangCode("deede"), false);
-  t.is(Comparator.isLangCode("deedee"), false);
+  t.assert.strictEqual(Comparator.isLangCode("dee"), false);
+  t.assert.strictEqual(Comparator.isLangCode("en_us"), false);
+  t.assert.strictEqual(Comparator.isLangCode("d"), false);
+  t.assert.strictEqual(Comparator.isLangCode("deed"), false);
+  t.assert.strictEqual(Comparator.isLangCode("deede"), false);
+  t.assert.strictEqual(Comparator.isLangCode("deedee"), false);
 });
 
 test("LangUtils.swapLanguageCode", (t) => {
-  t.is(LangUtils.swapLanguageCode("/"), "/"); // skip
-  t.is(LangUtils.swapLanguageCode("/", "en"), "/"); // skip
-  t.is(LangUtils.swapLanguageCode("/es/", "en"), "/en/");
-  t.is(LangUtils.swapLanguageCode("/es/", "not"), "/es/"); // skip
-  t.is(LangUtils.swapLanguageCode("/not-a-lang/", "en"), "/not-a-lang/"); // skip
-  t.is(LangUtils.swapLanguageCode("/es/es/es/", "en"), "/en/es/es/"); // first only
+  t.assert.strictEqual(LangUtils.swapLanguageCode("/"), "/"); // skip
+  t.assert.strictEqual(LangUtils.swapLanguageCode("/", "en"), "/"); // skip
+  t.assert.strictEqual(LangUtils.swapLanguageCode("/es/", "en"), "/en/");
+  t.assert.strictEqual(LangUtils.swapLanguageCode("/es/", "not"), "/es/"); // skip
+  t.assert.strictEqual(LangUtils.swapLanguageCode("/not-a-lang/", "en"), "/not-a-lang/"); // skip
+  t.assert.strictEqual(LangUtils.swapLanguageCode("/es/es/es/", "en"), "/en/es/es/"); // first only
 });
 
 test("contentMap Event from Eleventy", async (t) => {
   t.plan(4);
   let elev = new Eleventy("./test/stubs-i18n/", "./test/stubs-i18n/_site", {
-    config: function (eleventyConfig) {
-      eleventyConfig.addPlugin(I18nPlugin, {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, {
         defaultLanguage: "en",
         errorMode: "allow-fallback",
       });
 
-      eleventyConfig.on("eleventy.contentMap", (maps) => {
-        t.truthy(maps);
+      $config.on("buildawesome.contentmap", (maps) => {
+        t.assert.ok(maps);
 
         // if future maps are added, they should be tested here
-        t.is(Object.keys(maps).length, 2);
-        t.deepEqual(maps.urlToInputPath, {
+        t.assert.strictEqual(Object.keys(maps).length, 2);
+        t.assert.deepStrictEqual(maps.urlToInputPath, {
           "/en/": {
 						inputPath: "./test/stubs-i18n/en/index.liquid",
 						groupNumber: 0
@@ -60,7 +60,7 @@ test("contentMap Event from Eleventy", async (t) => {
 					},
         });
 
-        t.deepEqual(maps.inputPathToUrl, {
+        t.assert.deepStrictEqual(maps.inputPathToUrl, {
           "./test/stubs-i18n/en/index.liquid": ["/en/"],
           "./test/stubs-i18n/en-us/index.11ty.cjs": ["/en-us/"],
           "./test/stubs-i18n/es/index.njk": ["/es/"],
@@ -81,8 +81,8 @@ function getContentFor(results, filename) {
 test("errorMode default (strict)", async (t) => {
   let elev = new Eleventy("./test/stubs-i18n/", "./test/stubs-i18n/_site", {
     quietMode: true,
-    config: function (eleventyConfig) {
-      eleventyConfig.addPlugin(I18nPlugin, {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, {
         _test: "this is from errorMode default (strict)",
         defaultLanguage: "en",
         // errorMode: "allow-fallback"
@@ -95,15 +95,15 @@ test("errorMode default (strict)", async (t) => {
   elev.setIsVerbose(false);
   elev.disableLogger();
 
-  await t.throwsAsync(async () => {
+  await t.assert.rejects(async () => {
     await elev.toJSON();
   });
 });
 
 test("locale_url and locale_links Filters", async (t) => {
   let elev = new Eleventy("./test/stubs-i18n/", "./test/stubs-i18n/_site", {
-    config: function (eleventyConfig) {
-      eleventyConfig.addPlugin(I18nPlugin, {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, {
         _test: "this is from locale_url and locale_links Filters",
         defaultLanguage: "en",
         errorMode: "allow-fallback",
@@ -112,7 +112,7 @@ test("locale_url and locale_links Filters", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/non-lang-file.njk"),
     `/en/
 /en-us/
@@ -122,7 +122,7 @@ test("locale_url and locale_links Filters", async (t) => {
 en`
   );
 
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/es/index.njk"),
     `/es/
 /es/
@@ -134,7 +134,7 @@ en`
 es`
   );
 
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/en/index.liquid"),
     `/en/
 /en/
@@ -146,7 +146,7 @@ es`
 en`
   );
 
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/en-us/index.11ty.cjs"),
     `/en-us/
 /en-us/

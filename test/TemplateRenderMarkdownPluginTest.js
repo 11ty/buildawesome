@@ -1,8 +1,8 @@
-import test from "ava";
+import test from "node:test";
 import md from "markdown-it";
 
 import TemplateRender from "../src/TemplateRender.js";
-import EleventyExtensionMap from "../src/EleventyExtensionMap.js";
+import ExtensionMap from "../src/ExtensionMap.js";
 import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
 
 import { getTemplateConfigInstance } from "./_testHelpers.js";
@@ -11,7 +11,7 @@ async function getNewTemplateRender(name, inputDir) {
   let eleventyConfig = await getTemplateConfigInstance();
 
   let tr = new TemplateRender(name, eleventyConfig);
-  tr.extensionMap = new EleventyExtensionMap(eleventyConfig);
+  tr.extensionMap = new ExtensionMap(eleventyConfig);
   tr.extensionMap.engineManager = new TemplateEngineManager(eleventyConfig);
   tr.extensionMap.setFormats([]);
   await tr.init();
@@ -42,8 +42,8 @@ test("Markdown Render: with HTML prerender, sends context data to the markdown l
 
   let fn = await tr.getCompiledTemplate("[link text](http://link.com)");
   let result = await fn(data);
-  t.deepEqual(plugin.environment, data);
-  t.is(result, '<p><a href="http://link.com?data=data">link text</a></p>\n');
+  t.assert.deepStrictEqual(plugin.environment, data);
+  t.assert.strictEqual(result, '<p><a href="http://link.com?data=data">link text</a></p>\n');
 });
 
 test("Markdown Render: without HTML prerender, sends context data to the markdown library", async (t) => {
@@ -52,14 +52,14 @@ test("Markdown Render: without HTML prerender, sends context data to the markdow
   const plugin = createTestMarkdownPlugin();
   let mdLib = md().use(plugin);
   tr.engine.setLibrary(mdLib);
-  tr.setHtmlEngine(false);
+  tr.setPreprocessingEngine(false);
 
   const data = { some: "data" };
 
   let fn = await tr.getCompiledTemplate("[link text](http://link.com)");
   let result = await fn(data);
-  t.deepEqual(plugin.environment, data);
-  t.is(result, '<p><a href="http://link.com?data=data">link text</a></p>\n');
+  t.assert.deepStrictEqual(plugin.environment, data);
+  t.assert.strictEqual(result, '<p><a href="http://link.com?data=data">link text</a></p>\n');
 });
 
 test("Markdown Render: renderer that only implements the render function", async (t) => {
@@ -70,9 +70,9 @@ test("Markdown Render: renderer that only implements the render function", async
       return `<p><a href="${href}">${text}</a></p>\n`;
     },
   });
-  tr.setHtmlEngine(false);
+  tr.setPreprocessingEngine(false);
 
   let fn = await tr.getCompiledTemplate("[link text](http://link.com)");
   let result = await fn();
-  t.is(result, '<p><a href="http://link.com">link text</a></p>\n');
+  t.assert.strictEqual(result, '<p><a href="http://link.com">link text</a></p>\n');
 });

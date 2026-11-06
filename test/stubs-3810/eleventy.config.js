@@ -1,15 +1,15 @@
 import fs from 'fs';
-import { RenderPlugin } from '../../src/Eleventy.js';
+import { RenderPlugin } from '../../src/Core.js';
 const { RenderManager } = RenderPlugin;
 
-export default function(eleventyConfig) {
+export default function($config) {
 	const rm = new RenderManager();
 
-	eleventyConfig.on('eleventy.config', cfg => {
+	$config.on('eleventy.config', cfg => {
 		rm.templateConfig = cfg;
 	});
 
-	eleventyConfig.addAsyncShortcode('promo', async function (promoType) {
+	$config.addAsyncShortcode('promo', async function (promoType) {
 		let content = fs.readFileSync('./test/stubs-3810/_includes/promo.njk').toString();
 
 		const fn = await rm.compile(content, 'njk');

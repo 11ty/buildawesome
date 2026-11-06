@@ -2,17 +2,17 @@ import path from "node:path";
 
 import copy from "@11ty/recursive-copy";
 import { TemplatePath } from "@11ty/eleventy-utils";
-import debugUtil from "debug";
 
 import { readableFileSize } from "./Util/FileSize.js";
 import { isDynamicPattern } from "./Util/GlobMatcher.js";
-import EleventyBaseError from "./Errors/EleventyBaseError.js";
+import BaseError from "./Errors/BaseError.js";
 import checkPassthroughCopyBehavior from "./Util/PassthroughCopyBehaviorCheck.js";
 import ProjectDirectories from "./Util/ProjectDirectories.js";
+import { createDebug } from "./Util/DebugLogUtil.js";
 
-const debug = debugUtil("Eleventy:TemplatePassthrough");
+const debug = createDebug("TemplatePassthrough");
 
-class TemplatePassthroughError extends EleventyBaseError {}
+class TemplatePassthroughError extends BaseError {}
 
 class TemplatePassthrough {
 	isDryRun = false;
@@ -319,6 +319,23 @@ class TemplatePassthrough {
 			);
 	}
 
+	// The dev server can only emulate `dot` and `junk`, so these copy files for real
+	static isEmulatable(copyOptions) {
+		return (
+			!copyOptions?.filter &&
+			!copyOptions?.rawPathFilter &&
+			!copyOptions?.rename &&
+			!copyOptions?.transform
+		);
+	}
+
+	get isEmulated() {
+		return (
+			checkPassthroughCopyBehavior(this.config, this.runMode) &&
+			TemplatePassthrough.isEmulatable(this.copyOptions)
+		);
+	}
+
 	async write() {
 		if (this.isDryRun) {
 			return Promise.resolve({
@@ -340,16 +357,22 @@ class TemplatePassthrough {
 			expand: false, // follow symlinks (matches recursive-copy default)
 			debug: false, // (matches recursive-copy default)
 
-			// Note: `filter` callback function only passes in a relative path, which is unreliable
-			// See https://github.com/timkendrick/recursive-copy/blob/4c9a8b8a4bf573285e9c4a649a30a2b59ccf441c/lib/copy.js#L59
-			// e.g. `{ filePaths: [ './img/coolkid.jpg' ], relativePaths: [ '' ] }`
+			// `filter` receives paths relative to the copy source (empty for single files), use `rawPathFilter` for full paths.
 		};
 
 		let copyOptions = Object.assign(copyOptionsDefault, this.copyOptions);
 
+		let isEmulated = this.isEmulated;
+		if (isEmulated) {
+			// Skip files `dot` and `junk` exclude (recursive-copy does this when copying)
+			fileMap = fileMap.filter(
+				({ inputPath }) => this.isDirectory(inputPath) || copy.shouldCopy(inputPath, copyOptions),
+			);
+		}
+
 		let promises = fileMap.map((entry) => {
 			// For-free passthrough copy
-			if (checkPassthroughCopyBehavior(this.config, this.runMode)) {
+			if (isEmulated) {
 				let aliasMap = {};
 				aliasMap[entry.inputPath] = entry.outputPath;
 
@@ -375,6 +398,23 @@ class TemplatePassthrough {
 					count += result.count;
 					size += result.size;
 					Object.assign(map, result.map);
+				}
+
+				if (isEmulated) {
+					// Served by the dev server, which applies `dot` and `junk` per request
+					let aliases = fileMap.map(({ inputPath, outputPath }) => ({
+						inputPath,
+						outputPath,
+						dot: Boolean(copyOptions.dot),
+						junk: Boolean(copyOptions.junk),
+					}));
+
+					return {
+						count,
+						size,
+						map,
+						aliases,
+					};
 				}
 
 				return {
