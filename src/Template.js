@@ -59,12 +59,14 @@ function getContentPipeline(entry) {
 	);
 }
 
-// Copy of an entry with a placeholder for `content` that isn’t rendered yet (instead of throwing), Issue #3744
+// Copy of an entry with placeholders for unrendered `content` and circular `data.collections`, Issue #3744
 function getSerializableEntry(entry) {
 	let copy = {};
 	for (let key of Object.keys(entry)) {
 		if (key === "content" && entry.needsCheck && entry._templateContent === undefined) {
 			copy[key] = "[Internals: content queued to be rendered later]";
+		} else if (key === "data" && entry.data?.collections) {
+			copy[key] = { ...entry.data, collections: "[Internals: collections omitted]" };
 		} else {
 			copy[key] = entry[key];
 		}

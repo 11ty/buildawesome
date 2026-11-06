@@ -66,3 +66,27 @@ test("#3744: JSON.stringify includes rendered `content`", async (t) => {
 	let index = results.find((entry) => entry.inputPath.endsWith("index.njk"));
 	t.assert.strictEqual(index.content, "Hello");
 });
+
+test("#3744: JSON.stringify works on a whole collection", async (t) => {
+	let elev = new Eleventy("test/noop", false, {
+		config(eleventyConfig) {
+			eleventyConfig.addShortcode("serialize", (entries) => {
+				let json = JSON.parse(JSON.stringify(entries));
+				return json.map((entry) => `${entry.inputPath}=${entry.data.collections}`).join(",");
+			});
+			eleventyConfig.addTemplate("index.njk", "{% serialize collections.post %}");
+			eleventyConfig.addTemplate("post.njk", "Hello", { tags: "post" });
+			eleventyConfig.addTemplate("paged.njk", "Paged", {
+				tags: "post",
+				items: [1, 2],
+				pagination: { data: "items", size: 1 },
+				permalink: "/paged/{{ pagination.pageNumber }}/",
+			});
+		},
+	});
+
+	let results = await elev.toJSON();
+	let index = results.find((entry) => entry.inputPath.endsWith("index.njk"));
+	t.assert.match(index.content, /\.\/test\/noop\/post\.njk=\[Internals: collections omitted\]/);
+	t.assert.match(index.content, /\.\/test\/noop\/paged\.njk=\[Internals: collections omitted\]/);
+});
