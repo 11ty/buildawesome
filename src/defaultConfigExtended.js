@@ -106,5 +106,5 @@ export default function ($config) {
 	// Returns the parent directory of a path
 	// For directories (/mydir/): returns parent (/mydir/ -> /)
 	// For files (/mydir/file.html): returns containing directory (/mydir/file.html -> /mydir/)
-	config.addFilter("getParentDirectory", getParentDirectory);
+	$config.addFilter("getParentDirectory", getParentDirectory);
 }

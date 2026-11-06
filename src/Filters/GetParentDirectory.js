@@ -1,49 +1,24 @@
-/**
- * Returns the parent directory of a given path.
- *
- * For directory paths (ending with /): returns the parent directory
- * For file paths: returns the directory containing the file
- *
- * Examples:
- *   /mydir/           -> /
- *   /mydir/slug.html  -> /mydir/
- *   /mydir/index.md   -> /mydir/
- *   /a/b/c/           -> /a/b/
- *   /file.html        -> /
- *
- * @param {string} path - The path to get the parent directory of
- * @returns {string} The parent directory path
- */
-export default function getParentDirectory(path) {
-	if (!path || typeof path !== "string") {
-		return "";
+// Directories (trailing slash) return their parent, files return their containing directory.
+export default function getParentDirectory(input) {
+	// `instanceof String` also allows Nunjucks SafeString.
+	if (typeof input !== "string" && !(input instanceof String)) {
+		return undefined;
 	}
 
-	// If path ends with /, it's a directory - get its parent
-	if (path.endsWith("/") && path.length > 1) {
-		// Remove trailing slash, then find parent
-		let withoutTrailing = path.slice(0, -1);
-		let lastSlash = withoutTrailing.lastIndexOf("/");
-		if (lastSlash === -1) {
-			return "/";
-		}
-		return withoutTrailing.slice(0, lastSlash + 1) || "/";
+	let str = String(input);
+
+	// Opaque URLs (mailto:, data:, C:) have a "null" origin and are treated as paths.
+	let url = URL.canParse(str) ? new URL(str) : undefined;
+	if (url && url.origin !== "null") {
+		let parent = new URL(url.pathname.endsWith("/") ? "../" : "./", url);
+		return parent.origin + parent.pathname;
 	}
 
-	// Handle root directory
-	if (path === "/") {
-		return "/";
-	}
-
-	// Otherwise it's a file path - get the directory containing it
+	// Paths (page.url, page.inputPath) are not encoded, so return an exact prefix of the input.
+	let path = str.length > 1 && str.endsWith("/") ? str.slice(0, -1) : str;
 	let lastSlash = path.lastIndexOf("/");
 	if (lastSlash === -1) {
-		// No slash found, no parent directory
-		return "";
-	}
-	if (lastSlash === 0) {
-		// File is at root level
-		return "/";
+		return undefined;
 	}
 	return path.slice(0, lastSlash + 1);
 }
