@@ -12,6 +12,7 @@ import TemplateConfig from "../TemplateConfig.js";
 import ExtensionMap from "../ExtensionMap.js";
 import TemplateEngineManager from "../Engines/TemplateEngineManager.js";
 import Liquid from "../Adapters/Engines/Liquid.js";
+import memoize from "../Util/MemoizeFunction.js";
 
 class NunjucksError extends BaseError {}
 
@@ -120,6 +121,21 @@ async function compileFile(inputPath, options = {}, templateLang) {
 	return tr.getCompiledTemplate(content);
 }
 
+const memoizedCompiles = new WeakMap();
+
+function memoizeCompile(templateConfig, key, compileFn) {
+	let memoized = memoizedCompiles.get(templateConfig);
+	if (!memoized) {
+		memoized = memoize((key, compileFn) => compileFn(), { getCacheKey: (key) => key });
+		// Clearing everything also covers changes to a rendered template’s includes.
+		templateConfig.eventBus.on("buildawesome.resourcemodified", memoized.clear);
+		templateConfig.eventBus.on("buildawesome.compilecachereset", memoized.clear);
+		memoizedCompiles.set(templateConfig, memoized);
+	}
+
+	return memoized(key, compileFn);
+}
+
 /** @this {object} */
 async function renderShortcodeFn(fn, data) {
 	if (fn === undefined) {
@@ -182,6 +198,7 @@ function RenderPlugin($config, options = {}) {
 	 * @property {string} [tagNameFile] - The shortcode name to render a template file.
 	 * @property {module:11ty/eleventy/TemplateConfig} [templateConfig] - Configuration object
 	 * @property {boolean} [accessGlobalData] - Whether or not the template has access to the page’s data.
+	 * @property {string} [memoize] - Comma-separated list (`file`, `string`) to reuse compiled `renderFile` and `renderTemplate`/`renderContent` templates across pages.
 	 */
 
 	// For incremental builds, the page uses what it renders
@@ -197,6 +214,7 @@ function RenderPlugin($config, options = {}) {
 	options.filterName ??= "renderContent";
 	options.templateConfig ??= null;
 	options.accessGlobalData ??= false;
+	let memoize = new Set((options.memoize || "").split(",").map((entry) => entry.trim()));
 
 	function liquidTemplateTag(liquidEngine, tagName, extras) {
 		const { evalToken } = extras;
@@ -382,10 +400,22 @@ function RenderPlugin($config, options = {}) {
 			addDependency(this?.page, lang, ...lang.split(","));
 		}
 
-		let fn = await compile.call(this, content, templateLang, {
+		let compileOptions = {
 			templateConfig: options.templateConfig || templateConfig,
 			extensionMap,
-		});
+		};
+		let compileFn = () => compile.call(this, content, templateLang, compileOptions);
+
+		let fn;
+		if (memoize.has("string") && compileOptions.templateConfig) {
+			fn = await memoizeCompile(
+				compileOptions.templateConfig,
+				`string:${lang || ""}:${content}`,
+				compileFn,
+			);
+		} else {
+			fn = await compileFn();
+		}
 
 		return renderShortcodeFn.call(this, fn, data);
 	}
@@ -399,7 +429,17 @@ function RenderPlugin($config, options = {}) {
 
 		addDependency(this?.page, inputPath);
 
-		let fn = await compileFile.call(this, inputPath, renderFileOptions, templateLang);
+		let fn;
+		let compileFn = () => compileFile(inputPath, renderFileOptions, templateLang);
+		if (memoize.has("file") && renderFileOptions.templateConfig) {
+			fn = await memoizeCompile(
+				renderFileOptions.templateConfig,
+				`file:${templateLang || ""}:${inputPath}`,
+				compileFn,
+			);
+		} else {
+			fn = await compileFn();
+		}
 
 		return renderShortcodeFn.call(this, fn, data);
 	}

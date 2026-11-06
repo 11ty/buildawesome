@@ -356,3 +356,78 @@ test("#2912 renderTemplate data `page` takes precedence over `this.page`", async
   });
   t.assert.strictEqual(html, "/data/");
 });
+
+async function getCompileCount(pluginOptions, templates) {
+  let counter = { compiles: 0 };
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: function ($config) {
+      $config.addPlugin(RenderPlugin, pluginOptions);
+      $config.addExtension("cnt", {
+        compile: (str) => {
+          counter.compiles++;
+          return (data) => `${str.trim()} ${data.name}`;
+        },
+      });
+      for (let [name, content] of Object.entries(templates)) {
+        $config.addTemplate(name, content);
+      }
+    },
+  });
+
+  let results = await elev.toJSON();
+  let content = results.map((entry) => entry.content).sort();
+  return { compileCount: counter.compiles, counter, content, elev };
+}
+
+const renderFileTemplates = {
+  "a.njk": `{% renderFile "./test/stubs-render-plugin/_includes/cached.cnt", { name: "A" } %}`,
+  "b.njk": `{% renderFile "./test/stubs-render-plugin/_includes/cached.cnt", { name: "B" } %}`,
+};
+
+const renderTemplateTemplates = {
+  "a.njk": `{% renderTemplate "cnt", { name: "A" } %}Hello{% endrenderTemplate %}`,
+  "b.njk": `{% renderTemplate "cnt", { name: "B" } %}Hello{% endrenderTemplate %}`,
+};
+
+test("renderFile compiles once per page by default", async (t) => {
+  let { compileCount, content } = await getCompileCount(undefined, renderFileTemplates);
+  t.assert.deepStrictEqual(content, ["Hello A", "Hello B"]);
+  t.assert.strictEqual(compileCount, 2);
+});
+
+test("renderFile with memoize: 'file' compiles once", async (t) => {
+  let { compileCount, content } = await getCompileCount({ memoize: "file" }, renderFileTemplates);
+  t.assert.deepStrictEqual(content, ["Hello A", "Hello B"]);
+  t.assert.strictEqual(compileCount, 1);
+});
+
+test("renderTemplate compiles once per page by default", async (t) => {
+  let { compileCount, content } = await getCompileCount(undefined, renderTemplateTemplates);
+  t.assert.deepStrictEqual(content, ["Hello A", "Hello B"]);
+  t.assert.strictEqual(compileCount, 2);
+});
+
+test("renderTemplate with memoize: 'string' compiles once", async (t) => {
+  let { compileCount, content } = await getCompileCount({ memoize: "string" }, renderTemplateTemplates);
+  t.assert.deepStrictEqual(content, ["Hello A", "Hello B"]);
+  t.assert.strictEqual(compileCount, 1);
+});
+
+test("renderFile with memoize: 'file' clears on resource modified", async (t) => {
+  let { counter, elev } = await getCompileCount({ memoize: "file" }, renderFileTemplates);
+  t.assert.strictEqual(counter.compiles, 1);
+
+  elev.eleventyConfig.eventBus.emit("buildawesome.resourcemodified", "./test/stubs-render-plugin/_includes/cached.cnt");
+  await elev.toJSON();
+  t.assert.strictEqual(counter.compiles, 2);
+});
+
+test("memoize: 'file,string' memoizes both", async (t) => {
+  let { compileCount, content } = await getCompileCount({ memoize: "file,string" }, {
+    ...renderFileTemplates,
+    "c.njk": `{% renderTemplate "cnt", { name: "C" } %}Hi{% endrenderTemplate %}`,
+    "d.njk": `{% renderTemplate "cnt", { name: "D" } %}Hi{% endrenderTemplate %}`,
+  });
+  t.assert.deepStrictEqual(content, ["Hello A", "Hello B", "Hi C", "Hi D"]);
+  t.assert.strictEqual(compileCount, 2);
+});
