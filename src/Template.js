@@ -59,8 +59,33 @@ function getContentPipeline(entry) {
 	);
 }
 
+// Copy of an entry with a placeholder for `content` that isn’t rendered yet (instead of throwing), Issue #3744
+function getSerializableEntry(entry) {
+	let copy = {};
+	for (let key of Object.keys(entry)) {
+		if (key === "content" && entry.needsCheck && entry._templateContent === undefined) {
+			copy[key] = "[Internals: content queued to be rendered later]";
+		} else {
+			copy[key] = entry[key];
+		}
+	}
+	return copy;
+}
+
 // Shared across page entries so the accessor functions aren’t recreated per page
 const TEMPLATE_CONTENT_PROPERTIES = {
+	toJSON: {
+		enumerable: false,
+		value() {
+			return getSerializableEntry(this);
+		},
+	},
+	[Symbol.for("nodejs.util.inspect.custom")]: {
+		enumerable: false,
+		value() {
+			return getSerializableEntry(this);
+		},
+	},
 	needsCheck: {
 		enumerable: false,
 		writable: true,
@@ -72,7 +97,7 @@ const TEMPLATE_CONTENT_PROPERTIES = {
 		value: undefined,
 	},
 	templateContent: {
-		enumerable: true,
+		enumerable: false,
 		set(content) {
 			if (content === undefined) {
 				this.needsCheck = false;
@@ -979,6 +1004,8 @@ class Template extends TemplateContent {
 	}
 
 	static augmentWithTemplateContentProperty(obj) {
+		// Hidden from enumeration to make collection entries easier to serialize, Issue #3744
+		Object.defineProperty(obj, "template", { enumerable: false });
 		return Object.defineProperties(obj, TEMPLATE_CONTENT_PROPERTIES);
 	}
 
