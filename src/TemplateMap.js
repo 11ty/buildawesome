@@ -1,5 +1,6 @@
 import { isPlainObject, TemplatePath } from "@11ty/eleventy-utils";
 
+import Template from "./Template.js";
 import TemplateCollection from "./TemplateCollection.js";
 import ErrorUtil from "./Errors/ErrorUtil.js";
 import BaseError from "./Errors/BaseError.js";
@@ -643,10 +644,10 @@ class TemplateMap {
 				if (entry) {
 					let index = item.pageNumber || 0;
 					let page = entry._pages[index];
-					let content = page._templateContent;
+					let content = Template.getRenderedContent(page);
 					if (content !== undefined) {
 						item.templateContent = content;
-						// Copies of page entries (e.g. spread in a collection callback) don’t have the getter
+						// Copies of page entries (e.g. spread in a collection callback) and entries from another map need the pipeline copied
 						if (item !== page) {
 							item.contentPipeline = page.contentPipeline;
 						}

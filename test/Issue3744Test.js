@@ -90,3 +90,21 @@ test("#3744: JSON.stringify works on a whole collection", async (t) => {
 	t.assert.match(index.content, /\.\/test\/noop\/post\.njk=\[Internals: collections omitted\]/);
 	t.assert.match(index.content, /\.\/test\/noop\/paged\.njk=\[Internals: collections omitted\]/);
 });
+
+test("#3744: Reading `_templateContent` throws", async (t) => {
+	let elev = new Eleventy("test/noop", false, {
+		config(eleventyConfig) {
+			eleventyConfig.addShortcode("internal", (entry) => {
+				try {
+					entry._templateContent;
+				} catch (e) {
+					return e.message.startsWith("Unfortunately you’re using code that monkey patched");
+				}
+			});
+			eleventyConfig.addTemplate("index.njk", "{% internal collections.all[0] %}");
+		},
+	});
+
+	let [result] = await elev.toJSON();
+	t.assert.strictEqual(result.content, "true");
+});

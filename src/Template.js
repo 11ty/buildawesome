@@ -35,8 +35,25 @@ const earlyReadWarnings = new WeakMap();
 // data => layout key whose front matter is merged into that data
 const mergedLayoutKeys = new WeakMap();
 
+// page entry => internal render state, kept off the entry so it serializes cleanly
+const entryStates = new WeakMap();
+
+function getEntryState(entry) {
+	let state = entryStates.get(entry);
+	if (!state) {
+		state = { needsCheck: true };
+		entryStates.set(entry, state);
+	}
+	return state;
+}
+
+function isContentPending(entry) {
+	let state = getEntryState(entry);
+	return state.needsCheck && state.content === undefined;
+}
+
 function assertContentReady(entry, propName) {
-	if (entry.needsCheck && entry._templateContent === undefined) {
+	if (isContentPending(entry)) {
 		let suffix = `${entry.inputPath}${entry.pageNumber ? ` (page ${entry.pageNumber})` : ""}`;
 		if (entry.template.isRenderable()) {
 			throw new TemplateContentPrematureUseError(`Tried to use ${propName} too early on ${suffix}`);
@@ -52,116 +69,63 @@ function getContentPipeline(entry) {
 		return {};
 	}
 
+	let { stepInputs } = getEntryState(entry);
 	let names = entry.template.templateRender.getPipelineStepNames();
 	// The first step receives the template source
 	return Object.fromEntries(
-		names.map((name, j) => [name, j === 0 ? entry.rawInput : entry._stepInputs?.[j - 1]]),
+		names.map((name, j) => [name, j === 0 ? entry.rawInput : stepInputs?.[j - 1]]),
 	);
 }
 
 // Copy of an entry with placeholders for unrendered `content` and circular `data.collections`, Issue #3744
-function getSerializableEntry(entry) {
+function getSerializableEntry() {
 	let copy = {};
-	for (let key of Object.keys(entry)) {
-		if (key === "content" && entry.needsCheck && entry._templateContent === undefined) {
+	for (let key of Object.keys(this)) {
+		if (key === "content" && isContentPending(this)) {
 			copy[key] = "[Internals: content queued to be rendered later]";
-		} else if (key === "data" && entry.data?.collections) {
-			copy[key] = { ...entry.data, collections: "[Internals: collections omitted]" };
+		} else if (key === "data" && this.data?.collections) {
+			copy[key] = { ...this.data, collections: "[Internals: collections omitted]" };
 		} else {
-			copy[key] = entry[key];
+			copy[key] = this[key];
 		}
 	}
 	return copy;
 }
 
+// Live from `page` until overwritten, computed data can resolve them after collections are built, Issue #1469
+function livePageProperty(name) {
+	return {
+		enumerable: true,
+		configurable: true,
+		get() {
+			return this.page[name];
+		},
+		set(value) {
+			Object.defineProperty(this, name, {
+				value,
+				writable: true,
+				enumerable: true,
+				configurable: true,
+			});
+		},
+	};
+}
+
 // Shared across page entries so the accessor functions aren’t recreated per page
 const TEMPLATE_CONTENT_PROPERTIES = {
-	toJSON: {
-		enumerable: false,
-		value() {
-			return getSerializableEntry(this);
-		},
-	},
-	[Symbol.for("nodejs.util.inspect.custom")]: {
-		enumerable: false,
-		value() {
-			return getSerializableEntry(this);
-		},
-	},
-	needsCheck: {
-		enumerable: false,
-		writable: true,
-		value: true,
-	},
-	_templateContent: {
-		enumerable: false,
-		writable: true,
-		value: undefined,
-	},
+	toJSON: { value: getSerializableEntry },
+	[Symbol.for("nodejs.util.inspect.custom")]: { value: getSerializableEntry },
 	templateContent: {
-		enumerable: false,
 		set(content) {
+			let state = getEntryState(this);
 			if (content === undefined) {
-				this.needsCheck = false;
+				state.needsCheck = false;
 			}
-			this._templateContent = content;
+			state.content = content;
 		},
 		get() {
 			assertContentReady(this, "templateContent");
-			return this._templateContent;
-		},
-	},
-	_stepInputs: {
-		enumerable: false,
-		writable: true,
-		value: undefined,
-	},
-	_contentPipeline: {
-		enumerable: false,
-		writable: true,
-		value: undefined,
-	},
-	// Content each template syntax step received, keyed by engine name, e.g. `contentPipeline.md`
-	contentPipeline: {
-		enumerable: false,
-		set(content) {
-			this._contentPipeline = content;
-		},
-		get() {
-			assertContentReady(this, "contentPipeline");
-			this._contentPipeline ??= getContentPipeline(this);
-			return this._contentPipeline;
-		},
-	},
-	// Live from `page`, computed data can resolve them after collections are built, Issue #1469
-	url: {
-		enumerable: true,
-		configurable: true,
-		get() {
-			return this.page.url;
-		},
-		set(value) {
-			Object.defineProperty(this, "url", {
-				value,
-				writable: true,
-				enumerable: true,
-				configurable: true,
-			});
-		},
-	},
-	outputPath: {
-		enumerable: true,
-		configurable: true,
-		get() {
-			return this.page.outputPath;
-		},
-		set(value) {
-			Object.defineProperty(this, "outputPath", {
-				value,
-				writable: true,
-				enumerable: true,
-				configurable: true,
-			});
+			return getEntryState(this).content;
 		},
 	},
 	// Alias for templateContent for consistency
@@ -174,6 +138,31 @@ const TEMPLATE_CONTENT_PROPERTIES = {
 			throw new Error("Setter not available for `content`. Use `templateContent` instead.");
 		},
 	},
+	// Content each template syntax step received, keyed by engine name, e.g. `contentPipeline.md`
+	contentPipeline: {
+		set(content) {
+			getEntryState(this).contentPipeline = content;
+		},
+		get() {
+			assertContentReady(this, "contentPipeline");
+			let state = getEntryState(this);
+			state.contentPipeline ??= getContentPipeline(this);
+			return state.contentPipeline;
+		},
+	},
+	// For monkey patchers, Issue #3744
+	_templateContent: {
+		get() {
+			throw new Error(
+				"Unfortunately you’re using code that monkey patched some Eleventy internals and `_templateContent` is no longer available. Change your code to use `templateContent` or `content` instead!",
+			);
+		},
+		set(content) {
+			this.templateContent = content;
+		},
+	},
+	url: livePageProperty("url"),
+	outputPath: livePageProperty("outputPath"),
 };
 
 class Template extends TemplateContent {
@@ -620,9 +609,10 @@ class Template extends TemplateContent {
 				false,
 				renderContext,
 			).then((content) => {
-				pageEntry._stepInputs =
+				let state = getEntryState(pageEntry);
+				state.stepInputs =
 					renderContext.stepInputs.length > 0 ? renderContext.stepInputs : undefined;
-				pageEntry._contentPipeline = undefined;
+				state.contentPipeline = undefined;
 				return content;
 			});
 			this.renderCount++;
@@ -1003,6 +993,11 @@ class Template extends TemplateContent {
 			`${key} › ${layoutKey}`,
 			`Warning: computed data set \`${key}\` to \`${layoutKey}\` after the rest of computed data resolved (likely because it reads \`collections\`), so that layout’s front matter data was not applied: ${this.inputPath} › ${key}. You can work around this issue by computing \`${key}\` without reading \`collections\`, or by setting it outside of computed data (e.g. front matter or a directory data file).`,
 		);
+	}
+
+	// Rendered content without the premature use check, `undefined` until rendered
+	static getRenderedContent(entry) {
+		return entryStates.get(entry)?.content;
 	}
 
 	static augmentWithTemplateContentProperty(obj) {
