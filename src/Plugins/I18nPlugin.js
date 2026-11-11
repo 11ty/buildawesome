@@ -68,6 +68,15 @@ class Comparator {
 	}
 }
 
+// Splits the query string and hash off a URL: "/about/?q=1#team" => ["/about/", "?q=1#team"]
+function splitUrlSuffix(url) {
+	let index = url.search(/[?#]/);
+	if (index === -1) {
+		return [url, ""];
+	}
+	return [url.slice(0, index), url.slice(index)];
+}
+
 function normalizeInputPath(inputPath, extensionMap) {
 	if (extensionMap) {
 		return extensionMap.removeTemplateExtension(inputPath);
@@ -201,11 +210,18 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 	// Normalize a theoretical URL based on the current page’s language
 	// If a non-localized file exists, returns the URL without a language assigned
 	// Fails if no file exists (localized and not localized)
-	eleventyConfig.addFilter(options.filters.url, function (url, langCodeOverride) {
+	eleventyConfig.addFilter(options.filters.url, function (urlWithSuffix, langCodeOverride) {
 		let langCode =
 			langCodeOverride ||
 			LangUtils.getLanguageCodeFromUrl(this.page?.url) ||
 			options.defaultLanguage;
+
+		// Only the path is localized, a query string and/or hash is added back unchanged
+		let [url, suffix] = splitUrlSuffix(urlWithSuffix);
+		if (!url && suffix) {
+			// e.g. "#anchor" or "?query" on the current page
+			return urlWithSuffix;
+		}
 
 		// Already has a language code on it and has a relevant url with the target language code
 		if (
@@ -215,7 +231,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 			for (let existingUrlObj of contentMaps.localeUrlsMap[url] ||
 				contentMaps.localeUrlsMap[`${url}/`]) {
 				if (Comparator.urlHasLangCode(existingUrlObj.url, langCode)) {
-					return existingUrlObj.url;
+					return existingUrlObj.url + suffix;
 				}
 			}
 		}
@@ -226,7 +242,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 			contentMaps.localeUrlsMap[prependedLangCodeUrl] ||
 			(!prependedLangCodeUrl.endsWith("/") && contentMaps.localeUrlsMap[`${prependedLangCodeUrl}/`])
 		) {
-			return prependedLangCodeUrl;
+			return prependedLangCodeUrl + suffix;
 		}
 
 		if (
@@ -246,7 +262,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 			);
 		}
 
-		return url;
+		return urlWithSuffix;
 	});
 
 	// Refactor to use url

@@ -158,3 +158,82 @@ en`
 en-us`
   );
 });
+
+// #3023: `locale_url` with a hash and/or query string
+async function getLocaleUrlResults(errorMode, links) {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
+    quietMode: true,
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, {
+        defaultLanguage: "en",
+        errorMode,
+      });
+
+      $config.addTemplate("en/index.njk", "");
+      $config.addTemplate("es/index.njk", "");
+      $config.addTemplate("en/about.njk", "");
+      $config.addTemplate("es/about.njk", "");
+      $config.addTemplate("non-lang.njk", "");
+      $config.addTemplate("es/links.njk", links);
+    },
+  });
+
+  await elev.initializeConfig();
+  elev.setIsVerbose(false);
+  elev.disableLogger();
+
+  let results = await elev.toJSON();
+  return getContentFor(results, "/es/links.njk");
+}
+
+for (let errorMode of ["strict", "allow-fallback", "never"]) {
+  test(`locale_url keeps the hash and query string (errorMode: ${errorMode}), Issue #3023`, async (t) => {
+    let content = await getLocaleUrlResults(
+      errorMode,
+      `{{ "/about/#team" | locale_url }}
+{{ "/about#team" | locale_url }}
+{{ "/en/about/#team" | locale_url }}
+{{ "/about/?q=1" | locale_url }}
+{{ "/about/?q=1#team" | locale_url }}
+{{ "/about/#team?q=1" | locale_url }}
+{{ "/#top" | locale_url }}
+{{ "/about/#team" | locale_url("en") }}
+{{ "#top" | locale_url }}
+{{ "?q=1" | locale_url }}
+{{ "/about/" | locale_url }}
+{{ "/about" | locale_url }}`,
+    );
+
+    t.assert.strictEqual(
+      content,
+      `/es/about/#team
+/es/about#team
+/es/about/#team
+/es/about/?q=1
+/es/about/?q=1#team
+/es/about/#team?q=1
+/es/#top
+/en/about/#team
+#top
+?q=1
+/es/about/
+/es/about`,
+    );
+  });
+}
+
+test("locale_url with a hash, non-localized target (errorMode: strict), Issue #3023", async (t) => {
+  await t.assert.rejects(getLocaleUrlResults("strict", `{{ "/non-lang/#top" | locale_url }}`), (err) => {
+    while (err.cause) {
+      err = err.cause;
+    }
+    return /^Localized file for URL \/es\/non-lang\/ was not found in your project\. A non-localized version does exist/.test(
+      err.message,
+    );
+  });
+});
+
+test("locale_url with a hash, non-localized target (errorMode: allow-fallback), Issue #3023", async (t) => {
+  let content = await getLocaleUrlResults("allow-fallback", `{{ "/non-lang/#top" | locale_url }}`);
+  t.assert.strictEqual(content, "/non-lang/#top");
+});
