@@ -114,6 +114,8 @@ test("Test command line --events-file writes a passthrough event", async (t) => 
         t.deepEqual(events.map((e) => e.type), ["build.start", "passthrough", "build.end"]);
         let passthrough = events[1];
         t.is(passthrough.v, 1);
+        t.is(passthrough.id, events[0].id);
+        t.is(events[2].id, events[0].id);
         t.false(passthrough.emulated);
         t.deepEqual(passthrough.map, {
           "/robots.txt": "test/stubs/events-file-passthrough/robots.txt",

@@ -166,6 +166,8 @@ export class NdjsonReporter {
 			this.#emit({
 				v: SCHEMA_VERSION,
 				type: "passthrough",
+				// The build it belongs to, like `build.end`
+				id: this.#buildId ?? null,
 				ts: Date.now(),
 				emulated: checkPassthroughCopyBehavior(eleventyConfig, this.#runMode),
 				map: toPosixMap(map),
