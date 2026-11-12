@@ -103,10 +103,20 @@ class TemplateConfig {
 			return this.existsCache.exists(filePath);
 		};
 
+		this.#addInternalEventListeners();
+	}
+
+	#addInternalEventListeners() {
 		this.userConfig.events.on("buildawesome#templatemodified", (inputPath, metadata = {}) => {
 			// Issue #3569, the file may have been added (or deleted)
 			this.#existsCache.delete(inputPath);
 		});
+	}
+
+	// Internal (`#` prefixed) event listeners are singletons, cleared at the start of each build
+	resetUserConfigEvents() {
+		this.userConfig.events.reset();
+		this.#addInternalEventListeners();
 	}
 
 	get userConfig() {
@@ -211,7 +221,8 @@ class TemplateConfig {
 	 */
 	async reset() {
 		this.#existsCache.reset();
-		this.userConfig.reset();
+		this.userConfig.reset(); // allocates a new event emitter
+		this.#addInternalEventListeners();
 		this.#syncCommandLineTemplateFormats();
 		this.usesGraph.reset(); // needs to be before forceReloadConfig #3711
 

@@ -16,6 +16,25 @@ import memoize from "../Util/MemoizeFunction.js";
 
 class NunjucksError extends BaseError {}
 
+const fallbackExtensionMaps = new WeakMap();
+
+// One map per config: a new engine manager per call would leave its engines (and their listeners) behind
+function getFallbackExtensionMap(templateConfig) {
+	let extensionMap = fallbackExtensionMaps.get(templateConfig);
+	if (!extensionMap) {
+		extensionMap = new ExtensionMap(templateConfig);
+		extensionMap.engineManager = new TemplateEngineManager(templateConfig);
+		fallbackExtensionMaps.set(templateConfig, extensionMap);
+
+		// Same invalidation as the memoized compile cache below
+		let reset = () => extensionMap.reset();
+		templateConfig.eventBus.on("buildawesome.resourcemodified", reset);
+		templateConfig.eventBus.on("buildawesome.compilecachereset", reset);
+	}
+
+	return extensionMap;
+}
+
 /** @this {object} */
 async function compile(content, templateLang, options = {}) {
 	let { templateConfig, extensionMap } = options;
@@ -36,8 +55,7 @@ async function compile(content, templateLang, options = {}) {
 		if (strictMode) {
 			throw new Error("Internal error: missing `extensionMap` in RenderPlugin->compile.");
 		}
-		extensionMap = new ExtensionMap(templateConfig);
-		extensionMap.engineManager = new TemplateEngineManager(templateConfig);
+		extensionMap = getFallbackExtensionMap(templateConfig);
 	}
 	let tr = new TemplateRender(templateLang, templateConfig);
 	tr.extensionMap = extensionMap;
@@ -100,8 +118,7 @@ async function compileFile(inputPath, options = {}, templateLang) {
 			throw new Error("Internal error: missing `extensionMap` in RenderPlugin->compileFile.");
 		}
 
-		extensionMap = new ExtensionMap(templateConfig);
-		extensionMap.engineManager = new TemplateEngineManager(templateConfig);
+		extensionMap = getFallbackExtensionMap(templateConfig);
 	}
 	let tr = new TemplateRender(inputPath, templateConfig);
 	tr.extensionMap = extensionMap;

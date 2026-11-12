@@ -680,3 +680,19 @@ test("Test getters #3310", async (t) => {
   t.assert.ok(userCfg.getPairedShortcode("myPairedShortcode"));
   t.assert.ok(userCfg.getPairedShortcode("myPairedAsyncShortcode"));
 });
+
+test("Internal event listeners survive a user config events reset", async (t) => {
+  let templateConfig = new TemplateConfig();
+  await templateConfig.init();
+
+  let events = templateConfig.userConfig.events;
+  let before = events.listenerCount("buildawesome#templatemodified");
+  t.assert.strictEqual(before, 1);
+
+  templateConfig.resetUserConfigEvents();
+
+  t.assert.strictEqual(
+    templateConfig.userConfig.events.listenerCount("buildawesome#templatemodified"),
+    before,
+  );
+});

@@ -9,6 +9,7 @@ import {
 import Eleventy from "../src/Core.js";
 
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
+import { getTemplateConfigInstance } from "./_testHelpers.js";
 
 async function getTestOutput(input, configCallback = function () {}) {
   let elev = new Eleventy(input, "./_site/", {
@@ -430,4 +431,26 @@ test("memoize: 'file,string' memoizes both", async (t) => {
   });
   t.assert.deepStrictEqual(content, ["Hello A", "Hello B", "Hi C", "Hi D"]);
   t.assert.strictEqual(compileCount, 2);
+});
+
+test("Compiling without an extensionMap reuses engines (no listener per call)", async (t) => {
+  let templateConfig = await getTemplateConfigInstance();
+  let events = templateConfig.userConfig.events;
+  let count = () => events.listenerCount("buildawesome#templatemodified");
+  let before = count();
+
+  for (let j = 0; j < 10; j++) {
+    let fn = await RenderPluginString.call({}, "{{ x }}", "njk", { templateConfig });
+    t.assert.strictEqual(await fn({ x: j }), String(j));
+  }
+
+  t.assert.strictEqual(count(), before + 1);
+
+  // A changed file drops the reused engines
+  templateConfig.eventBus.emit("buildawesome.resourcemodified", "./test/stubs/index.njk");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  t.assert.strictEqual(count(), before);
+
+  let fn = await RenderPluginString.call({}, "{{ x }}", "njk", { templateConfig });
+  t.assert.strictEqual(await fn({ x: "ok" }), "ok");
 });

@@ -3,6 +3,7 @@ import test from "node:test";
 import TemplateEngineManager from "../src/Engines/TemplateEngineManager.js";
 import ExtensionMap from "../src/ExtensionMap.js";
 import TemplateConfig from "../src/TemplateConfig.js";
+import { getTemplateConfigInstance } from "./_testHelpers.js";
 
 test("Unsupported engine", async (t) => {
   await t.assert.rejects(async () => {
@@ -90,4 +91,40 @@ test("getEngineLib", async (t) => {
   let tem = new TemplateEngineManager(eleventyConfig);
   let engine = await tem.getEngine("md", extensionMap);
   t.assert.ok(engine.getEngineLib());
+});
+
+test("Engine event listeners are removed when the engine cache is reset", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstance();
+  let extensionMap = new ExtensionMap(eleventyConfig);
+
+  let events = eleventyConfig.userConfig.events;
+  let count = () => events.listenerCount("buildawesome#templatemodified");
+  let before = count();
+
+  let tem = new TemplateEngineManager(eleventyConfig);
+  for (let j = 0; j < 5; j++) {
+    await tem.getEngine("njk", extensionMap);
+    await tem.getEngine("11ty.js", extensionMap);
+    tem.reset();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  t.assert.strictEqual(count(), before);
+});
+
+test("Nunjucks setLibrary does not add another templateModified listener", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstance();
+  let extensionMap = new ExtensionMap(eleventyConfig);
+
+  let events = eleventyConfig.userConfig.events;
+  let count = () => events.listenerCount("buildawesome#templatemodified");
+
+  let tem = new TemplateEngineManager(eleventyConfig);
+  let engine = await tem.getEngine("njk", extensionMap);
+  let expected = count();
+
+  engine.setLibrary();
+  engine.setLibrary();
+
+  t.assert.strictEqual(count(), expected);
 });

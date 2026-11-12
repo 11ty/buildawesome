@@ -83,6 +83,14 @@ class TemplateEngineManager {
 	}
 
 	reset() {
+		// Cached engines are discarded here, so release their config event listeners too
+		for (let name in this.engineCache) {
+			Promise.resolve(this.engineCache[name]).then(
+				(engine) => engine.removeConfigEventListeners(),
+				() => {},
+			);
+		}
+
 		this.engineCache = {};
 	}
 
