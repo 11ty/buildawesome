@@ -85,6 +85,8 @@ test("Test command line --events-file writes build.end on success", async (t) =>
         let start = events.find((e) => e.type === "build.start");
         let end = events.find((e) => e.type === "build.end");
         t.is(start.v, 1);
+        t.regex(start.id, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+        t.is(end.id, start.id);
         t.true(end.ok);
         t.true(Number.isInteger(end.durationMs));
         t.is(end.pages.length, 1);
@@ -198,6 +200,7 @@ test("Test command line --events-file writes build.error instead of build.end wh
         let events = readEvents(eventsFile);
         let types = events.map((e) => e.type);
         t.deepEqual(types, ["build.start", "passthrough", "build.error"]);
+        t.is(events.at(-1).id, events[0].id);
         resolve();
       }
     );

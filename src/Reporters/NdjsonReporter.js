@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdirSync, openSync, writeSync } from "node:fs";
 import path from "node:path";
 import { TemplatePath } from "@11ty/eleventy-utils";
@@ -53,6 +54,8 @@ export class NdjsonReporter {
 	/** @type {number|undefined} */
 	#startedAt;
 	/** @type {string|undefined} */
+	#buildId;
+	/** @type {string|undefined} */
 	#runMode;
 	/** @type {WeakSet<object>} */
 	#reportedErrors = new WeakSet();
@@ -98,6 +101,8 @@ export class NdjsonReporter {
 		this.#emit({
 			v: SCHEMA_VERSION,
 			type: "build.error",
+			// null for errors outside of a build, like `durationMs`
+			id: this.#buildId ?? null,
 			ts: Date.now(),
 			ok: false,
 			// null for errors outside of a build (e.g. configuration errors)
@@ -110,6 +115,7 @@ export class NdjsonReporter {
 		});
 
 		this.#startedAt = undefined;
+		this.#buildId = undefined;
 	}
 
 	/** @param {object} eleventyConfig */
@@ -123,10 +129,13 @@ export class NdjsonReporter {
 
 		eleventyConfig.on("buildawesome.before", (eventsArg) => {
 			this.#startedAt = performance.now();
+			// Random, not a counter: a counter would repeat after a restart
+			this.#buildId = randomUUID();
 			this.#runMode = eventsArg.runMode;
 			this.#emit({
 				v: SCHEMA_VERSION,
 				type: "build.start",
+				id: this.#buildId,
 				ts: Date.now(),
 				runMode: eventsArg.runMode,
 				incremental: Boolean(eventsArg.incremental),
@@ -139,12 +148,14 @@ export class NdjsonReporter {
 					this.#emit({
 						v: SCHEMA_VERSION,
 						type: "build.end",
+						id: this.#buildId,
 						ts: Date.now(),
 						ok: true,
 						durationMs: this.#getDuration(performance.now()),
 						pages: (eventsArg.results || []).map(toManifestEntry),
 					});
 					this.#startedAt = undefined;
+					this.#buildId = undefined;
 				});
 			}
 		});
