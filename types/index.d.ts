@@ -10,19 +10,26 @@ export function defineConfig<T extends ConfigurationApi>(callback: T): T;
 type Plugin = ($config: UserConfig, options?: any) => any;
 
 export interface CoreOptions {
-	/** Directory or filename for input files. */
+	/** The input directory (or a single input file). Mirrors the --input CLI flag. */
 	input?: string;
-	/** Directory for output files. */
+	/** The output directory. Mirrors the --output CLI flag. */
 	output?: string;
 	source?: "cli" | "script";
 	runMode?: "build" | "serve" | "watch";
+	/** When true, runs a full build but does not write anything to the file system. */
 	dryRun?: boolean;
+	/** Path to a configuration file. Equivalent to the --config CLI flag. */
 	configPath?: string;
+	/** Prepends this value to all URLs. Equivalent to the --pathprefix CLI option used with the HTML <base> plugin. */
 	pathPrefix?: string;
+	/** When true, suppresses the build output logging. Equivalent to the --quiet CLI flag. */
 	quietMode?: boolean;
+	/** The input directory (or a single input file). Mirrors the --input CLI flag. */
 	inputDir?: string;
+	/** Force the module mode: "esm", "cjs", or "auto" (detected from your package.json type). */
 	loader?: "esm" | "cjs" | "auto";
-	config?: ConfigurationApi;
+	/** A configuration callback that receives the config API object. */
+	config?: (api: ? extends ConfigurationApi) => void;
 }
 
 declare class Core {
