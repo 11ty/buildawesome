@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { mkdirSync, openSync, writeSync } from "node:fs";
 import path from "node:path";
 import { TemplatePath } from "@11ty/eleventy-utils";
@@ -128,8 +127,7 @@ export class NdjsonReporter {
 
 		eleventyConfig.on("buildawesome.before", (eventsArg) => {
 			this.#startedAt = performance.now();
-			// Random, not a counter: a counter would repeat after a restart
-			this.#buildId = randomUUID();
+			this.#buildId = eventsArg.buildId;
 			this.#runMode = eventsArg.runMode;
 			this.#emit({
 				v: SCHEMA_VERSION,

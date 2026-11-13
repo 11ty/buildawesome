@@ -306,6 +306,7 @@ export default class Core extends CoreFs {
 				});
 
 			await this.eleventyServe.reload({
+				buildId: this.buildId,
 				files: queue,
 				subtype: onlyCssChanges ? "css" : undefined,
 				build: {
@@ -575,7 +576,7 @@ export default class Core extends CoreFs {
 			await this.write();
 
 			// Refresh pages opened while the initial build was running (no-op without a server)
-			await this.eleventyServe.reload();
+			await this.eleventyServe.reload({ buildId: this.buildId });
 		} catch (error) {
 			// Already logged by `write()`; keep the server and watcher running so a fix triggers a rebuild, like `#rewatch`.
 			this.eleventyServe.sendError({ error });

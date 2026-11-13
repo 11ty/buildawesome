@@ -87,7 +87,7 @@ describe("Command line", { concurrency: true }, () => {
           let start = events.find((e) => e.type === "build.start");
           let end = events.find((e) => e.type === "build.end");
           t.assert.strictEqual(start.v, 1);
-          t.assert.match(start.id, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+          t.assert.match(start.id, /^[\da-f]{8}(-[\da-f]{4}){3}-[\da-f]{12}$/);
           t.assert.strictEqual(end.id, start.id);
           t.assert.strictEqual(end.ok, true);
           t.assert.strictEqual(Number.isInteger(end.durationMs), true);

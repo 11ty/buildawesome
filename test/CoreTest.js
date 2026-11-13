@@ -815,6 +815,28 @@ test("Access to raw input of file (dryRun), issue #1206", async (t) => {
 	deleteDirectory("./test/stubs-1206/_site/");
 });
 
+test("buildawesome.before and buildawesome.after share a new buildId per build", async (t) => {
+  let ids = [];
+  let elev = new Eleventy("./test/noop/", "./test/noop/_site", {
+    config: function ($config) {
+      $config.on("buildawesome.before", arg => {
+        ids.push(arg.buildId);
+      });
+      $config.on("buildawesome.after", arg => {
+        t.assert.strictEqual(arg.buildId, ids.at(-1));
+      });
+    },
+  });
+
+  await elev.toJSON();
+  await elev.toJSON();
+
+  t.assert.strictEqual(ids.length, 2);
+  t.assert.match(ids[0], /^[\da-f]{8}(-[\da-f]{4}){3}-[\da-f]{12}$/);
+  t.assert.notStrictEqual(ids[0], ids[1]);
+  t.assert.strictEqual(elev.buildId, ids[1]);
+});
+
 test("{eleventy,buildawesome}.before and {eleventy,buildawesome}.after Event Arguments, directories", async (t) => {
   t.plan(12);
   let elev = new Eleventy("./test/noop/", "./test/noop/_site", {

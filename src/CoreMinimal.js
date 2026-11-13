@@ -191,6 +191,12 @@ export class CoreMinimal {
 		this.buildCount = 0;
 
 		/**
+		 * @type {String|undefined}
+		 * @description Unique id of the most recent build, shared with `--events-file` and the dev server.
+		 */
+		this.buildId = undefined;
+
+		/**
 		 * @member {String} - Force ESM or CJS mode instead of detecting from package.json. Either cjs, esm, or auto.
 		 * @default "auto"
 		 */
@@ -876,7 +882,10 @@ Verbose Output: ${this.verboseMode}`;
 
 		try {
 			let directories = this.directories.getUserspaceInstance();
+			// Global `crypto` for the browser bundle, where `randomUUID` is missing outside secure contexts
+			this.buildId = globalThis.crypto?.randomUUID?.();
 			eventsArg = {
+				buildId: this.buildId,
 				directories,
 
 				// v3.0.0-alpha.6, changed to use `directories` instead (this was only used by serverless plugin)
