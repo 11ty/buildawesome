@@ -87,6 +87,8 @@ describe("Command line", { concurrency: true }, () => {
           let start = events.find((e) => e.type === "build.start");
           let end = events.find((e) => e.type === "build.end");
           t.assert.strictEqual(start.v, 1);
+          t.assert.match(start.id, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+          t.assert.strictEqual(end.id, start.id);
           t.assert.strictEqual(end.ok, true);
           t.assert.strictEqual(Number.isInteger(end.durationMs), true);
           t.assert.strictEqual(end.pages.length, 1);
@@ -114,6 +116,8 @@ describe("Command line", { concurrency: true }, () => {
           t.assert.deepStrictEqual(events.map((e) => e.type), ["build.start", "passthrough", "build.end"]);
           let passthrough = events[1];
           t.assert.strictEqual(passthrough.v, 1);
+          t.assert.strictEqual(passthrough.id, events[0].id);
+          t.assert.strictEqual(events[2].id, events[0].id);
           t.assert.strictEqual(passthrough.emulated, false);
           t.assert.deepStrictEqual(passthrough.map, {
             "/robots.txt": "test/stubs/events-file-passthrough/robots.txt",
@@ -200,6 +204,7 @@ describe("Command line", { concurrency: true }, () => {
           let events = readEvents(eventsFile);
           let types = events.map((e) => e.type);
           t.assert.deepStrictEqual(types, ["build.start", "passthrough", "build.error"]);
+          t.assert.strictEqual(events.at(-1).id, events[0].id);
           resolve();
         }
       );
