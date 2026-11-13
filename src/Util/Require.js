@@ -6,7 +6,6 @@ import importer from "./importer.js";
 import { clearRequireCache, requireCommonJsTypeScript } from "../Util/RequireUtils.js";
 import { addModifiedPath } from "./EsmResolverPortAdapter.js";
 import BaseError from "../Errors/BaseError.js";
-import eventBus from "../EventBus.js";
 
 class ImportError extends BaseError {}
 
@@ -56,7 +55,9 @@ function loadContents(path, options = {}) {
 }
 
 let lastModifiedPaths = new Map();
-eventBus.on("buildawesome.importcachereset", (fileQueue) => {
+
+// Node’s module cache is process-wide, so this is too.
+function resetImportCache(fileQueue) {
 	for (let filePath of fileQueue) {
 		let absolutePath = TemplatePath.absolutePath(filePath);
 		let newDate = Date.now();
@@ -67,7 +68,7 @@ eventBus.on("buildawesome.importcachereset", (fileQueue) => {
 
 		clearRequireCache(absolutePath);
 	}
-});
+}
 
 // raw means we don’t normalize away the `default` export
 async function dynamicImportAbsolutePath(absolutePath, options = {}) {
@@ -213,4 +214,5 @@ export {
 	loadContents as LoadContent,
 	dynamicImport as DynamicImport,
 	dynamicImportRaw as DynamicImportRaw,
+	resetImportCache,
 };

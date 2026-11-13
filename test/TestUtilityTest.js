@@ -1,10 +1,10 @@
-import test from "ava";
+import test from "node:test";
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 
 test("normalizeNewLines", (t) => {
-  t.is(normalizeNewLines("\n"), "\n");
-  t.is(normalizeNewLines("\r\n"), "\n");
-  t.is(normalizeNewLines("\r\n\n"), "\n\n");
-  t.is(normalizeNewLines("\r\n\r\n"), "\n\n");
-  t.is(normalizeNewLines("a\r\nhello\r\nhi"), "a\nhello\nhi");
+  t.assert.strictEqual(normalizeNewLines("\n"), "\n");
+  t.assert.strictEqual(normalizeNewLines("\r\n"), "\n");
+  t.assert.strictEqual(normalizeNewLines("\r\n\n"), "\n\n");
+  t.assert.strictEqual(normalizeNewLines("\r\n\r\n"), "\n\n");
+  t.assert.strictEqual(normalizeNewLines("a\r\nhello\r\nhi"), "a\nhello\nhi");
 });

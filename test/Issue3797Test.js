@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#3797 Virtual templates with empty includes", async (t) => {
@@ -13,5 +13,5 @@ test("#3797 Virtual templates with empty includes", async (t) => {
 
   let [result] = await elev.toJSON();
 
-  t.truthy(result);
+  t.assert.ok(result);
 });

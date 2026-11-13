@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#3875 numeric tags", async (t) => {
@@ -12,7 +12,7 @@ test("#3875 numeric tags", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results[0].content, "1,2,3,all");
+  t.assert.strictEqual(results[0].content, "1,2,3,all");
 });
 
 test("#3875 numeric tags (via front matter)", async (t) => {
@@ -30,7 +30,7 @@ tags:
   });
 
   let results = await elev.toJSON();
-  t.is(results[0].content, "1,2,3,all");
+  t.assert.strictEqual(results[0].content, "1,2,3,all");
 });
 
 test("#3875 consume a numeric tag collection (njk)", async (t) => {
@@ -45,7 +45,7 @@ test("#3875 consume a numeric tag collection (njk)", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.filter(entry => entry.inputPath.endsWith("index.njk"))[0].content, "string,string:1:1");
+  t.assert.strictEqual(results.filter(entry => entry.inputPath.endsWith("index.njk"))[0].content, "string,string:1:1");
 });
 
 test("#3875 consume a numeric tag collection (liquid)", async (t) => {
@@ -60,7 +60,7 @@ test("#3875 consume a numeric tag collection (liquid)", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.filter(entry => entry.inputPath.endsWith("index.liquid"))[0].content, "string,string:1:1");
+  t.assert.strictEqual(results.filter(entry => entry.inputPath.endsWith("index.liquid"))[0].content, "string,string:1:1");
 });
 
 test("#3875 consume a numeric tag collection (11ty.js)", async (t) => {
@@ -78,5 +78,5 @@ test("#3875 consume a numeric tag collection (11ty.js)", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(results.filter(entry => entry.inputPath.endsWith("index.11ty.js"))[0].content, "string,string:1:1");
+  t.assert.strictEqual(results.filter(entry => entry.inputPath.endsWith("index.11ty.js"))[0].content, "string,string:1:1");
 });

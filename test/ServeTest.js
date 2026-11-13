@@ -1,5 +1,5 @@
-import test from "ava";
-import { mkdtempSync } from "node:fs";
+import test from "node:test";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -7,6 +7,7 @@ import Serve from "../src/Serve.js";
 import Core from "../src/Core.js";
 import TemplateConfig from "../src/TemplateConfig.js";
 import ConsoleLogger from "../src/Util/ConsoleLogger.js";
+import { deleteDirectory } from "./_testHelpers.js";
 
 async function getServerInstance(eleventyConfig) {
   let es = new Serve();
@@ -28,15 +29,14 @@ async function getServerInstance(eleventyConfig) {
 
 test("Constructor", async (t) => {
   let es = await getServerInstance();
-  t.is(es.options.pathPrefix, "/");
+  t.assert.strictEqual(es.options.pathPrefix, "/");
 });
 
 test("Get Options", async (t) => {
   let es = await getServerInstance();
   es.setOutputDir("_site");
 
-  t.deepEqual(es.options, {
-    onClientMessage: async() => {},
+  t.assert.deepStrictEqual(es.options, {
     pathPrefix: "/",
     port: 8080,
   });
@@ -49,8 +49,7 @@ test("Get Options (with a pathPrefix)", async (t) => {
   let es = await getServerInstance(eleventyConfig);
   es.setOutputDir("_site");
 
-  t.deepEqual(es.options, {
-    onClientMessage: async() => {},
+  t.assert.deepStrictEqual(es.options, {
     pathPrefix: "/web/",
     port: 8080,
   });
@@ -60,8 +59,7 @@ test("Get Options (override in config)", async (t) => {
   let es = await getServerInstance();
   es.setOutputDir("_site");
 
-  t.deepEqual(es.options, {
-    onClientMessage: async() => {},
+  t.assert.deepStrictEqual(es.options, {
     pathPrefix: "/",
     port: 8080,
   });
@@ -72,7 +70,7 @@ test("Sanity test that default output is set correctly", async (t) => {
   es.setOutputDir("_site");
   await es.initServerInstance();
 
-  t.is(es.server.dir, "_site");
+  t.assert.strictEqual(es.server.dir, "_site");
 });
 
 // This assert should work once updating the output dir of the server works.
@@ -81,9 +79,9 @@ test("Custom output dir is set correctly", async (t) => {
   es.setOutputDir("x");
   await es.initServerInstance();
 
-  t.is(es.outputDir, "x");
+  t.assert.strictEqual(es.outputDir, "x");
 
-  t.is(es.server.dir, "x");
+  t.assert.strictEqual(es.server.dir, "x");
 });
 
 test("Incremental passthrough builds merge into existing dev server entries", async (t) => {
@@ -109,11 +107,11 @@ test("Incremental passthrough builds merge into existing dev server entries", as
   };
 
   await core.write();
-  t.deepEqual(entries.map(({ url }) => url).sort(), ["/img.jpg", "/static"]);
+  t.assert.deepStrictEqual(entries.map(({ url }) => url).sort(), ["/img.jpg", "/static"]);
 
   core.setIncrementalFile("./test/stubs/template-passthrough/img.jpg");
   await core.write();
-  t.deepEqual(entries.map(({ url }) => url).sort(), ["/img.jpg", "/static"]);
+  t.assert.deepStrictEqual(entries.map(({ url }) => url).sort(), ["/img.jpg", "/static"]);
 });
 
 test("Emulated passthrough entries reach the dev server before templates finish rendering", async (t) => {
@@ -147,15 +145,57 @@ test("Emulated passthrough entries reach the dev server before templates finish 
   };
 
   await core.write();
-  t.deepEqual(entriesDuringRender?.map(({ url }) => url), ["/static"]);
+  t.assert.deepStrictEqual(entriesDuringRender?.map(({ url }) => url), ["/static"]);
+});
+
+test("Emulated passthrough copy files added or deleted after the build update the dev server (#3007)", async (t) => {
+  let inputDir = "test/_generated/3007";
+  deleteDirectory(inputDir);
+  mkdirSync(inputDir, { recursive: true });
+  t.after(() => deleteDirectory(inputDir));
+
+  let core = new Core(inputDir, mkdtempSync(path.join(tmpdir(), "serve-3007-")), {
+    runMode: "serve",
+    quietMode: true,
+    configPath: false,
+    config(eleventyConfig) {
+      eleventyConfig.setServerPassthroughCopyBehavior("passthrough");
+      eleventyConfig.addPassthroughCopy({ "test/_generated/3007/_tmp/styles.css": "assets/styles.css" });
+      eleventyConfig.addTemplate("index.html", "Hello");
+    },
+  });
+  core.disableLogger();
+  await core.init();
+  await core.write();
+
+  // Events are emitted manually below
+  core.eleventyServe.resetConfig();
+  await core.eleventyServe.initServerInstance();
+  let watcher = core.eleventyServe.options.chokidar;
+  t.after(() => watcher.close());
+
+  let entries;
+  core.eleventyServe._server.setPassthroughCopies = (e) => {
+    entries = e;
+  };
+
+  mkdirSync(`${inputDir}/_tmp`);
+  writeFileSync(`${inputDir}/_tmp/styles.css`, "body {}");
+  watcher.emit("add", `${inputDir}/_tmp/styles.css`);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  t.assert.deepStrictEqual(entries?.map(({ url, inputPath }) => [url, inputPath]), [["/assets/styles.css", "./test/_generated/3007/_tmp/styles.css"]]);
+
+  watcher.emit("unlink", `${inputDir}/_tmp/styles.css`);
+  t.assert.deepStrictEqual(entries, []);
 });
 
 test("sendBuildStart is a no-op without a server or when the server doesn’t implement it", async (t) => {
   let es = new Serve();
-  await t.notThrowsAsync(() => es.sendBuildStart());
+  await t.assert.doesNotReject(() => es.sendBuildStart());
 
   es._server = {};
-  await t.notThrowsAsync(() => es.sendBuildStart());
+  await t.assert.doesNotReject(() => es.sendBuildStart());
 
   let calls = 0;
   es._server = {
@@ -164,7 +204,7 @@ test("sendBuildStart is a no-op without a server or when the server doesn’t im
     },
   };
   await es.sendBuildStart();
-  t.is(calls, 1);
+  t.assert.strictEqual(calls, 1);
 });
 
 async function getWatchCore(configCallback) {
@@ -202,7 +242,7 @@ test("Initial watch build signals build start, then reloads", async (t) => {
   });
 
   await core.watch();
-  t.deepEqual(calls, ["sendBuildStart", "reload"]);
+  t.assert.deepStrictEqual(calls, ["sendBuildStart", "reload"]);
 });
 
 test("Failed initial watch build sends an error and still starts the watcher", async (t) => {
@@ -220,5 +260,5 @@ test("Failed initial watch build sends an error and still starts the watcher", a
   await core.watch();
   process.exitCode = exitCode;
 
-  t.deepEqual(calls, ["sendBuildStart", "sendError", "startWatch"]);
+  t.assert.deepStrictEqual(calls, ["sendBuildStart", "sendError", "startWatch"]);
 });

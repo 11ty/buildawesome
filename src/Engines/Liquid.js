@@ -1,4 +1,3 @@
-import moo from "moo";
 import { Tokenizer, TokenKind, LookupType, Parser, evalToken, Liquid as LiquidJs } from "liquidjs";
 import { TemplatePath } from "@11ty/eleventy-utils";
 
@@ -6,13 +5,9 @@ import TemplateEngine from "./TemplateEngine.js";
 import { augmentObject } from "./Util/ContextAugmenter.js";
 
 export default class Liquid extends TemplateEngine {
-	static argumentLexerOptions = {
-		number: /[0-9]+\.*[0-9]*/,
-		doubleQuoteString: /"(?:\\["\\]|[^\n"\\])*"/,
-		singleQuoteString: /'(?:\\['\\]|[^\n'\\])*'/,
-		keyword: /[a-zA-Z0-9.\-_]+/,
-		"ignore:whitespace": /[, \t]+/, // includes comma separator
-	};
+	// Legacy argument tokens (number, double/single quoted string, keyword), separated by commas or whitespace.
+	static argumentLexer =
+		/([0-9]+\.*[0-9]*|"(?:\\["\\]|[^\n"\\])*"|'(?:\\['\\]|[^\n'\\])*'|[a-zA-Z0-9.\-_]+)|[, \t]+/y;
 
 	constructor(name, eleventyConfig) {
 		super(name, eleventyConfig);
@@ -20,8 +15,6 @@ export default class Liquid extends TemplateEngine {
 		this.liquidOptions = this.config.liquidOptions || {};
 
 		this.setLibrary(this.config.libraryOverrides.liquid);
-
-		this.argLexer = moo.compile(Liquid.argumentLexerOptions);
 	}
 
 	get cacheable() {
@@ -49,6 +42,7 @@ export default class Liquid extends TemplateEngine {
 			strictFilters: true,
 			// cache: true,
 			jsTruthy: true, // Breaking in v4 #3507
+			timezoneOffset: this.config.dateTimeZone?.zone ?? 0, // Match `setDateTimeZone` (or UTC) when parsing dates, breaking in v4 #1905
 		};
 
 		let options = Object.assign(defaults, this.liquidOptions || {});
@@ -168,35 +162,21 @@ export default class Liquid extends TemplateEngine {
 		}
 	}
 
-	static parseArguments(lexer, str) {
+	static parseArguments(str) {
 		let argArray = [];
-
-		if (!lexer) {
-			lexer = moo.compile(Liquid.argumentLexerOptions);
+		if (typeof str !== "string") {
+			return argArray;
 		}
 
-		if (typeof str === "string") {
-			lexer.reset(str);
-
-			let arg = lexer.next();
-			while (arg) {
-				/*{
-					type: 'doubleQuoteString',
-					value: '"test 2"',
-					text: '"test 2"',
-					toString: [Function: tokenToString],
-					offset: 0,
-					lineBreaks: 0,
-					line: 1,
-					col: 1 }*/
-				if (arg.type.indexOf("ignore:") === -1) {
-					// Push the promise into an array instead of awaiting it here.
-					// This forces the promises to run in order with the correct scope value for each arg.
-					// Otherwise they run out of order and can lead to undefined values for arguments in layout template shortcodes.
-					// console.log( arg.value, scope, engine );
-					argArray.push(arg.value);
-				}
-				arg = lexer.next();
+		let lexer = new RegExp(Liquid.argumentLexer);
+		while (lexer.lastIndex < str.length) {
+			let index = lexer.lastIndex;
+			let match = lexer.exec(str);
+			if (!match) {
+				throw new Error(`Invalid Liquid shortcode argument syntax at col ${index + 1}: ${str}`);
+			}
+			if (match[1] !== undefined) {
+				argArray.push(match[1]);
 			}
 		}
 
@@ -266,7 +246,7 @@ export default class Liquid extends TemplateEngine {
 					let argArray = [];
 
 					if (this.legacyArgs) {
-						let rawArgs = Liquid.parseArguments(_t.argLexer, this.legacyArgs);
+						let rawArgs = Liquid.parseArguments(this.legacyArgs);
 						for (let arg of rawArgs) {
 							let b = yield liquidEngine.evalValue(arg, ctx);
 							argArray.push(b);
@@ -310,7 +290,7 @@ export default class Liquid extends TemplateEngine {
 				render: function* (ctx /*, emitter*/) {
 					let argArray = [];
 					if (this.legacyArgs) {
-						let rawArgs = Liquid.parseArguments(_t.argLexer, this.legacyArgs);
+						let rawArgs = Liquid.parseArguments(this.legacyArgs);
 						for (let arg of rawArgs) {
 							let b = yield liquidEngine.evalValue(arg, ctx);
 							argArray.push(b);

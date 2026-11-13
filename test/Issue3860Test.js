@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#3860 addCollection consumes `collections` but is missing `collections.all`", async (t) => {
@@ -23,8 +23,8 @@ test("#3860 addCollection consumes `collections` but is missing `collections.all
   let results = await elev.toJSON();
 
   let tagPages = results.filter((entry) => entry.inputPath.endsWith("tag.njk"));
-  t.is(tagPages.length, 3);
-  t.is(tagPages[0]?.content.trim(), `bar,foo,all`)
-  t.is(tagPages[1]?.content.trim(), `bar,foo,all`)
-  t.is(tagPages[2]?.content.trim(), `bar,foo,all`)
+  t.assert.strictEqual(tagPages.length, 3);
+  t.assert.strictEqual(tagPages[0]?.content.trim(), `bar,foo,all`)
+  t.assert.strictEqual(tagPages[1]?.content.trim(), `bar,foo,all`)
+  t.assert.strictEqual(tagPages[2]?.content.trim(), `bar,foo,all`)
 });

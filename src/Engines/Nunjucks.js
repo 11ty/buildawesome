@@ -56,6 +56,11 @@ export default class Nunjucks extends TemplateEngine {
 
 	#setEnv(override) {
 		if (override) {
+			if (!(override instanceof Environment)) {
+				debug(
+					"WARNING: the Nunjucks environment passed to `setLibrary` was not created by `@11ty/nunjucks`. Import from `@11ty/nunjucks` instead of `nunjucks` to avoid mixing library versions.",
+				);
+			}
 			this.njkEnv = override;
 		} else if (this._usingPrecompiled) {
 			// Precompiled templates to avoid eval!
@@ -130,8 +135,11 @@ export default class Nunjucks extends TemplateEngine {
 	setLibrary(override) {
 		this.#setEnv(override);
 
+		// `setLibrary` is public and re-callable, so drop the previous handler first
+		this.removeConfigEventListeners();
+
 		// Note that a new Nunjucks engine instance is created for subsequent builds
-		this.config.events.on("buildawesome#templatemodified", (templatePath) => {
+		this.addConfigEventListener("buildawesome#templatemodified", (templatePath) => {
 			// NunjucksEnvironment:
 			// loader.pathToNames: {'ABSOLUTE_PATH/src/_includes/components/possum-home.css': 'components/possum-home.css'}
 			// loader.cache: { 'components/possum-home.css': [Template] }

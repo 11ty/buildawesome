@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("Paired shortcodes in macros #2261 #1749", async (t) => {
@@ -8,8 +8,8 @@ test("Paired shortcodes in macros #2261 #1749", async (t) => {
 	});
 
 	let results = await elev.toJSON();
-	t.is(results.length, 1);
-	t.is(results[0].content.trim(), `<div>HelloHello Manuel</div>`);
+	t.assert.strictEqual(results.length, 1);
+	t.assert.strictEqual(results[0].content.trim(), `<div>HelloHello Manuel</div>`);
 });
 
 test("Async -> Sync crossover shortcodes in Nunjucks #4305 #2261", async (t) => {
@@ -31,8 +31,8 @@ test("Async -> Sync crossover shortcodes in Nunjucks #4305 #2261", async (t) => 
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `BEFOREABCTESTAFTERxyz`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `BEFOREABCTESTAFTERxyz`);
 });
 
 test("Sync -> Async crossover shortcodes in Nunjucks #4305 #2261", async (t) => {
@@ -55,8 +55,8 @@ test("Sync -> Async crossover shortcodes in Nunjucks #4305 #2261", async (t) => 
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `abcbeforeTESTxyzafter`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `abcbeforeTESTxyzafter`);
 });
 
 test("Sync -> psuedo-Async (returns promise) crossover shortcodes in Nunjucks #4305 #2261", async (t) => {
@@ -86,6 +86,6 @@ test("Sync -> psuedo-Async (returns promise) crossover shortcodes in Nunjucks #4
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `abcbeforeTESTxyzafter`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `abcbeforeTESTxyzafter`);
 });

@@ -12,8 +12,28 @@ import TemplateConfig from "../TemplateConfig.js";
 import ExtensionMap from "../ExtensionMap.js";
 import TemplateEngineManager from "../Engines/TemplateEngineManager.js";
 import Liquid from "../Adapters/Engines/Liquid.js";
+import memoize from "../Util/MemoizeFunction.js";
 
 class NunjucksError extends BaseError {}
+
+const fallbackExtensionMaps = new WeakMap();
+
+// One map per config: a new engine manager per call would leave its engines (and their listeners) behind
+function getFallbackExtensionMap(templateConfig) {
+	let extensionMap = fallbackExtensionMaps.get(templateConfig);
+	if (!extensionMap) {
+		extensionMap = new ExtensionMap(templateConfig);
+		extensionMap.engineManager = new TemplateEngineManager(templateConfig);
+		fallbackExtensionMaps.set(templateConfig, extensionMap);
+
+		// Same invalidation as the memoized compile cache below
+		let reset = () => extensionMap.reset();
+		templateConfig.eventBus.on("buildawesome.resourcemodified", reset);
+		templateConfig.eventBus.on("buildawesome.compilecachereset", reset);
+	}
+
+	return extensionMap;
+}
 
 /** @this {object} */
 async function compile(content, templateLang, options = {}) {
@@ -28,15 +48,14 @@ async function compile(content, templateLang, options = {}) {
 
 	// Breaking change in 2.0+, previous default was `html` and now we default to the page template syntax
 	if (!templateLang) {
-		templateLang = this.page.templateSyntax;
+		templateLang = this?.page?.templateSyntax;
 	}
 
 	if (!extensionMap) {
 		if (strictMode) {
 			throw new Error("Internal error: missing `extensionMap` in RenderPlugin->compile.");
 		}
-		extensionMap = new ExtensionMap(templateConfig);
-		extensionMap.engineManager = new TemplateEngineManager(templateConfig);
+		extensionMap = getFallbackExtensionMap(templateConfig);
 	}
 	let tr = new TemplateRender(templateLang, templateConfig);
 	tr.extensionMap = extensionMap;
@@ -99,8 +118,7 @@ async function compileFile(inputPath, options = {}, templateLang) {
 			throw new Error("Internal error: missing `extensionMap` in RenderPlugin->compileFile.");
 		}
 
-		extensionMap = new ExtensionMap(templateConfig);
-		extensionMap.engineManager = new TemplateEngineManager(templateConfig);
+		extensionMap = getFallbackExtensionMap(templateConfig);
 	}
 	let tr = new TemplateRender(inputPath, templateConfig);
 	tr.extensionMap = extensionMap;
@@ -120,6 +138,21 @@ async function compileFile(inputPath, options = {}, templateLang) {
 	return tr.getCompiledTemplate(content);
 }
 
+const memoizedCompiles = new WeakMap();
+
+function memoizeCompile(templateConfig, key, compileFn) {
+	let memoized = memoizedCompiles.get(templateConfig);
+	if (!memoized) {
+		memoized = memoize((key, compileFn) => compileFn(), { getCacheKey: (key) => key });
+		// Clearing everything also covers changes to a rendered template’s includes.
+		templateConfig.eventBus.on("buildawesome.resourcemodified", memoized.clear);
+		templateConfig.eventBus.on("buildawesome.compilecachereset", memoized.clear);
+		memoizedCompiles.set(templateConfig, memoized);
+	}
+
+	return memoized(key, compileFn);
+}
+
 /** @this {object} */
 async function renderShortcodeFn(fn, data) {
 	if (fn === undefined) {
@@ -135,16 +168,19 @@ async function renderShortcodeFn(fn, data) {
 		};
 	}
 
-	if ("data" in this && isPlainObject(this.data)) {
+	if (this && "data" in this && isPlainObject(this.data)) {
 		// when options.accessGlobalData is true, this allows the global data
 		// to be accessed inside of the shortcode as a fallback
 
 		data = ProxyWrap(data, this.data);
 	} else {
-		// save `page` and `eleventy` for reuse
-		data.page = this.page;
-		data.eleventy = this.eleventy;
-		data.buildawesome = this.buildawesome;
+		// Context values are fallbacks; a copy avoids leaking one page’s context into a reused data object.
+		data = {
+			page: this?.page,
+			eleventy: this?.eleventy,
+			buildawesome: this?.buildawesome,
+			...data,
+		};
 	}
 
 	return fn(data);
@@ -179,6 +215,7 @@ function RenderPlugin($config, options = {}) {
 	 * @property {string} [tagNameFile] - The shortcode name to render a template file.
 	 * @property {module:11ty/eleventy/TemplateConfig} [templateConfig] - Configuration object
 	 * @property {boolean} [accessGlobalData] - Whether or not the template has access to the page’s data.
+	 * @property {string} [memoize] - Comma-separated list (`file`, `string`) to reuse compiled `renderFile` and `renderTemplate`/`renderContent` templates across pages.
 	 */
 
 	// For incremental builds, the page uses what it renders
@@ -194,6 +231,7 @@ function RenderPlugin($config, options = {}) {
 	options.filterName ??= "renderContent";
 	options.templateConfig ??= null;
 	options.accessGlobalData ??= false;
+	let memoize = new Set((options.memoize || "").split(",").map((entry) => entry.trim()));
 
 	function liquidTemplateTag(liquidEngine, tagName, extras) {
 		const { evalToken } = extras;
@@ -238,7 +276,7 @@ function RenderPlugin($config, options = {}) {
 
 				let argArray = [];
 				if (this.legacyArgs) {
-					let rawArgs = Liquid.parseArguments(null, this.legacyArgs);
+					let rawArgs = Liquid.parseArguments(this.legacyArgs);
 					for (let arg of rawArgs) {
 						let b = yield liquidEngine.evalValue(arg, ctx);
 						argArray.push(b);
@@ -374,15 +412,27 @@ function RenderPlugin($config, options = {}) {
 		}
 
 		// Engines record a string template’s dependencies under the engine name (e.g. `njk` or `webc`)
-		let lang = templateLang || this.page?.templateSyntax;
+		let lang = templateLang || this?.page?.templateSyntax;
 		if (typeof lang === "string") {
-			addDependency(this.page, lang, ...lang.split(","));
+			addDependency(this?.page, lang, ...lang.split(","));
 		}
 
-		let fn = await compile.call(this, content, templateLang, {
+		let compileOptions = {
 			templateConfig: options.templateConfig || templateConfig,
 			extensionMap,
-		});
+		};
+		let compileFn = () => compile.call(this, content, templateLang, compileOptions);
+
+		let fn;
+		if (memoize.has("string") && compileOptions.templateConfig) {
+			fn = await memoizeCompile(
+				compileOptions.templateConfig,
+				`string:${lang || ""}:${content}`,
+				compileFn,
+			);
+		} else {
+			fn = await compileFn();
+		}
 
 		return renderShortcodeFn.call(this, fn, data);
 	}
@@ -394,9 +444,19 @@ function RenderPlugin($config, options = {}) {
 			extensionMap,
 		};
 
-		addDependency(this.page, inputPath);
+		addDependency(this?.page, inputPath);
 
-		let fn = await compileFile.call(this, inputPath, renderFileOptions, templateLang);
+		let fn;
+		let compileFn = () => compileFile(inputPath, renderFileOptions, templateLang);
+		if (memoize.has("file") && renderFileOptions.templateConfig) {
+			fn = await memoizeCompile(
+				renderFileOptions.templateConfig,
+				`file:${templateLang || ""}:${inputPath}`,
+				compileFn,
+			);
+		} else {
+			fn = await compileFn();
+		}
 
 		return renderShortcodeFn.call(this, fn, data);
 	}

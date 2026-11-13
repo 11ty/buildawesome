@@ -448,7 +448,7 @@ export class CoreMinimal {
 			await this.initializeConfig();
 		} else {
 			// Note: Global event bus is different from user config event bus
-			this.config.events.reset();
+			this.eleventyConfig.resetUserConfigEvents();
 		}
 
 		await this.config.events.emit("buildawesome.config", this.eleventyConfig);

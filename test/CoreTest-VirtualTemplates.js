@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import fs from "fs";
 import { feedPlugin } from "@11ty/eleventy-plugin-rss";
 
@@ -16,9 +16,9 @@ test("Virtual templates, issue #1612", async (t) => {
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `<h1>Hello</h1>`);
-	t.deepEqual(results[0].rawInput, `# Hello`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<h1>Hello</h1>`);
+	t.assert.deepStrictEqual(results[0].rawInput, `# Hello`);
 });
 
 test("Virtual templates with front matter, issue #1612", async (t) => {
@@ -33,9 +33,9 @@ myKey: myValue
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `<h1>myValue</h1>`);
-	t.deepEqual(results[0].rawInput, `# {{ myKey }}`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<h1>myValue</h1>`);
+	t.assert.deepStrictEqual(results[0].rawInput, `# {{ myKey }}`);
 });
 
 test("Virtual templates with supplemental data, issue #1612", async (t) => {
@@ -47,9 +47,9 @@ test("Virtual templates with supplemental data, issue #1612", async (t) => {
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `<h1>myValue</h1>`);
-	t.deepEqual(results[0].rawInput, `# {{ myKey }}`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<h1>myValue</h1>`);
+	t.assert.deepStrictEqual(results[0].rawInput, `# {{ myKey }}`);
 });
 
 // Supplemental data overrides front matter.
@@ -66,9 +66,9 @@ myKey3: myValueFm
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `<h1>myValue1myValue2myValueData</h1>`);
-	t.deepEqual(results[0].rawInput, `# {{ myKey1 }}{{ myKey2 }}{{ myKey3 }}`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<h1>myValue1myValue2myValueData</h1>`);
+	t.assert.deepStrictEqual(results[0].rawInput, `# {{ myKey1 }}{{ myKey2 }}{{ myKey3 }}`);
 });
 
 test("Virtual template conflicts with file on file system, issue #1612", async (t) => {
@@ -79,7 +79,7 @@ test("Virtual template conflicts with file on file system, issue #1612", async (
 	});
 	elev.disableLogger();
 
-	await t.throwsAsync(elev.toJSON(), {
+	await t.assert.rejects(elev.toJSON(), {
 		message: `A virtual template had the same path as a file on the file system: "./test/stubs/stubs-virtual-conflict/virtual.md"`
 	});
 });
@@ -97,14 +97,44 @@ test("Virtual templates try to output to the same file, issue #1612", async (t) 
 	});
 	elev.disableLogger();
 
-	await t.throwsAsync(elev.toJSON(), {
-		instanceOf: DuplicatePermalinkOutputError,
+	let e;
+	await t.assert.rejects(elev.toJSON(), (err) => {
+		e = err;
+		return true;
 	});
+	t.assert.ok(e instanceof DuplicatePermalinkOutputError);
+	t.assert.strictEqual(e.message.startsWith("Output conflict: multiple input files are writing to"), true);
+});
+
+test("Paginated template with a static permalink writes to the same file, issue #1946", async (t) => {
+	let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
+		config: function ($config) {
+			$config.addTemplate("paged.md", "", {
+				pagination: {
+					data: "items",
+					size: 1,
+				},
+				items: ["a", "b"],
+				permalink: "/output.html",
+			})
+		},
+	});
+	elev.disableLogger();
+
+	let e;
+	await t.assert.rejects(elev.toJSON(), (err) => {
+		e = err;
+		return true;
+	});
+	t.assert.ok(e instanceof DuplicatePermalinkOutputError);
+	t.assert.strictEqual(e.message.includes("multiple pages from pagination template"), true);
+	t.assert.strictEqual(e.message.includes("(pagination.pageNumber: 0)"), true);
+	t.assert.strictEqual(e.message.includes("(pagination.pageNumber: 1)"), true);
 });
 
 // Warning: this test writes to the file system
 test("Virtual template writes to file system, issue #1612", async (t) => {
-	let elev = new Eleventy("./test/stubs-virtual", "./test/stubs-virtual/_site", {
+	let elev = new Eleventy("./test/stubs-virtual", "./test/_generated/virtual-write/_site", {
 		config: function ($config) {
 			$config.addTemplate("virtual.md", `# Hello`)
 		},
@@ -113,12 +143,12 @@ test("Virtual template writes to file system, issue #1612", async (t) => {
 
 	let [,results] = await elev.write();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `<h1>Hello</h1>`);
-	t.deepEqual(results[0].rawInput, `# Hello`);
-	t.true(fs.existsSync("./test/stubs-virtual/_site/virtual/index.html"));
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<h1>Hello</h1>`);
+	t.assert.deepStrictEqual(results[0].rawInput, `# Hello`);
+	t.assert.strictEqual(fs.existsSync("./test/_generated/virtual-write/_site/virtual/index.html"), true);
 
-	deleteDirectory("./test/stubs-virtual/_site/");
+	deleteDirectory("./test/_generated/virtual-write/");
 });
 
 test("Virtual templates conflict", async (t) => {
@@ -129,11 +159,15 @@ test("Virtual templates conflict", async (t) => {
 		},
 	});
 
-	let e = await t.throwsAsync(async () => {
+	let e;
+	await t.assert.rejects(async () => {
 		await elev.toJSON();
+	}, (err) => {
+		e = err;
+		return true;
 	});
 
-	t.is(e.message, "Virtual template conflict: you can’t add multiple virtual templates that have the same inputPath: virtual.md");
+	t.assert.strictEqual(e.message, "Virtual template conflict: you can’t add multiple virtual templates that have the same inputPath: virtual.md");
 });
 
 // https://github.com/11ty/eleventy-plugin-rss/issues/50
@@ -155,9 +189,9 @@ test("RSS virtual templates plugin", async (t) => {
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 2);
+	t.assert.deepStrictEqual(results.length, 2);
 	let [ feed ] = results.filter(entry => entry.outputPath.endsWith(".xml"));
-	t.truthy(feed.content.startsWith(`<?xml version="1.0" encoding="utf-8"?>`));
+	t.assert.ok(feed.content.startsWith(`<?xml version="1.0" encoding="utf-8"?>`));
 });
 
 test("Virtual templates as layouts, issue #2307", async (t) => {
@@ -174,9 +208,28 @@ test("Virtual templates as layouts, issue #2307", async (t) => {
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `<!-- Layout --><h1>Hello</h1>`);
-	t.deepEqual(results[0].rawInput, `# Hello`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<!-- Layout --><h1>Hello</h1>`);
+	t.assert.deepStrictEqual(results[0].rawInput, `# Hello`);
+});
+
+test("Virtual templates as layouts outside of the input directory, issue #4409", async (t) => {
+	let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
+		config: function ($config) {
+			$config.setLayoutsDirectory("../stubs-virtual-layouts-outside");
+
+			$config.addTemplate("virtual.md", `# Hello`, {
+				layout: "outside.html"
+			});
+
+			$config.addTemplate("../stubs-virtual-layouts-outside/outside.html", `<!-- Layout -->{{ content }}`);
+		},
+	});
+
+	let results = await elev.toJSON();
+
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<!-- Layout --><h1>Hello</h1>`);
 });
 
 test("11ty.js Virtual Templates (object), issue #3347", async (t) => {
@@ -197,11 +250,11 @@ test("11ty.js Virtual Templates (object), issue #3347", async (t) => {
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `this is a test 2.`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `this is a test 2.`);
 	// TODO support rawInput on 11ty.js? Issue #3348
-	// t.deepEqual(results[0].rawInput.data, templateDefinition.data);
-	// t.deepEqual(results[0].rawInput.render, templateDefinition.render);
+	// t.assert.deepStrictEqual(results[0].rawInput.data, templateDefinition.data);
+	// t.assert.deepStrictEqual(results[0].rawInput.render, templateDefinition.render);
 });
 
 test("11ty.js Virtual Templates (function), issue #3347", async (t) => {
@@ -217,10 +270,10 @@ test("11ty.js Virtual Templates (function), issue #3347", async (t) => {
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `this is a test /virtual/.`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `this is a test /virtual/.`);
   // TODO support rawInput on 11ty.js?
-	// t.deepEqual(results[0].rawInput, templateDefinition);
+	// t.assert.deepStrictEqual(results[0].rawInput, templateDefinition);
 });
 
 
@@ -232,7 +285,7 @@ test("11ty.js class templates with invalid signature, issue #1645", async (t) =>
 	});
   elev.disableLogger();
 
-  await t.throwsAsync(elev.toJSON(), {
+  await t.assert.rejects(elev.toJSON(), {
 		message: `Invalid class signature for an 11ty.js template: needs a render or data instance property.`
 	});
 });
@@ -246,8 +299,8 @@ test("11ty.js class templates with instance properties (data), issue #1645", asy
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), ``);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), ``);
 });
 
 test("11ty.js class templates with instance properties (render), issue #1645", async (t) => {
@@ -259,8 +312,8 @@ test("11ty.js class templates with instance properties (render), issue #1645", a
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `Hello!`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `Hello!`);
 });
 
 test("11ty.js class templates with instance properties (data and render), issue #1645", async (t) => {
@@ -275,8 +328,8 @@ test("11ty.js class templates with instance properties (data and render), issue 
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `Hello world!`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `Hello world!`);
 });
 
 test("11ty.js class templates with instance properties (data and render arrows), issue #1645", async (t) => {
@@ -291,8 +344,8 @@ test("11ty.js class templates with instance properties (data and render arrows),
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `Hello world!`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `Hello world!`);
 });
 
 test("11ty.js class templates with instance properties (data and render arrows, new), issue #1645", async (t) => {
@@ -307,8 +360,8 @@ test("11ty.js class templates with instance properties (data and render arrows, 
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `Hello world!`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `Hello world!`);
 });
 
 test("server.js Virtual Templates (object)", async (t) => {
@@ -329,6 +382,6 @@ test("server.js Virtual Templates (object)", async (t) => {
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `this is a test 2.`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `this is a test 2.`);
 });

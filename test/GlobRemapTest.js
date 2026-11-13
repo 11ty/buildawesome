@@ -1,22 +1,22 @@
-import test from "ava";
+import test from "node:test";
 import path from "node:path";
 import GlobRemap from "../src/Util/GlobRemap.js";
 import { normalizeSeparatorString } from "./Util/normalizeSeparators.js";
 
 test("getParentDirPrefix", (t) => {
-  t.is(GlobRemap.getParentDirPrefix(""), "");
-  t.is(GlobRemap.getParentDirPrefix("./test/"), "");
-  t.is(GlobRemap.getParentDirPrefix("../test/"), "../");
-  t.is(GlobRemap.getParentDirPrefix("../test/../"), "../");
-  t.is(GlobRemap.getParentDirPrefix("../../test/"), "../../");
+  t.assert.strictEqual(GlobRemap.getParentDirPrefix(""), "");
+  t.assert.strictEqual(GlobRemap.getParentDirPrefix("./test/"), "");
+  t.assert.strictEqual(GlobRemap.getParentDirPrefix("../test/"), "../");
+  t.assert.strictEqual(GlobRemap.getParentDirPrefix("../test/../"), "../");
+  t.assert.strictEqual(GlobRemap.getParentDirPrefix("../../test/"), "../../");
 });
 
 test("getCwd", (t) => {
-  t.is(GlobRemap.getCwd([]), "");
-  t.is(GlobRemap.getCwd(["test.njk"]), "");
-  t.is(GlobRemap.getCwd(["./test.njk"]), "");
-  t.is(GlobRemap.getCwd(["../test.njk"]), "../");
-  t.is(GlobRemap.getCwd(["../test.njk", "../../2.njk"]), "../../");
+  t.assert.strictEqual(GlobRemap.getCwd([]), "");
+  t.assert.strictEqual(GlobRemap.getCwd(["test.njk"]), "");
+  t.assert.strictEqual(GlobRemap.getCwd(["./test.njk"]), "");
+  t.assert.strictEqual(GlobRemap.getCwd(["../test.njk"]), "../");
+  t.assert.strictEqual(GlobRemap.getCwd(["../test.njk", "../../2.njk"]), "../../");
 });
 
 test("Constructor (control)", t => {
@@ -31,7 +31,7 @@ test("Constructor (control)", t => {
     'eleventy.config.js',
   ])
 
-  t.deepEqual(m.getInput(), [
+  t.assert.deepStrictEqual(m.getInput(), [
     '**/*.{liquid,md,njk,html,11ty.js,11ty.cjs,11ty.mjs}',
     '**/*.txt', // passthrough copy
     '**/*.png',
@@ -55,7 +55,7 @@ test("Constructor (control with ./)", t => {
     './eleventy.config.js',
   ])
 
-  t.deepEqual(m.getInput(), [
+  t.assert.deepStrictEqual(m.getInput(), [
     './**/*.{liquid,md,njk,html,11ty.js,11ty.cjs,11ty.mjs}',
     './**/*.txt', // passthrough copy
     './**/*.png',
@@ -82,7 +82,7 @@ test("Constructor (up one dir)", t => {
 
   let parentDir = normalizeSeparatorString(path.resolve("./").split(path.sep).slice(-1).join(path.sep));
 
-  t.deepEqual(m.getInput(), [
+  t.assert.deepStrictEqual(m.getInput(), [
     '**/*.{liquid,md,njk,html,11ty.js,11ty.cjs,11ty.mjs}',
     '**/*.txt', // passthrough copy
     '**/*.png',
@@ -111,7 +111,7 @@ test("Constructor (up two dirs)", t => {
   let childDir = normalizeSeparatorString(path.resolve("./").split(path.sep).slice(-2).join(path.sep));
   let parentDir = normalizeSeparatorString(path.resolve("./").split(path.sep).slice(-2, -1).join(path.sep));
 
-  t.deepEqual(m.getInput(), [
+  t.assert.deepStrictEqual(m.getInput(), [
     '**/*.{liquid,md,njk,html,11ty.js,11ty.cjs,11ty.mjs}',
     `${parentDir}/**/*.txt`, // passthrough copy
     `${parentDir}/**/*.png`,

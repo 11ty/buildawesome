@@ -21,6 +21,7 @@ class ReservedData {
 		"inputPath",
 		"fileSlug",
 		"filePathStem",
+		"relativeInputPath",
 		"outputFileExtension",
 		"templateSyntax",
 		"url",
@@ -94,8 +95,8 @@ class ReservedData {
 	static isFrozenError(e) {
 		return (
 			e instanceof TypeError &&
-			e.message.startsWith("Cannot add property") &&
-			e.message.endsWith("not extensible")
+			((e.message.startsWith("Cannot add property") && e.message.endsWith("not extensible")) ||
+				e.message.startsWith("Cannot assign to read only property"))
 		);
 	}
 

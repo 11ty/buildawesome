@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 
 import TemplateData from "../src/Data/TemplateData.js";
 
@@ -25,7 +25,7 @@ test("Layout front matter does not override template data files", async (t) => {
   );
 
   let data = await tmpl.getData();
-  t.is(data.shared, "datafile");
+  t.assert.strictEqual(data.shared, "datafile");
 });
 
 test("Layout front matter should not override global data (sanity check, Issue 915)", async (t) => {
@@ -47,7 +47,7 @@ test("Layout front matter should not override global data (sanity check, Issue 9
   );
 
   let data = await tmpl.getData();
-  t.is(data.cascade, "from-layout-file");
+  t.assert.strictEqual(data.cascade, "from-layout-file");
 });
 
 test("Template data files should be more specific in data cascade than Layout front matter (breaking change in 1.0, issue 915)", async (t) => {
@@ -69,7 +69,7 @@ test("Template data files should be more specific in data cascade than Layout fr
   );
 
   let data = await tmpl.getData();
-  t.is(data.cascade, "template-data-file");
+  t.assert.strictEqual(data.cascade, "template-data-file");
 });
 
 test("Directory data files should be more specific in data cascade than Layout front matter (breaking change in 1.0, issue 915)", async (t) => {
@@ -91,5 +91,5 @@ test("Directory data files should be more specific in data cascade than Layout f
   );
 
   let data = await tmpl.getData();
-  t.is(data.cascade, "dir-data-file");
+  t.assert.strictEqual(data.cascade, "dir-data-file");
 });

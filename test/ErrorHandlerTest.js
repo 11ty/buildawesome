@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import { ErrorHandler } from "../src/Errors/ErrorHandler.js";
 
 test("Log a warning, warning", (t) => {
@@ -21,7 +21,7 @@ test("Log a warning, warning", (t) => {
   errorHandler.warn(new Error("Test warning"), "Hello");
 
   let expected = "Hello:";
-  t.is(output.join("\n").slice(0, expected.length), expected);
+  t.assert.strictEqual(output.join("\n").slice(0, expected.length), expected);
 });
 
 test("Log a warning, error", (t) => {
@@ -49,5 +49,24 @@ test("Log a warning, error", (t) => {
 Test error
 
 Original error stack trace: Error: Test error`;
-  t.is(output.join("\n").slice(0, expected.length), expected);
+  t.assert.strictEqual(output.join("\n").slice(0, expected.length), expected);
+});
+
+test("Log an error wrapped via top-level `cause`", (t) => {
+  let errorHandler = new ErrorHandler();
+  let output = [];
+  errorHandler.logger = {
+    log: (str) => output.push(str),
+    warn: (str) => output.push(str),
+    error: (str) => output.push(str),
+    message: (str) => output.push(str),
+  };
+
+  let original = new TypeError("Original message");
+  errorHandler.error(new Error("Wrapper message", { cause: original }), "Hello");
+
+  let str = output.join("\n");
+  t.assert.strictEqual(str.includes("1. Wrapper message"), true);
+  t.assert.strictEqual(str.includes("2. Original message (via TypeError)"), true);
+  t.assert.strictEqual(str.includes("Original error stack trace: TypeError: Original message"), true);
 });

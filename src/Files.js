@@ -273,17 +273,23 @@ export class Files {
 			files.add(this.eleventyIgnoreContent);
 		}
 
+		let outputDirIgnore = this.#getOutputDirIgnore();
+		if (outputDirIgnore) {
+			files.add(outputDirIgnore);
+		}
+
+		return Array.from(files);
+	}
+
+	#getOutputDirIgnore() {
 		// Make sure output dir isn’t in the input dir (or it will ignore all input!)
 		// input: . and output: . (skip ignore)
 		// input: ./content and output . (skip ignore)
 		// input: . and output: ./_site (add ignore)
-		let outputContainsInputDir = DirContains(this.outputDir, this.inputDir);
-		if (!outputContainsInputDir) {
+		if (!DirContains(this.outputDir, this.inputDir)) {
 			// both are already normalized in 3.0
-			files.add(TemplateGlob.map(this.outputDir + "/**"));
+			return TemplateGlob.map(this.outputDir + "/**");
 		}
-
-		return Array.from(files);
 	}
 
 	getIgnoreFiles() {
@@ -391,17 +397,22 @@ export class Files {
 
 	/* For `eleventy --watch` */
 	getGlobWatcherFiles() {
-		let directoryGlobs = this.getIncludesAndDataDirs();
-
 		let globs = this.#getWatcherGlobs();
+		let extensionPassthroughGlobs = this.extensionMap.getPassthroughCopyGlobs(this.inputDir);
 
-		// Emulated passthrough copy files are watched by the dev server, others are copied on rebuild
+		// Emulated passthrough copy (by file extension) is watched by the dev server
 		if (checkPassthroughCopyBehavior(this.config, this.runMode)) {
-			return globs.concat(this.#getPassthroughGlobs(false)).concat(directoryGlobs);
+			extensionPassthroughGlobs = [];
 		}
 
-		// Revert to old passthroughcopy copy files behavior
-		return globs.concat(this.passthroughGlobs).concat(directoryGlobs);
+		return globs.concat(extensionPassthroughGlobs).concat(this.getIncludesAndDataDirs());
+	}
+
+	/* For `eleventy --watch`, a separate watcher because `addPassthroughCopy` bypasses project ignores (#3543) */
+	getGlobWatcherFilesForCopiedPassthroughCopy() {
+		// Emulated passthrough copy files are watched by the dev server, others are copied on rebuild
+		let isEmulated = checkPassthroughCopyBehavior(this.config, this.runMode);
+		return this.passthroughManager.getConfigPathGlobs(isEmulated ? false : undefined);
 	}
 
 	/* For `eleventy --watch` */
@@ -436,18 +447,31 @@ export class Files {
 		return results;
 	}
 
-	/* Ignored by `eleventy --watch` */
+	/* Always ignored by `eleventy --watch` */
 	getGlobWatcherIgnores() {
-		// convert to format without ! since they are passed in as a separate argument to glob watcher
-		let entries = new Set(
-			this.fileIgnores.map((ignore) => TemplatePath.stripLeadingDotSlash(ignore)),
-		);
+		let entries = new Set();
+		let outputDirIgnore = this.#getOutputDirIgnore();
+		if (outputDirIgnore) {
+			entries.add(TemplatePath.stripLeadingDotSlash(outputDirIgnore));
+		}
 
 		for (let ignore of this.config.watchIgnores) {
 			entries.add(this.normalizeIgnoreEntry(ignore));
 		}
 
-		// de-duplicated
+		return Array.from(entries);
+	}
+
+	/* Ignored by `eleventy --watch` for everything except `addPassthroughCopy` sources */
+	getGlobWatcherProjectIgnores() {
+		let entries = new Set(
+			this.fileIgnores.map((ignore) => TemplatePath.stripLeadingDotSlash(ignore)),
+		);
+
+		for (let ignore of this.config.ignores) {
+			entries.add(this.normalizeIgnoreEntry(ignore));
+		}
+
 		return Array.from(entries);
 	}
 

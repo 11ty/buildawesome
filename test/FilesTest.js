@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import { glob } from "tinyglobby";
 
 import TemplateConfig from "../src/TemplateConfig.js";
@@ -20,10 +20,10 @@ test("Dirs paths", async (t) => {
 
   let { eleventyFiles: evf } = getEleventyFilesInstance([], $config);
 
-  t.deepEqual(evf.inputDir, "./src/");
-  t.deepEqual(evf.includesDir, "./src/includes/");
-  t.deepEqual(evf.getDataDir(), "./src/data/");
-  t.deepEqual(evf.outputDir, "./dist/");
+  t.assert.deepStrictEqual(evf.inputDir, "./src/");
+  t.assert.deepStrictEqual(evf.includesDir, "./src/includes/");
+  t.assert.deepStrictEqual(evf.getDataDir(), "./src/data/");
+  t.assert.deepStrictEqual(evf.outputDir, "./dist/");
 });
 
 test("Dirs paths (relative)", async (t) => {
@@ -38,10 +38,10 @@ test("Dirs paths (relative)", async (t) => {
 
   let { eleventyFiles: evf } = getEleventyFilesInstance([], $config);
 
-  t.deepEqual(evf.inputDir, "./src/");
-  t.deepEqual(evf.includesDir, "./includes/");
-  t.deepEqual(evf.getDataDir(), "./data/");
-  t.deepEqual(evf.outputDir, "./dist/");
+  t.assert.deepStrictEqual(evf.inputDir, "./src/");
+  t.assert.deepStrictEqual(evf.includesDir, "./includes/");
+  t.assert.deepStrictEqual(evf.getDataDir(), "./data/");
+  t.assert.deepStrictEqual(evf.outputDir, "./dist/");
 });
 
 test("getFiles", async (t) => {
@@ -53,7 +53,7 @@ test("getFiles", async (t) => {
 
   let { eleventyFiles: evf } = getEleventyFilesInstance(["liquid", "md"], $config);
 
-  t.deepEqual(await evf.getFiles(), ["./test/stubs/writeTest/test.md"]);
+  t.assert.deepStrictEqual(await evf.getFiles(), ["./test/stubs/writeTest/test.md"]);
 });
 
 test("getFiles (without 11ty.js)", async (t) => {
@@ -65,7 +65,7 @@ test("getFiles (without 11ty.js)", async (t) => {
 
   let { eleventyFiles: evf } = getEleventyFilesInstance(["liquid", "md"], $config);
 
-  t.deepEqual(await evf.getFiles(), []);
+  t.assert.deepStrictEqual(await evf.getFiles(), []);
 });
 
 test("getFiles (with 11ty.js)", async (t) => {
@@ -77,7 +77,7 @@ test("getFiles (with 11ty.js)", async (t) => {
 
   let { eleventyFiles: evf } = getEleventyFilesInstance(["liquid", "md", "11ty.js"], $config);
 
-  t.deepEqual(await evf.getFiles(), ["./test/stubs/writeTestJS/test.11ty.cjs"]);
+  t.assert.deepStrictEqual(await evf.getFiles(), ["./test/stubs/writeTestJS/test.11ty.cjs"]);
 });
 
 test("getFiles (with js, treated as passthrough copy)", async (t) => {
@@ -90,7 +90,7 @@ test("getFiles (with js, treated as passthrough copy)", async (t) => {
   let { eleventyFiles: evf } = getEleventyFilesInstance(["liquid", "md", "js", "11ty.js"], $config);
 
   const files = await evf.getFiles();
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     files.sort(),
     [
       "./test/stubs/writeTestJS-passthrough/sample.js",
@@ -98,8 +98,8 @@ test("getFiles (with js, treated as passthrough copy)", async (t) => {
     ].sort()
   );
 
-  t.false(evf.extensionMap.hasEngine("./test/stubs/writeTestJS-passthrough/sample.js"));
-  t.true(evf.extensionMap.hasEngine("./test/stubs/writeTestJS-passthrough/test.11ty.js"));
+  t.assert.strictEqual(evf.extensionMap.hasEngine("./test/stubs/writeTestJS-passthrough/sample.js"), false);
+  t.assert.strictEqual(evf.extensionMap.hasEngine("./test/stubs/writeTestJS-passthrough/test.11ty.js"), true);
 });
 
 test("getFiles (with case insensitivity)", async (t) => {
@@ -111,15 +111,15 @@ test("getFiles (with case insensitivity)", async (t) => {
 
   let { eleventyFiles: evf } = getEleventyFilesInstance(["11ty.js", "JS"], $config);
 
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     (await evf.getFiles()).sort(),
     [
       "./test/stubs/writeTestJS-casesensitive/sample.Js",
       "./test/stubs/writeTestJS-casesensitive/test.11Ty.js",
     ].sort()
   );
-  t.false(evf.extensionMap.hasEngine("./test/stubs/writeTestJS-casesensitive/sample.Js"));
-  t.true(evf.extensionMap.hasEngine("./test/stubs/writeTestJS-casesensitive/test.11Ty.js"));
+  t.assert.strictEqual(evf.extensionMap.hasEngine("./test/stubs/writeTestJS-casesensitive/sample.Js"), false);
+  t.assert.strictEqual(evf.extensionMap.hasEngine("./test/stubs/writeTestJS-casesensitive/test.11Ty.js"), true);
 });
 
 test("Mutually exclusive Input and Output dirs", async (t) => {
@@ -132,9 +132,9 @@ test("Mutually exclusive Input and Output dirs", async (t) => {
   let { eleventyFiles: evf } = getEleventyFilesInstance(["liquid", "md"], $config);
 
   let files = await glob(evf.getFileGlobs());
-  t.deepEqual(evf.getRawFiles(), ["./test/stubs/writeTest/**/*.{liquid,md}"]);
-  t.true(files.length > 0);
-  t.is(files[0], "test/stubs/writeTest/test.md");
+  t.assert.deepStrictEqual(evf.getRawFiles(), ["./test/stubs/writeTest/**/*.{liquid,md}"]);
+  t.assert.strictEqual(files.length > 0, true);
+  t.assert.strictEqual(files[0], "test/stubs/writeTest/test.md");
 });
 
 test("Single File Input (deep path)", async (t) => {
@@ -147,9 +147,9 @@ test("Single File Input (deep path)", async (t) => {
   let { eleventyFiles: evf } = getEleventyFilesInstance(["liquid", "md"], $config);
 
   let files = await glob(evf.getFileGlobs());
-  t.is(evf.getRawFiles().length, 1);
-  t.is(files.length, 1);
-  t.is(files[0], "test/stubs/index.html");
+  t.assert.strictEqual(evf.getRawFiles().length, 1);
+  t.assert.strictEqual(files.length, 1);
+  t.assert.strictEqual(files[0], "test/stubs/index.html");
 });
 
 test("Single File Input (shallow path)", async (t) => {
@@ -165,9 +165,9 @@ test("Single File Input (shallow path)", async (t) => {
   let files = await glob(globs, {
     ignore: evf.getIgnoreGlobs(),
   });
-  t.is(evf.getRawFiles().length, 1);
-  t.is(files.length, 1);
-  t.is(files[0], "README.md");
+  t.assert.strictEqual(evf.getRawFiles().length, 1);
+  t.assert.strictEqual(files.length, 1);
+  t.assert.strictEqual(files[0], "README.md");
 });
 
 test("Glob Input", async (t) => {
@@ -181,9 +181,9 @@ test("Glob Input", async (t) => {
   let globs = evf.getFileGlobs();
   let files = await glob(globs);
 
-  t.is(files.length, 2);
-  t.is(files[0], "test/stubs/glob-pages/about.md");
-  t.is(files[1], "test/stubs/glob-pages/home.md");
+  t.assert.strictEqual(files.length, 2);
+  t.assert.strictEqual(files[0], "test/stubs/glob-pages/about.md");
+  t.assert.strictEqual(files[1], "test/stubs/glob-pages/home.md");
 });
 
 test(".eleventyignore parsing", async (t) => {
@@ -195,9 +195,9 @@ test(".eleventyignore parsing", async (t) => {
   let { eleventyFiles: evf } = getEleventyFilesInstance(["md"], $config);
 
   let ignores = evf.getFileIgnores("./test/stubs/.eleventyignore");
-  t.is(ignores.length, 2);
-  t.is(ignores[0], "./test/stubs/ignoredFolder/**");
-  t.is(ignores[1], "./test/stubs/ignoredFolder/ignored.md");
+  t.assert.strictEqual(ignores.length, 2);
+  t.assert.strictEqual(ignores[0], "./test/stubs/ignoredFolder/**");
+  t.assert.strictEqual(ignores[1], "./test/stubs/ignoredFolder/ignored.md");
 });
 
 test("Parse multiple .eleventyignores", async (t) => {
@@ -212,12 +212,12 @@ test("Parse multiple .eleventyignores", async (t) => {
     "./test/stubs/multiple-ignores/.eleventyignore",
     "./test/stubs/multiple-ignores/subfolder/.eleventyignore",
   ]);
-  t.is(ignores.length, 4);
+  t.assert.strictEqual(ignores.length, 4);
   // Note these folders must exist!
-  t.is(ignores[0], "./test/stubs/multiple-ignores/ignoredFolder/**");
-  t.is(ignores[1], "./test/stubs/multiple-ignores/ignoredFolder/ignored.md");
-  t.is(ignores[2], "./test/stubs/multiple-ignores/subfolder/ignoredFolder2/**");
-  t.is(ignores[3], "./test/stubs/multiple-ignores/subfolder/ignoredFolder2/ignored2.md");
+  t.assert.strictEqual(ignores[0], "./test/stubs/multiple-ignores/ignoredFolder/**");
+  t.assert.strictEqual(ignores[1], "./test/stubs/multiple-ignores/ignoredFolder/ignored.md");
+  t.assert.strictEqual(ignores[2], "./test/stubs/multiple-ignores/subfolder/ignoredFolder2/**");
+  t.assert.strictEqual(ignores[3], "./test/stubs/multiple-ignores/subfolder/ignoredFolder2/ignored2.md");
 });
 
 test("Passed file name does not exist", async (t) => {
@@ -229,7 +229,7 @@ test("Passed file name does not exist", async (t) => {
   let { eleventyFiles: evf } = getEleventyFilesInstance(["md"], $config);
 
   let ignores = evf.getFileIgnores(".thisfiledoesnotexist");
-  t.deepEqual(ignores, []);
+  t.assert.deepStrictEqual(ignores, []);
 });
 
 test(".eleventyignore files", async (t) => {
@@ -241,15 +241,15 @@ test(".eleventyignore files", async (t) => {
   let { eleventyFiles: evf } = getEleventyFilesInstance(["liquid", "md"], $config);
 
   let ignoredFiles = await glob("test/stubs/ignoredFolder/*.md");
-  t.is(ignoredFiles.length, 1);
+  t.assert.strictEqual(ignoredFiles.length, 1);
 
   let files = await glob(evf.getFileGlobs(), {
     ignore: evf.getIgnoreGlobs(),
   });
 
-  t.true(files.length > 0);
+  t.assert.strictEqual(files.length > 0, true);
 
-  t.is(
+  t.assert.strictEqual(
     files.filter((file) => {
       return file.indexOf("./test/stubs/ignoredFolder") > -1;
     }).length,
@@ -268,7 +268,7 @@ test("getTemplateData caching", async (t) => {
   evf.init();
   let templateDataFirstCall = evf.templateData;
   let templateDataSecondCall = evf.templateData;
-  t.is(templateDataFirstCall, templateDataSecondCall);
+  t.assert.strictEqual(templateDataFirstCall, templateDataSecondCall);
 });
 
 test("getDataDir", async (t) => {
@@ -280,7 +280,7 @@ test("getDataDir", async (t) => {
 
   let { eleventyFiles: evf } = getEleventyFilesInstance([], $config);
   evf.init();
-  t.is(evf.getDataDir(), "./_data/");
+  t.assert.strictEqual(evf.getDataDir(), "./_data/");
 });
 
 test("getDataDir subdir", async (t) => {
@@ -292,7 +292,7 @@ test("getDataDir subdir", async (t) => {
 
   let { eleventyFiles: evf } = getEleventyFilesInstance([], $config);
   evf.init();
-  t.is(evf.getDataDir(), "./test/stubs/_data/");
+  t.assert.strictEqual(evf.getDataDir(), "./test/stubs/_data/");
 });
 
 test("Include and Data Dirs", async (t) => {
@@ -304,7 +304,7 @@ test("Include and Data Dirs", async (t) => {
   let { eleventyFiles: evf } = getEleventyFilesInstance([], $config);
   evf.init();
 
-  t.deepEqual(evf.getIncludesAndDataDirs(), [
+  t.assert.deepStrictEqual(evf.getIncludesAndDataDirs(), [
     "./test/stubs/_includes/**",
     "./test/stubs/_data/**",
   ]);
@@ -329,7 +329,7 @@ test("Input to 'src' and empty includes dir (issue #403)", async (t) => {
   });
   evf.init(); // duplicate init
 
-  t.deepEqual(evf.getFileGlobs(), [
+  t.assert.deepStrictEqual(evf.getFileGlobs(), [
     "./src/**/*.{md,liquid,html}",
     // "!./src/_includes/**",
     // "!./src/_site/**",
@@ -346,7 +346,7 @@ test("Glob Watcher Files", async (t) => {
 
   let { eleventyFiles: evf } = getEleventyFilesInstance(["njk"], $config);
 
-  t.deepEqual(evf.getGlobWatcherFiles(), [
+  t.assert.deepStrictEqual(evf.getGlobWatcherFiles(), [
     "./test/stubs/**/*.njk",
     "./test/stubs/_includes/**",
     "./test/stubs/_data/**",
@@ -361,7 +361,7 @@ test("Glob Watcher Files with File Extension Passthroughs", async (t) => {
   });
   let { eleventyFiles: evf } = getEleventyFilesInstance(["njk", "png"], $config);
 
-  t.deepEqual(evf.getGlobWatcherFiles(), [
+  t.assert.deepStrictEqual(evf.getGlobWatcherFiles(), [
     "./test/stubs/**/*.njk",
     "./test/stubs/**/*.png",
     "./test/stubs/_includes/**",
@@ -383,13 +383,13 @@ test("Glob Watcher Files with File Extension Passthroughs with Dev Server (for f
   evf.setRunMode("serve");
   evf.init(); // duplicate init
 
-  t.deepEqual(evf.getGlobWatcherFiles(), [
+  t.assert.deepStrictEqual(evf.getGlobWatcherFiles(), [
     "./test/stubs/**/*.njk",
     "./test/stubs/_includes/**",
     "./test/stubs/_data/**",
   ]);
 
-  t.deepEqual(evf.getGlobWatcherFilesForPassthroughCopy(), ["./test/stubs/**/*.png"]);
+  t.assert.deepStrictEqual(evf.getGlobWatcherFilesForPassthroughCopy(), ["./test/stubs/**/*.png"]);
 });
 
 test("Glob Watcher Files with Config Passthroughs (one template format)", async (t) => {
@@ -405,12 +405,13 @@ test("Glob Watcher Files with Config Passthroughs (one template format)", async 
 
   let { eleventyFiles: evf } = getEleventyFilesInstance(["njk"], $config);
 
-  t.deepEqual(evf.getGlobWatcherFiles(), [
+  t.assert.deepStrictEqual(evf.getGlobWatcherFiles(), [
     "./test/stubs/**/*.njk",
-    "./test/stubs/img/**",
     "./test/stubs/_includes/**",
     "./test/stubs/_data/**",
   ]);
+
+  t.assert.deepStrictEqual(evf.getGlobWatcherFilesForCopiedPassthroughCopy(), ["./test/stubs/img/**"]);
 });
 
 test("Glob Watcher Files with Config Passthroughs (one template format) with Dev Server (for free passthrough copy #2456)", async (t) => {
@@ -431,13 +432,13 @@ test("Glob Watcher Files with Config Passthroughs (one template format) with Dev
   let mgr = new TemplatePassthroughManager($config);
   evf.setPassthroughManager(mgr);
 
-  t.deepEqual(evf.getGlobWatcherFiles(), [
+  t.assert.deepStrictEqual(evf.getGlobWatcherFiles(), [
     "./test/stubs/**/*.njk",
     "./test/stubs/_includes/**",
     "./test/stubs/_data/**",
   ]);
 
-  t.deepEqual(evf.getGlobWatcherFilesForPassthroughCopy(), ["./test/stubs/img/**"]);
+  t.assert.deepStrictEqual(evf.getGlobWatcherFilesForPassthroughCopy(), ["./test/stubs/img/**"]);
 });
 
 test("Glob Watcher Files with Dev Server rebuild for passthroughs that can’t be emulated", async (t) => {
@@ -459,14 +460,14 @@ test("Glob Watcher Files with Dev Server rebuild for passthroughs that can’t b
   let mgr = new TemplatePassthroughManager($config);
   evf.setPassthroughManager(mgr);
 
-  t.deepEqual(evf.getGlobWatcherFiles(), [
+  t.assert.deepStrictEqual(evf.getGlobWatcherFiles(), [
     "./test/stubs/**/*.njk",
-    "./test/stubs/template-passthrough/static/**",
     "./test/stubs/_includes/**",
     "./test/stubs/_data/**",
   ]);
 
-  t.deepEqual(evf.getGlobWatcherFilesForPassthroughCopy(), ["./test/stubs/img/**"]);
+  t.assert.deepStrictEqual(evf.getGlobWatcherFilesForCopiedPassthroughCopy(), ["./test/stubs/template-passthrough/static/**"]);
+  t.assert.deepStrictEqual(evf.getGlobWatcherFilesForPassthroughCopy(), ["./test/stubs/img/**"]);
 });
 
 test("Glob Watcher Files with Config Passthroughs (no template formats)", async (t) => {
@@ -480,7 +481,7 @@ test("Glob Watcher Files with Config Passthroughs (no template formats)", async 
   let { eleventyFiles: evf } = getEleventyFilesInstance([], $config);
   evf.init();
 
-  t.deepEqual(await evf.getGlobWatcherTemplateDataFiles(), [
+  t.assert.deepStrictEqual(await evf.getGlobWatcherTemplateDataFiles(), [
     `./test/stubs/**/*.{json,data.mjs,data.cjs,data.js,data.mts,data.cts,data.ts,11tydata.mjs,11tydata.cjs,11tydata.js,11tydata.mts,11tydata.cts,11tydata.ts}`,
   ]);
 });
@@ -494,7 +495,7 @@ test("Test that negations are ignored (for now) PR#709, will change when #693 is
   let $config = await getTemplateConfigInstance(templateConfig, projectDirs);
   let { eleventyFiles: evf } = getEleventyFilesInstance([], $config);
 
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     evf.normalizeIgnoreContent(
       "./",
       `hello

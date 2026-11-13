@@ -6,11 +6,13 @@ const { get: lodashGet } = lodash;
 // buildawesomeDataSchema looks for buildawesomeDataSchema and eleventyDataSchema (this is what we use internally)
 // eleventyDataSchema looks for eleventyDataSchema (and not buildawesomeDataSchema)
 export class ResolveConfigurationData {
+	static EXCLUDE_FROM_COLLECTIONS_KEY = "buildawesomeExcludeFromCollections";
+
 	static ELIGIBLE_PROPS = new Set([
 		// If these props are overridden by a user’s configuration, they will not be aliased (which is ok)
 		"buildawesomeComputed",
 		"buildawesomeDataSchema",
-		"buildawesomeExcludeFromCollections",
+		this.EXCLUDE_FROM_COLLECTIONS_KEY,
 		"buildawesomeImport",
 	]);
 	static BUILDAWESOME_PREFIX = "buildawesome";
@@ -34,16 +36,43 @@ export class ResolveConfigurationData {
 		return eligibleLocations;
 	}
 
-	static getValue(data, location) {
-		let eligible = this.getEligibleLocations(location);
-		let merging;
+	// Folds `eleventy*` aliases into `buildawesome*` per cascade layer so the cascade orders a single key, #4311
+	static normalize(data) {
+		if (!isPlainObject(data)) {
+			return data;
+		}
 
-		for (let loc of eligible) {
-			let val = lodashGet(data, loc, undefined);
-			if (val === undefined) {
+		let normalized;
+		for (let prop of this.ELIGIBLE_PROPS) {
+			let alternate = this.getAlternatePropertyName(prop);
+			if (!Object.hasOwn(data, alternate)) {
 				continue;
 			}
 
+			normalized ??= Object.assign({}, data);
+			normalized[prop] = this.getValue(data, prop);
+			delete normalized[alternate];
+		}
+
+		return normalized ?? data;
+	}
+
+	static getValue(data, location) {
+		let values = [];
+		for (let loc of this.getEligibleLocations(location)) {
+			let val = lodashGet(data, loc, undefined);
+			if (val !== undefined) {
+				values.push(val);
+			}
+		}
+
+		// Skip the merge copy in the common single-location case
+		if (values.length < 2) {
+			return values[0];
+		}
+
+		let merging;
+		for (let val of values) {
 			if (isPlainObject(val)) {
 				merging = DeepCopy(merging || {}, val);
 			} else if (Array.isArray(val)) {

@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 
 import { TransformPlugin } from "../src/Plugins/InputPathToUrl.js";
 import { default as HtmlBasePlugin } from "../src/Plugins/HtmlBasePlugin.js";
@@ -63,11 +63,11 @@ test("Using the transform (and the filter too)", async (t) => {
 
   let results = await elev.toJSON();
 	// filter is already available in the default config.
-	t.is(
+	t.assert.strictEqual(
     getContentFor(results, "/filter/index.html"),
     OUTPUT_HTML_STD
   );
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/transform/index.html"),
     OUTPUT_HTML_STD
   );
@@ -80,11 +80,11 @@ test("Using the filter", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/filter/index.html"),
     OUTPUT_HTML_STD
   );
-	t.not(
+	t.assert.notStrictEqual(
     getContentFor(results, "/transform/index.html"),
     OUTPUT_HTML_STD
   );
@@ -101,11 +101,11 @@ test("Using the transform and the base plugin", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/filter/index.html"),
     OUTPUT_HTML_BASE
   );
-	t.is(
+	t.assert.strictEqual(
     getContentFor(results, "/transform/index.html"),
     OUTPUT_HTML_BASE
   );
@@ -122,11 +122,11 @@ test("Using the transform and the base plugin, reverse order", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/filter/index.html"),
     OUTPUT_HTML_BASE
   );
-	t.is(
+	t.assert.strictEqual(
     getContentFor(results, "/transform/index.html"),
     OUTPUT_HTML_BASE
   );
@@ -147,7 +147,7 @@ test("Issue #3417 Using the transform with relative path (dot slash)", async (t)
 
   let results = await elev.toJSON();
 	// filter is already available in the default config.
-	t.is(
+	t.assert.strictEqual(
     getContentFor(results, "/source/test/index.html"),
     `<a href="/source/target/">Target</a>`
   );
@@ -167,7 +167,7 @@ test("Issue #3417 Using the transform with relative path (no dot slash)", async 
 
   let results = await elev.toJSON();
 	// filter is already available in the default config.
-	t.is(
+	t.assert.strictEqual(
     getContentFor(results, "/source/test/index.html"),
     `<a href="/source/target/">Target</a>`
   );
@@ -185,7 +185,7 @@ test("Issue #3581 #build-cost-🧰", async (t) => {
 
   let results = await elev.toJSON();
 
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/source/test/index.html"),
     `<a href="#built-cost-🧰">Target</a>`
   );
@@ -201,7 +201,7 @@ test("Issue #3583 Markdown diacritics (no plugin)", async (t) => {
 
   let results = await elev.toJSON();
 
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/test/index.html"),
     `<p><a href="/hypoth%C3%A8se/">Target</a></p>`
   );
@@ -220,7 +220,7 @@ test("Issue #3583 Diacritics", async (t) => {
 
   let results = await elev.toJSON();
 
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/test/index.html"),
     `<p><a href="/hypothèse/">Target</a></p>`
   );
@@ -239,7 +239,7 @@ test("Issue #3583 Diacritics Markdown raw", async (t) => {
 
   let results = await elev.toJSON();
 
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/test/index.html"),
     `<p><a href="/hypothèse/">Target</a></p>`
   );
@@ -255,7 +255,7 @@ test("Issue #3583 #3559 Markdown link with spaces (no plugin)", async (t) => {
 
   let results = await elev.toJSON();
 
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/test/index.html"),
     `<p><a href="/target%201/">Target</a></p>`
   );
@@ -278,7 +278,7 @@ test("Issue #3583 #3559 Markdown spaces", async (t) => {
 
   let results = await elev.toJSON();
 
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/test/index.html"),
     `<p><a href="/target-1/">Target</a></p>`
   );

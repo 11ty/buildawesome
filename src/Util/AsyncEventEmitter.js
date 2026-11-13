@@ -2,10 +2,7 @@ import { EventEmitter } from "node:events";
 
 /**
  * This class emits events asynchronously.
- *
- * Note that Eleventy has two separate event emitter instances it uses:
- * 1. a userland one (UserConfig.js)
- * 2. a global one for internals (EventBus.js)
+ * Used for userland events (UserConfig.js); internal events use TemplateConfig.js `eventBus`.
  *
  * @typedef {'parallel'|'sequential'} HandlerModeType
  */

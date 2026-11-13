@@ -1,48 +1,48 @@
-import test from "ava";
+import test from "node:test";
 import path from "node:path";
 import FileSystemSearch from "../src/FileSystemSearch.js";
 
 test("Base", async (t) => {
   let fs = new FileSystemSearch();
-  t.is(fs.count, 0);
+  t.assert.strictEqual(fs.count, 0);
 
-  t.deepEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
+  t.assert.deepStrictEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
     "./test/file-system-search/file.txt",
   ]);
-  t.is(fs.count, 1);
+  t.assert.strictEqual(fs.count, 1);
 
   fs.add("./test/file-system-search/virtual-file.txt");
-  t.deepEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
+  t.assert.deepStrictEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
     "./test/file-system-search/file.txt",
     "./test/file-system-search/virtual-file.txt",
   ]);
-  t.is(fs.count, 1);
+  t.assert.strictEqual(fs.count, 1);
 
   fs.add("./test/file-system-search/another-file.txt");
-  t.deepEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
+  t.assert.deepStrictEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
     "./test/file-system-search/file.txt",
     "./test/file-system-search/virtual-file.txt",
     "./test/file-system-search/another-file.txt",
   ]);
-  t.is(fs.count, 1);
+  t.assert.strictEqual(fs.count, 1);
 
   // Delete
   fs.delete("./test/file-system-search/file.txt");
-  t.deepEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
+  t.assert.deepStrictEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
     "./test/file-system-search/virtual-file.txt",
     "./test/file-system-search/another-file.txt",
   ]);
-  t.is(fs.count, 1);
+  t.assert.strictEqual(fs.count, 1);
 
   fs.delete("./test/file-system-search/another-file.txt");
-  t.deepEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
+  t.assert.deepStrictEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
     "./test/file-system-search/virtual-file.txt",
   ]);
-  t.is(fs.count, 1);
+  t.assert.strictEqual(fs.count, 1);
 
   fs.delete("./test/file-system-search/virtual-file.txt");
-  t.deepEqual(await fs.search("key", "./test/file-system-search/*.txt"), []);
-  t.is(fs.count, 1);
+  t.assert.deepStrictEqual(await fs.search("key", "./test/file-system-search/*.txt"), []);
+  t.assert.strictEqual(fs.count, 1);
 });
 
 // Backslashes are only path separators on Windows
@@ -63,9 +63,7 @@ windowsTest("New files with Windows paths are added to the cache", async (t) => 
     "./test/file-system-search/*.txt"
   );
 
-  t.true(
-    results.includes("./test/file-system-search/windows-new-file.txt")
-  );
+  t.assert.strictEqual(results.includes("./test/file-system-search/windows-new-file.txt"), true);
 });
 
 test("Added paths use platform separators (backslashes on Windows)", async (t) => {
@@ -73,13 +71,13 @@ test("Added paths use platform separators (backslashes on Windows)", async (t) =
   await fs.search("key", "./test/file-system-search/*.txt");
 
   fs.add(path.join("test", "file-system-search", "native-file.txt"));
-  t.deepEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
+  t.assert.deepStrictEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
     "./test/file-system-search/file.txt",
     "./test/file-system-search/native-file.txt",
   ]);
 
   fs.delete(path.join(".", "test", "file-system-search", "file.txt"));
-  t.deepEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
+  t.assert.deepStrictEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
     "./test/file-system-search/native-file.txt",
   ]);
 });
@@ -91,10 +89,10 @@ test("Modifications during an in-flight search are applied", async (t) => {
   fs.add("./test/file-system-search/virtual-file.txt");
   fs.delete("./test/file-system-search/file.txt");
 
-  t.deepEqual(await pending, [
+  t.assert.deepStrictEqual(await pending, [
     "./test/file-system-search/virtual-file.txt",
   ]);
-  t.deepEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
+  t.assert.deepStrictEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
     "./test/file-system-search/virtual-file.txt",
   ]);
 });

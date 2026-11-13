@@ -54,15 +54,13 @@
 	],
 	"scripts": {
 		"default": "npm run test",
-		"test": "npm run test:server && npm run test:browser",
-		"test:server": "npm run test:node && npm run test:ava",
-		"test:ava": "ava --verbose --timeout 20s",
-		"test:node": "node --test 'test_node/**/*test.js'",
+		"test": "npm run test:core && npm run test:browser",
+		"test:core": "node --test --test-timeout=20000 'test/[!_]*.js' 'test/_issues/**/*test.js'",
 		"test:browser": "cross-env CI=true npm run test --workspaces",
 		"format": "prettier . --write",
 		"check": "eslint src",
 		"typescript": "tsc && node scripts/prune-types.js",
-		"coverage": "npx c8 ava && npx c8 report --reporter=json-summary && cp coverage/coverage-summary.json docs/_data/coverage.json && node cmd.cjs --config=docs/eleventy.coverage.js",
+		"coverage": "npx c8 npm run test:core && npx c8 report --reporter=json-summary && cp coverage/coverage-summary.json docs/_data/coverage.json && node cmd.cjs --config=docs/eleventy.coverage.js",
 		"nano-staged": "nano-staged",
 		"prepare": "simple-git-hooks"
 	},
@@ -73,21 +71,6 @@
 	},
 	"bugs": "https://github.com/11ty/buildawesome/issues",
 	"homepage": "https://www.11ty.dev/",
-	"ava": {
-		"environmentVariables": {},
-		"failFast": true,
-		"files": [
-			"./test/*.js",
-			"./test/_issues/**/*test.js"
-		],
-		"watchMode": {
-			"ignoreChanges": [
-				"./test/stubs*/**/*",
-				"./test/**/_site/**/*",
-				".cache"
-			]
-		}
-	},
 	"nano-staged": {
 		"*.{js,css,md}": [
 			"prettier --write"
@@ -98,34 +81,33 @@
 		"pre-push": "npm test"
 	},
 	"devDependencies": {
-		"@11ty/eleventy-img": "^7.0.0",
+		"@11ty/eleventy-img": "^7.1.1",
 		"@11ty/eleventy-plugin-rss": "^3.1.0",
 		"@11ty/eleventy-plugin-syntaxhighlight": "^5.0.2",
-		"@11ty/eleventy-plugin-webc": "^0.12.0-beta.7",
+		"@11ty/eleventy-plugin-webc": "^0.12.0-beta.8",
 		"@eslint/js": "^10.0.1",
 		"@iarna/toml": "^2.2.5",
 		"@mdx-js/node-loader": "^3.1.1",
 		"@stylistic/eslint-plugin": "^5.10.0",
-		"@types/node": "^26.6.5",
+		"@types/node": "^26.6.6",
 		"@vue/server-renderer": "^3.5.44",
 		"@zachleat/noop": "^1.0.7",
-		"ava": "^8.0.2",
 		"c8": "^12.0.0",
 		"cross-env": "^10.1.0",
-		"eslint": "^10.12.0",
+		"eslint": "^10.14.0",
 		"eslint-config-prettier": "^10.1.8",
-		"globals": "^17.13.0",
-		"jsx-async-runtime": "^2.2.1",
+		"globals": "^17.14.0",
+		"jsx-async-runtime": "^3.0.0",
 		"luxon": "^3.7.2",
 		"markdown-it-abbr": "^2.0.0",
 		"markdown-it-emoji": "^3.1.0",
-		"marked": "^18.1.1",
+		"marked": "^18.1.3",
 		"nano-staged": "^1.0.2",
 		"prettier": "^3.9.10",
 		"pretty": "^2.0.0",
 		"react": "^19.3.1",
 		"react-dom": "^19.3.1",
-		"sass": "^1.105.1",
+		"sass": "^1.107.1",
 		"simple-git-hooks": "^2.14.0",
 		"tsx": "^4.23.15",
 		"typescript": "7.0.2",
@@ -134,34 +116,36 @@
 		"zod-validation-error": "^5.0.0"
 	},
 	"dependencies": {
-		"@11ty/chokidar-with-glob-support": "^2.1.0",
+		"@11ty/chokidar-with-glob-support": "^2.1.1",
 		"@11ty/dependency-tree": "^5.0.0-alpha.3",
 		"@11ty/eleventy-dev-server": "^3.0.0-alpha.15",
 		"@11ty/eleventy-plugin-bundle": "^4.0.3",
 		"@11ty/eleventy-utils": "^3.0.1",
 		"@11ty/gray-matter": "^3.0.0",
-		"@11ty/lodash-custom": "^4.17.21",
+		"@11ty/lodash-custom": "^5.0.0",
 		"@11ty/node-version-check": "^1.0.1",
 		"@11ty/nunjucks": "^4.0.0-alpha.4",
 		"@11ty/parse-date-strings": "^2.0.6",
 		"@11ty/posthtml-urls": "^2.0.0",
-		"@11ty/recursive-copy": "^5.1.0",
-		"@sindresorhus/slugify": "^3.0.1",
+		"@11ty/recursive-copy": "^5.2.0",
+		"@sindresorhus/slugify": "^4.0.0",
 		"bcp-47-normalize": "^2.3.0",
 		"dependency-graph": "^1.0.0",
-		"entities": "^8.1.0",
-		"import-module-string": "^3.0.0",
+		"entities": "^9.0.0",
+		"import-module-string": "^4.0.0",
 		"iso-639-1": "^3.1.6",
 		"kleur": "^4.1.5",
-		"liquidjs": "^10.30.0",
+		"liquidjs": "^10.30.1",
 		"markdown-it": "^15.0.3",
 		"minimist": "^1.2.8",
-		"moo": "0.5.2",
 		"obug": "^3.0.0",
 		"picomatch": "^4.0.7",
 		"posthtml": "^0.16.7",
 		"posthtml-match-helper": "^2.0.3",
-		"semver": "^7.8.5",
+		"semver": "^7.8.6",
 		"tinyglobby": "^0.2.17"
+	},
+	"overrides": {
+		"minimatch": "^11.0.4"
 	}
 }

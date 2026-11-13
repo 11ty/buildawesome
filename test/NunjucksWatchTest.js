@@ -1,9 +1,9 @@
-import test from "ava";
+import test, { describe } from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import Eleventy from "../src/Core.js";
 
-const ROOT = "test/stubs-nunjucks-watch";
+const ROOT = "test/_generated/nunjucks-watch";
 
 function getPagedTemplate({ permalink = "/paged/{{ item }}/", body = "" } = {}) {
   return `---
@@ -65,81 +65,83 @@ async function edit(elev, dir, file, content) {
   await elev.triggerWatchRunForPath(`./${dir}/${file}`);
 }
 
-test.after.always(() => {
+test.after(() => {
   fs.rmSync(ROOT, { recursive: true, force: true });
 });
 
-for (let incremental of [false, true]) {
-  let mode = incremental ? "incremental" : "full";
+describe("Nunjucks watch", { concurrency: true }, () => {
+  for (let incremental of [false, true]) {
+    let mode = incremental ? "incremental" : "full";
 
-  test(`Editing a paginated Nunjucks template updates every page (${mode})`, async (t) => {
-    let dir = createProject(`template-${mode}`);
-    let elev = await getWatchInstance(dir, { incremental });
-    t.is(read(dir, "/paged/b/"), "<main><b>b</b>[b]</main>");
+    test(`Editing a paginated Nunjucks template updates every page (${mode})`, async (t) => {
+      let dir = createProject(`template-${mode}`);
+      let elev = await getWatchInstance(dir, { incremental });
+      t.assert.strictEqual(read(dir, "/paged/b/"), "<main><b>b</b>[b]</main>");
 
-    await edit(elev, dir, "paged.njk", getPagedTemplate({ body: " edited" }));
+      await edit(elev, dir, "paged.njk", getPagedTemplate({ body: " edited" }));
 
-    t.is(read(dir, "/paged/a/"), "<main><b>a</b>[a] edited</main>");
-    t.is(read(dir, "/paged/b/"), "<main><b>b</b>[b] edited</main>");
-  });
+      t.assert.strictEqual(read(dir, "/paged/a/"), "<main><b>a</b>[a] edited</main>");
+      t.assert.strictEqual(read(dir, "/paged/b/"), "<main><b>b</b>[b] edited</main>");
+    });
 
-  test(`Editing a paginated Nunjucks permalink writes the new URLs (${mode})`, async (t) => {
-    let dir = createProject(`permalink-${mode}`);
-    let elev = await getWatchInstance(dir, { incremental });
+    test(`Editing a paginated Nunjucks permalink writes the new URLs (${mode})`, async (t) => {
+      let dir = createProject(`permalink-${mode}`);
+      let elev = await getWatchInstance(dir, { incremental });
 
-    await edit(elev, dir, "paged.njk", getPagedTemplate({ permalink: "/letters/{{ item }}/" }));
+      await edit(elev, dir, "paged.njk", getPagedTemplate({ permalink: "/letters/{{ item }}/" }));
 
-    t.is(read(dir, "/letters/a/"), "<main><b>a</b>[a]</main>");
-    t.is(read(dir, "/letters/b/"), "<main><b>b</b>[b]</main>");
-  });
+      t.assert.strictEqual(read(dir, "/letters/a/"), "<main><b>a</b>[a]</main>");
+      t.assert.strictEqual(read(dir, "/letters/b/"), "<main><b>b</b>[b]</main>");
+    });
 
-  test(`Editing a Nunjucks include updates paginated pages (${mode})`, async (t) => {
-    let dir = createProject(`include-${mode}`);
-    let elev = await getWatchInstance(dir, { incremental });
+    test(`Editing a Nunjucks include updates paginated pages (${mode})`, async (t) => {
+      let dir = createProject(`include-${mode}`);
+      let elev = await getWatchInstance(dir, { incremental });
 
-    await edit(elev, dir, "_includes/item.njk", "<i>{{ item }}</i>");
+      await edit(elev, dir, "_includes/item.njk", "<i>{{ item }}</i>");
 
-    t.is(read(dir, "/paged/a/"), "<main><i>a</i>[a]</main>");
-    t.is(read(dir, "/paged/b/"), "<main><i>b</i>[b]</main>");
-  });
+      t.assert.strictEqual(read(dir, "/paged/a/"), "<main><i>a</i>[a]</main>");
+      t.assert.strictEqual(read(dir, "/paged/b/"), "<main><i>b</i>[b]</main>");
+    });
 
-  test(`Editing an imported Nunjucks macro updates paginated pages (${mode})`, async (t) => {
-    let dir = createProject(`macro-${mode}`);
-    let elev = await getWatchInstance(dir, { incremental });
+    test(`Editing an imported Nunjucks macro updates paginated pages (${mode})`, async (t) => {
+      let dir = createProject(`macro-${mode}`);
+      let elev = await getWatchInstance(dir, { incremental });
 
-    await edit(elev, dir, "_includes/macros.njk", "{% macro label(x) %}({{ x }}){% endmacro %}");
+      await edit(elev, dir, "_includes/macros.njk", "{% macro label(x) %}({{ x }}){% endmacro %}");
 
-    t.is(read(dir, "/paged/a/"), "<main><b>a</b>(a)</main>");
-    t.is(read(dir, "/paged/b/"), "<main><b>b</b>(b)</main>");
-  });
+      t.assert.strictEqual(read(dir, "/paged/a/"), "<main><b>a</b>(a)</main>");
+      t.assert.strictEqual(read(dir, "/paged/b/"), "<main><b>b</b>(b)</main>");
+    });
 
-  test(`Editing a Nunjucks layout updates paginated pages (${mode})`, async (t) => {
-    let dir = createProject(`layout-${mode}`);
-    let elev = await getWatchInstance(dir, { incremental });
+    test(`Editing a Nunjucks layout updates paginated pages (${mode})`, async (t) => {
+      let dir = createProject(`layout-${mode}`);
+      let elev = await getWatchInstance(dir, { incremental });
 
-    await edit(elev, dir, "_includes/layout.njk", "<article>{{ content | safe }}</article>");
+      await edit(elev, dir, "_includes/layout.njk", "<article>{{ content | safe }}</article>");
 
-    t.is(read(dir, "/paged/a/"), "<article><b>a</b>[a]</article>");
-    t.is(read(dir, "/paged/b/"), "<article><b>b</b>[b]</article>");
-  });
+      t.assert.strictEqual(read(dir, "/paged/a/"), "<article><b>a</b>[a]</article>");
+      t.assert.strictEqual(read(dir, "/paged/b/"), "<article><b>b</b>[b]</article>");
+    });
 
-  test(`Editing a Nunjucks page updates it (${mode})`, async (t) => {
-    let dir = createProject(`page-${mode}`);
-    let elev = await getWatchInstance(dir, { incremental });
-    t.is(read(dir, "/page/"), "Page one");
+    test(`Editing a Nunjucks page updates it (${mode})`, async (t) => {
+      let dir = createProject(`page-${mode}`);
+      let elev = await getWatchInstance(dir, { incremental });
+      t.assert.strictEqual(read(dir, "/page/"), "Page one");
 
-    await edit(elev, dir, "page.njk", "Page {{ 'two' }}");
+      await edit(elev, dir, "page.njk", "Page {{ 'two' }}");
 
-    t.is(read(dir, "/page/"), "Page two");
-  });
+      t.assert.strictEqual(read(dir, "/page/"), "Page two");
+    });
 
-  test(`Editing one of two identical Nunjucks templates leaves the other alone (${mode})`, async (t) => {
-    let dir = createProject(`twins-${mode}`);
-    let elev = await getWatchInstance(dir, { incremental });
+    test(`Editing one of two identical Nunjucks templates leaves the other alone (${mode})`, async (t) => {
+      let dir = createProject(`twins-${mode}`);
+      let elev = await getWatchInstance(dir, { incremental });
 
-    await edit(elev, dir, "twin-a.njk", "Edited {{ page.fileSlug }}");
+      await edit(elev, dir, "twin-a.njk", "Edited {{ page.fileSlug }}");
 
-    t.is(read(dir, "/twin-a/"), "Edited twin-a");
-    t.is(read(dir, "/twin-b/"), "Twin twin-b");
-  });
-}
+      t.assert.strictEqual(read(dir, "/twin-a/"), "Edited twin-a");
+      t.assert.strictEqual(read(dir, "/twin-b/"), "Twin twin-b");
+    });
+  }
+});

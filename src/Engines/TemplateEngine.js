@@ -11,6 +11,7 @@ export default class TemplateEngine {
 	#extensionMap;
 	#engineManager;
 	#benchmarks;
+	#configEventListeners = [];
 
 	constructor(name, eleventyConfig) {
 		this.name = name;
@@ -25,6 +26,20 @@ export default class TemplateEngine {
 
 	get cacheable() {
 		return false;
+	}
+
+	// Engine instances are replaced on each build, so their listeners must not outlive them
+	addConfigEventListener(eventName, fn) {
+		let events = this.config.events;
+		this.#configEventListeners.push([events, eventName, fn]);
+		events.on(eventName, fn);
+	}
+
+	removeConfigEventListeners() {
+		for (let [events, eventName, fn] of this.#configEventListeners) {
+			events.off(eventName, fn);
+		}
+		this.#configEventListeners = [];
 	}
 
 	get dirs() {

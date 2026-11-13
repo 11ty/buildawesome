@@ -1,5 +1,6 @@
 import { isPlainObject, TemplatePath } from "@11ty/eleventy-utils";
 
+import Template from "./Template.js";
 import TemplateCollection from "./TemplateCollection.js";
 import ErrorUtil from "./Errors/ErrorUtil.js";
 import BaseError from "./Errors/BaseError.js";
@@ -8,6 +9,7 @@ import DuplicatePermalinkOutputError from "./Errors/DuplicatePermalinkOutputErro
 import TemplateData from "./Data/TemplateData.js";
 import GlobalDependencyMap from "./GlobalDependencyMap.js";
 import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
+import { withoutTracking } from "./Data/InternalReads.js";
 import { createDebug } from "./Util/DebugLogUtil.js";
 import { isGlobMatch } from "./Util/GlobMatcher.js";
 
@@ -44,6 +46,7 @@ class TemplateMap {
 		this.collectionsData = null;
 		this.cached = false;
 		this.collection = new TemplateCollection();
+		eleventyConfig.queryRegistry.setTemplateMap(this);
 	}
 
 	set userConfig(config) {
@@ -142,9 +145,14 @@ class TemplateMap {
 
 		// TODO it’d be nice to set the dependency relationship for addCollection here
 		// But collections are not yet populated (they populate after template order)
-		let publishes = TemplateData.getIncludedCollectionNames(entry.data);
+		// Computed `tags` reading pagination data resolve per page, so this read is expected to miss them, Issue #1952
+		let publishes = withoutTracking(() =>
+			TemplateData.getIncludedCollectionNames(entry.data, this.config.keys.tags),
+		);
 
 		this.config.uses.addNewNodeRelationships(entry.inputPath, consumes, publishes);
+
+		this.eleventyConfig.queryRegistry.addToGraph(entry.inputPath, this.config.uses);
 	}
 
 	addAllToGlobalDependencyGraph() {
@@ -183,6 +191,8 @@ class TemplateMap {
 		// Temporary workaround for async constructor work in templates
 		// Issue #3170 #3870
 		this.#ignoreDeferForPaginatedCollections();
+
+		this.collection.tagsKey = this.config.keys.tags;
 
 		let inputPathSet = new Set(fullTemplateOrder);
 		await Promise.all(
@@ -223,7 +233,15 @@ class TemplateMap {
 
 			// is a template entry
 			let map = this.getMapEntryForInputPath(depEntry);
+			this.eleventyConfig.queryRegistry.populate(map.inputPath);
 			await this.#initDependencyMapEntry(map);
+		}
+
+		// Per-page tags (e.g. computed from pagination data) aren’t in the dependency graph, Issue #1952
+		for (let tagName of this.collection.getTagNames()) {
+			if (!this.isUserConfigCollectionName(tagName)) {
+				await this.setCollectionByTagName(tagName);
+			}
 		}
 	}
 
@@ -252,14 +270,20 @@ class TemplateMap {
 							},
 						});
 					}
-				} else if (!map.outputPath) {
-					map.outputPath = page.outputPath;
+				} else if (!Object.prototype.hasOwnProperty.call(map, "outputPath")) {
+					// Live, computed data can resolve it after collections, Issue #1469
+					Object.defineProperty(map, "outputPath", {
+						enumerable: true,
+						get: () => page.outputPath,
+					});
 				}
 
 				if (counter === 0 || map.data.pagination?.addAllPagesToCollections) {
 					if (
-						ResolveConfigurationData.getValue(map.data, "buildawesomeExcludeFromCollections") !==
-						true
+						ResolveConfigurationData.getValue(
+							map.data,
+							ResolveConfigurationData.EXCLUDE_FROM_COLLECTIONS_KEY,
+						) !== true
 					) {
 						// is in *some* collections
 						this.#checkForStaleUserConfigCollections(map, page);
@@ -313,6 +337,7 @@ class TemplateMap {
 		);
 
 		await this.initDependencyMap(fullTemplateOrder);
+		this.eleventyConfig.queryRegistry.populateAll();
 		await this.resolveRemainingComputedData();
 
 		let orderedPaths = this.#removeTagsFromTemplateOrder(fullTemplateOrder);
@@ -550,7 +575,7 @@ class TemplateMap {
 			return true;
 		}
 
-		let tags = TemplateData.getIncludedTagNames(page.data);
+		let tags = TemplateData.getIncludedTagNames(page.data, this.config.keys.tags);
 		if (reads.tags.some((tagSet) => tagSet.every((tag) => tags.includes(tag)))) {
 			return true;
 		}
@@ -619,10 +644,10 @@ class TemplateMap {
 				if (entry) {
 					let index = item.pageNumber || 0;
 					let page = entry._pages[index];
-					let content = page._templateContent;
+					let content = Template.getRenderedContent(page);
 					if (content !== undefined) {
 						item.templateContent = content;
-						// Copies of page entries (e.g. spread in a collection callback) don’t have the getter
+						// Copies of page entries (e.g. spread in a collection callback) and entries from another map need the pipeline copied
 						if (item !== page) {
 							item.contentPipeline = page.contentPipeline;
 						}
@@ -709,20 +734,28 @@ class TemplateMap {
 				}
 				inputs[page.inputPath] = true;
 
+				let entry = { inputPath: template.inputPath, pageNumber: page.pageNumber };
 				if (!outputPaths[page.outputPath]) {
-					outputPaths[page.outputPath] = [template.inputPath];
+					outputPaths[page.outputPath] = [entry];
 				} else {
-					warnings[page.outputPath] = `Output conflict: multiple input files are writing to \`${
-						page.outputPath
-					}\`. Use distinct \`permalink\` values to resolve this conflict.
-  1. ${template.inputPath}
-${outputPaths[page.outputPath]
-	.map(function (inputPath, index) {
-		return `  ${index + 2}. ${inputPath}\n`;
-	})
-	.join("")}
-`;
-					outputPaths[page.outputPath].push(template.inputPath);
+					let entries = [entry, ...outputPaths[page.outputPath]];
+					let list = entries
+						.map(({ inputPath, pageNumber }, index) => {
+							let pageLabel =
+								typeof pageNumber === "number" ? ` (pagination.pageNumber: ${pageNumber})` : "";
+							return `  ${index + 1}. ${inputPath}${pageLabel}\n`;
+						})
+						.join("");
+
+					if (entries.every((e) => e.inputPath === template.inputPath)) {
+						// A template can only conflict with itself via pagination, Issue #1946
+						warnings[page.outputPath] =
+							`Output conflict: multiple pages from pagination template \`${template.inputPath}\` are writing to \`${page.outputPath}\`. Often this means you used an unknown property which resolved to an empty string "" in your permalink.\n${list}`;
+					} else {
+						warnings[page.outputPath] =
+							`Output conflict: multiple input files are writing to \`${page.outputPath}\`. Use distinct \`permalink\` values to resolve this conflict.\n${list}`;
+					}
+					outputPaths[page.outputPath].push(entry);
 				}
 			}
 		});
@@ -769,7 +802,7 @@ This is usually but not *always* an error so if you’d like to disable this err
 	_testGetAllTags() {
 		let allTags = {};
 		for (let map of this.map) {
-			let tags = map.data.tags;
+			let tags = map.data[this.config.keys.tags];
 			if (Array.isArray(tags)) {
 				for (let tag of tags) {
 					allTags[tag] = true;

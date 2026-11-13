@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import semver from "semver";
 import { createRequire } from "module";
 import { Merge } from "@11ty/eleventy-utils";
@@ -36,7 +36,7 @@ test("Create", async (t) => {
 
   let data = await dataObj.getGlobalData();
 
-  t.true(Object.keys(data[eleventyConfig.getConfig().keys.package]).length > 0);
+  t.assert.strictEqual(Object.keys(data[eleventyConfig.getConfig().keys.package]).length > 0, true);
 });
 
 test("getGlobalData()", async (t) => {
@@ -51,20 +51,17 @@ test("getGlobalData()", async (t) => {
   dataObj.setProjectUsingEsm(true);
   dataObj.setFileSystemSearch(new FileSystemSearch());
 
-  t.is(dataObj.getGlobalData().toString(), "[object Promise]");
+  t.assert.strictEqual(dataObj.getGlobalData().toString(), "[object Promise]");
 
   let data = await dataObj.getGlobalData();
-  t.is(data.globalData.datakey1, "datavalue1", "simple data value");
-  t.is(
+  t.assert.strictEqual(data.globalData.datakey1, "datavalue1", "simple data value");
+  t.assert.strictEqual(
     data.globalData.datakey2,
     "{{pkg.name}}",
     `variables, resolve ${config.keys.package} to its value.`
   );
 
-  t.true(
-    Object.keys(data[config.keys.package]).length > 0,
-    `package.json imported to data in ${config.keys.package}`
-  );
+  t.assert.strictEqual(Object.keys(data[config.keys.package]).length > 0, true, `package.json imported to data in ${config.keys.package}`);
 });
 
 test("getGlobalData() use default processing (false)", async (t) => {
@@ -79,11 +76,11 @@ test("getGlobalData() use default processing (false)", async (t) => {
   dataObj.setFileSystemSearch(new FileSystemSearch());
 
   let data = await dataObj.getGlobalData();
-  t.is(data.globalData.datakey2, "{{pkg.name}}", `variables should not resolve`);
+  t.assert.strictEqual(data.globalData.datakey2, "{{pkg.name}}", `variables should not resolve`);
 });
 
 test("Data dir does not exist", async (t) => {
-  await t.throwsAsync(async () => {
+  await t.assert.rejects(async () => {
     let eleventyConfig = await getTemplateConfigInstance({
       dir: {
         input: "test/thisdirectorydoesnotexist"
@@ -111,19 +108,19 @@ test("Add local data", async (t) => {
 
   let data = await dataObj.getGlobalData();
 
-  t.is(data.globalData.datakey1, "datavalue1");
-  t.is(data.globalData.datakey2, "{{pkg.name}}");
+  t.assert.strictEqual(data.globalData.datakey1, "datavalue1");
+  t.assert.strictEqual(data.globalData.datakey2, "{{pkg.name}}");
 
   let withLocalData = await testGetLocalData(dataObj, "./test/stubs/component/component.njk");
-  t.is(withLocalData.globalData.datakey1, "datavalue1");
-  t.is(withLocalData.globalData.datakey2, "{{pkg.name}}");
-  t.is(withLocalData.localdatakey1, "localdatavalue1");
+  t.assert.strictEqual(withLocalData.globalData.datakey1, "datavalue1");
+  t.assert.strictEqual(withLocalData.globalData.datakey2, "{{pkg.name}}");
+  t.assert.strictEqual(withLocalData.localdatakey1, "localdatavalue1");
 
   // from the js file
   // this checks priority/overrides
-  t.is(withLocalData.localdatakeyfromcjs, "common-js-howdydoody");
-  t.is(withLocalData.localdatakeyfromjs, "howdydoody");
-  t.is(withLocalData.localdatakeyfromjs2, "howdy2");
+  t.assert.strictEqual(withLocalData.localdatakeyfromcjs, "common-js-howdydoody");
+  t.assert.strictEqual(withLocalData.localdatakeyfromjs, "howdydoody");
+  t.assert.strictEqual(withLocalData.localdatakeyfromjs2, "howdy2");
 });
 
 test("Get local data async JS", async (t) => {
@@ -141,8 +138,8 @@ test("Get local data async JS", async (t) => {
   let withLocalData = await testGetLocalData(dataObj, "./test/stubs/component-async/component.njk");
 
   // from the js file
-  t.is(withLocalData.localdatakeyfromcjs, "common-js-howdydoody");
-  t.is(withLocalData.localdatakeyfromjs, "howdydoody");
+  t.assert.strictEqual(withLocalData.localdatakeyfromcjs, "common-js-howdydoody");
+  t.assert.strictEqual(withLocalData.localdatakeyfromjs, "howdydoody");
 });
 
 test("addLocalData() doesn’t exist but doesn’t fail (template file does exist)", async (t) => {
@@ -165,9 +162,9 @@ test("addLocalData() doesn’t exist but doesn’t fail (template file does exis
     dataObj,
     "./test/stubs/datafiledoesnotexist/template.njk"
   );
-  t.is(withLocalData.globalData.datakey1, "datavalue1");
-  t.is(withLocalData.globalData.datakey2, "{{pkg.name}}");
-  t.deepEqual(Object.keys(withLocalData), beforeDataKeyCount);
+  t.assert.strictEqual(withLocalData.globalData.datakey1, "datavalue1");
+  t.assert.strictEqual(withLocalData.globalData.datakey2, "{{pkg.name}}");
+  t.assert.deepStrictEqual(Object.keys(withLocalData), beforeDataKeyCount);
 });
 
 test("addLocalData() doesn’t exist but doesn’t fail (template file does not exist)", async (t) => {
@@ -189,9 +186,9 @@ test("addLocalData() doesn’t exist but doesn’t fail (template file does not 
     dataObj,
     "./test/stubs/datafiledoesnotexist/templatedoesnotexist.njk"
   );
-  t.is(withLocalData.globalData.datakey1, "datavalue1");
-  t.is(withLocalData.globalData.datakey2, "{{pkg.name}}");
-  t.deepEqual(Object.keys(withLocalData), beforeDataKeyCount);
+  t.assert.strictEqual(withLocalData.globalData.datakey1, "datavalue1");
+  t.assert.strictEqual(withLocalData.globalData.datakey2, "{{pkg.name}}");
+  t.assert.deepStrictEqual(Object.keys(withLocalData), beforeDataKeyCount);
 });
 
 test("Global Dir Directory", async (t) => {
@@ -204,7 +201,7 @@ test("Global Dir Directory", async (t) => {
   let dataObj = new TemplateData(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
-  t.deepEqual(dataObj.getGlobalDataGlob(), [`./_data/**/*.{json,mjs,cjs,js${isTypeScriptSupported() ? ",mts,cts,ts" : ""}}`]);
+  t.assert.deepStrictEqual(dataObj.getGlobalDataGlob(), [`./_data/**/*.{json,mjs,cjs,js${isTypeScriptSupported() ? ",mts,cts,ts" : ""}}`]);
 });
 
 test("Global Dir Directory with Constructor Path Arg", async (t) => {
@@ -217,7 +214,7 @@ test("Global Dir Directory with Constructor Path Arg", async (t) => {
   let dataObj = new TemplateData(eleventyConfig);
   dataObj.setProjectUsingEsm(true);
 
-  t.deepEqual(dataObj.getGlobalDataGlob(), [`./test/stubs/_data/**/*.{json,mjs,cjs,js${isTypeScriptSupported() ? ",mts,cts,ts" : ""}}`]);
+  t.assert.deepStrictEqual(dataObj.getGlobalDataGlob(), [`./test/stubs/_data/**/*.{json,mjs,cjs,js${isTypeScriptSupported() ? ",mts,cts,ts" : ""}}`]);
 });
 
 test("getAllGlobalData() with other data files", async (t) => {
@@ -234,21 +231,19 @@ test("getAllGlobalData() with other data files", async (t) => {
   let data = await dataObj.getGlobalData();
   let dataFilePaths = await dataObj.getGlobalDataFiles();
 
-  t.true(dataFilePaths.length > 0);
-  t.true(
-    dataFilePaths.filter((path) => {
+  t.assert.strictEqual(dataFilePaths.length > 0, true);
+  t.assert.strictEqual(dataFilePaths.filter((path) => {
       return path.indexOf("./test/stubs/_data/globalData.json") === 0;
-    }).length > 0
-  );
+    }).length > 0, true);
 
-  t.truthy(data.globalData);
-  t.is(data.globalData.datakey1, "datavalue1");
+  t.assert.ok(data.globalData);
+  t.assert.strictEqual(data.globalData.datakey1, "datavalue1");
 
-  t.truthy(data.testData);
-  t.deepEqual(data.testData, {
+  t.assert.ok(data.testData);
+  t.assert.deepStrictEqual(data.testData, {
     testdatakey1: "testdatavalue1",
   });
-  t.deepEqual(data.subdir.testDataSubdir, {
+  t.assert.deepStrictEqual(data.subdir.testDataSubdir, {
     subdirkey: "subdirvalue",
   });
 });
@@ -267,14 +262,12 @@ test("getAllGlobalData() with js object data file", async (t) => {
   let data = await dataObj.getGlobalData();
   let dataFilePaths = await dataObj.getGlobalDataFiles();
 
-  t.true(
-    dataFilePaths.filter((path) => {
+  t.assert.strictEqual(dataFilePaths.filter((path) => {
       return path.indexOf("./test/stubs/_data/globalData2.cjs") === 0;
-    }).length > 0
-  );
+    }).length > 0, true);
 
-  t.truthy(data.globalData2);
-  t.is(data.globalData2.datakeyfromjs, "howdy");
+  t.assert.ok(data.globalData2);
+  t.assert.strictEqual(data.globalData2.datakeyfromjs, "howdy");
 });
 
 test("getAllGlobalData() with js function data file", async (t) => {
@@ -291,14 +284,12 @@ test("getAllGlobalData() with js function data file", async (t) => {
   let data = await dataObj.getGlobalData();
   let dataFilePaths = await dataObj.getGlobalDataFiles();
 
-  t.true(
-    dataFilePaths.filter((path) => {
+  t.assert.strictEqual(dataFilePaths.filter((path) => {
       return path.indexOf("./test/stubs/_data/globalDataFn.js") === 0;
-    }).length > 0
-  );
+    }).length > 0, true);
 
-  t.truthy(data.globalDataFn);
-  t.is(data.globalDataFn.datakeyfromjsfn, "howdy");
+  t.assert.ok(data.globalDataFn);
+  t.assert.strictEqual(data.globalDataFn.datakeyfromjsfn, "howdy");
 });
 
 test("getAllGlobalData() with config globalData", async (t) => {
@@ -316,9 +307,9 @@ test("getAllGlobalData() with config globalData", async (t) => {
 
   let data = await dataObj.getGlobalData();
 
-  t.is(data.example, "one");
-  t.is(data.example2, "two");
-  t.is(data.example3, "static");
+  t.assert.strictEqual(data.example, "one");
+  t.assert.strictEqual(data.example2, "two");
+  t.assert.strictEqual(data.example3, "static");
 });
 
 test("getAllGlobalData() with common js function data file", async (t) => {
@@ -335,14 +326,12 @@ test("getAllGlobalData() with common js function data file", async (t) => {
   let data = await dataObj.getGlobalData();
   let dataFilePaths = await dataObj.getGlobalDataFiles();
 
-  t.true(
-    dataFilePaths.filter((path) => {
+  t.assert.strictEqual(dataFilePaths.filter((path) => {
       return path.indexOf("./test/stubs/_data/globalDataFnCJS.cjs") === 0;
-    }).length > 0
-  );
+    }).length > 0, true);
 
-  t.truthy(data.globalDataFnCJS);
-  t.is(data.globalDataFnCJS.datakeyfromcjsfn, "common-cjs-howdy");
+  t.assert.ok(data.globalDataFnCJS);
+  t.assert.strictEqual(data.globalDataFnCJS.datakeyfromcjsfn, "common-cjs-howdy");
 });
 
 test("getDataValue() without template engine preprocessing", async (t) => {
@@ -359,7 +348,7 @@ test("getDataValue() without template engine preprocessing", async (t) => {
     pkg: { name: "pkgname" },
   });
 
-  t.deepEqual(data, {
+  t.assert.deepStrictEqual(data, {
     datakey1: "datavalue1",
     datakey2: "{{ pkg.name }}",
   });
@@ -377,7 +366,7 @@ test("getLocalDataPaths", async (t) => {
   dataObj.setProjectUsingEsm(true);
   let paths = await dataObj.getLocalDataPaths("./test/stubs/component/component.liquid");
 
-  t.deepEqual(paths, [
+  t.assert.deepStrictEqual(paths, [
     "./test/stubs/stubs.json",
 
     "./test/stubs/stubs.11tydata.json",
@@ -428,7 +417,7 @@ test("getLocalDataPaths (with setDataFileBaseName #1699)", async (t) => {
   dataObj.setProjectUsingEsm(true);
   let paths = await dataObj.getLocalDataPaths("./test/stubs/component/component.liquid");
 
-  t.deepEqual(paths, [
+  t.assert.deepStrictEqual(paths, [
     "./test/stubs/index.11tydata.json",
     "./test/stubs/index.11tydata.mjs",
     "./test/stubs/index.11tydata.cjs",
@@ -493,7 +482,7 @@ test("getLocalDataPaths (with empty setDataFileSuffixes #1699)", async (t) => {
   dataObj.setProjectUsingEsm(true);
   let paths = await dataObj.getLocalDataPaths("./test/stubs/component/component.liquid");
 
-  t.deepEqual(paths, []);
+  t.assert.deepStrictEqual(paths, []);
 });
 
 test("getLocalDataPaths (with setDataFileSuffixes override #1699)", async (t) => {
@@ -508,7 +497,7 @@ test("getLocalDataPaths (with setDataFileSuffixes override #1699)", async (t) =>
   dataObj.setProjectUsingEsm(true);
   let paths = await dataObj.getLocalDataPaths("./test/stubs/component/component.liquid");
 
-  t.deepEqual(paths, [
+  t.assert.deepStrictEqual(paths, [
     "./test/stubs/stubs.howdy.json",
     "./test/stubs/stubs.howdy.mjs",
     "./test/stubs/stubs.howdy.cjs",
@@ -544,7 +533,7 @@ test("getLocalDataPaths (with setDataFileSuffixes empty string override #1699)",
   dataObj.setProjectUsingEsm(true);
   let paths = await dataObj.getLocalDataPaths("./test/stubs/component/component.liquid");
 
-  t.deepEqual(paths, ["./test/stubs/stubs.json", "./test/stubs/component/component.json"]);
+  t.assert.deepStrictEqual(paths, ["./test/stubs/stubs.json", "./test/stubs/component/component.json"]);
 });
 
 test("getLocalDataPaths (with setDataFileSuffixes override with two entries #1699)", async (t) => {
@@ -560,7 +549,7 @@ test("getLocalDataPaths (with setDataFileSuffixes override with two entries #169
   dataObj.setProjectUsingEsm(true);
   let paths = await dataObj.getLocalDataPaths("./test/stubs/component/component.liquid");
 
-  t.deepEqual(paths, [
+  t.assert.deepStrictEqual(paths, [
     "./test/stubs/stubs.json",
     "./test/stubs/stubs.howdy.json",
     "./test/stubs/stubs.howdy.mjs",
@@ -600,7 +589,7 @@ test("getLocalDataPaths (with setDataFileSuffixes and setDataFileBaseName #1699)
   dataObj.setProjectUsingEsm(true);
   let paths = await dataObj.getLocalDataPaths("./test/stubs/component/component.liquid");
 
-  t.deepEqual(paths, [
+  t.assert.deepStrictEqual(paths, [
     "./test/stubs/index.howdy.json",
     "./test/stubs/index.howdy.mjs",
     "./test/stubs/index.howdy.cjs",
@@ -636,7 +625,7 @@ test("Deeper getLocalDataPaths", async (t) => {
   dataObj.setProjectUsingEsm(true);
   let paths = await dataObj.getLocalDataPaths("./test/stubs/component/component.liquid");
 
-  t.deepEqual(paths, [
+  t.assert.deepStrictEqual(paths, [
     "./test/test.json",
 
     "./test/test.11tydata.json",
@@ -705,7 +694,7 @@ test("getLocalDataPaths with an 11ty js template", async (t) => {
   dataObj.setProjectUsingEsm(true);
   let paths = await dataObj.getLocalDataPaths("./test/stubs/component/component.11ty.js");
 
-  t.deepEqual(paths, [
+  t.assert.deepStrictEqual(paths, [
     "./test/stubs/stubs.json",
 
     "./test/stubs/stubs.11tydata.json",
@@ -756,7 +745,7 @@ test("getLocalDataPaths with inputDir passed in (trailing slash)", async (t) => 
   dataObj.setProjectUsingEsm(true);
   let paths = await dataObj.getLocalDataPaths("./test/stubs/component/component.liquid");
 
-  t.deepEqual(paths, [
+  t.assert.deepStrictEqual(paths, [
     "./test/stubs/stubs.json",
 
     "./test/stubs/stubs.11tydata.json",
@@ -807,7 +796,7 @@ test("getLocalDataPaths with inputDir passed in (no trailing slash)", async (t) 
   dataObj.setProjectUsingEsm(true);
   let paths = await dataObj.getLocalDataPaths("./test/stubs/component/component.liquid");
 
-  t.deepEqual(paths, [
+  t.assert.deepStrictEqual(paths, [
     "./test/stubs/stubs.json",
 
     "./test/stubs/stubs.11tydata.json",
@@ -858,7 +847,7 @@ test("getLocalDataPaths with inputDir passed in (no leading slash)", async (t) =
   dataObj.setProjectUsingEsm(true);
   let paths = await dataObj.getLocalDataPaths("./test/stubs/component/component.liquid");
 
-  t.deepEqual(paths, [
+  t.assert.deepStrictEqual(paths, [
     "./test/stubs/stubs.json",
 
     "./test/stubs/stubs.11tydata.json",
@@ -907,7 +896,7 @@ test("getRawImports", async (t) => {
   dataObj.setProjectUsingEsm(true);
   let data = await dataObj.getRawImports();
 
-  t.is(data.pkg.name, "@11ty/eleventy");
+  t.assert.strictEqual(data.pkg.name, "@11ty/eleventy");
 });
 
 test("getTemplateDataFileGlob", async (t) => {
@@ -919,14 +908,14 @@ test("getTemplateDataFileGlob", async (t) => {
 
   let tw = new TemplateData(eleventyConfig);
 
-  t.deepEqual(tw.getTemplateDataFileGlob(), [
+  t.assert.deepStrictEqual(tw.getTemplateDataFileGlob(), [
     `./test/stubs/**/*.{json,data.mjs,data.cjs,data.js,data.mts,data.cts,data.ts,11tydata.mjs,11tydata.cjs,11tydata.js,11tydata.mts,11tydata.cts,11tydata.ts}`,
   ]);
 });
 
 // https://github.com/11ty/eleventy/issues/3937
 test("TemplateData.merge is now Merge()", (t) => {
-  t.deepEqual(
+  t.assert.deepStrictEqual(
     Merge(
       {
         tags: [1, 2, 3],
@@ -940,12 +929,12 @@ test("TemplateData.merge is now Merge()", (t) => {
 });
 
 test("TemplateData.cleanupData", (t) => {
-  t.deepEqual(TemplateData.cleanupData({}), {});
-  t.deepEqual(TemplateData.cleanupData({ tags: null }), { tags: [] });
-  t.deepEqual(TemplateData.cleanupData({ tags: "" }), { tags: [] });
-  t.deepEqual(TemplateData.cleanupData({ tags: [] }), { tags: [] });
-  t.deepEqual(TemplateData.cleanupData({ tags: "test" }), { tags: ["test"] });
-  t.deepEqual(TemplateData.cleanupData({ tags: ["test1", "test2"] }), {
+  t.assert.deepStrictEqual(TemplateData.cleanupData({}), {});
+  t.assert.deepStrictEqual(TemplateData.cleanupData({ tags: null }), { tags: [] });
+  t.assert.deepStrictEqual(TemplateData.cleanupData({ tags: "" }), { tags: [] });
+  t.assert.deepStrictEqual(TemplateData.cleanupData({ tags: [] }), { tags: [] });
+  t.assert.deepStrictEqual(TemplateData.cleanupData({ tags: "test" }), { tags: ["test"] });
+  t.assert.deepStrictEqual(TemplateData.cleanupData({ tags: ["test1", "test2"] }), {
     tags: ["test1", "test2"],
   });
 });
@@ -964,7 +953,7 @@ test("Parent directory for data (Issue #337)", async (t) => {
 
   let data = await dataObj.getGlobalData();
 
-  t.deepEqual(data.xyz, {
+  t.assert.deepStrictEqual(data.xyz, {
     hi: "bye",
   });
 });
@@ -982,7 +971,7 @@ test("Dots in datafile path (Issue #1242)", async (t) => {
 
   let data = await dataObj.getGlobalData();
 
-  t.deepEqual(data["xyz.dottest"], {
+  t.assert.deepStrictEqual(data["xyz.dottest"], {
     hi: "bye",
     test: {
       abc: 42,
@@ -1008,9 +997,9 @@ test("addGlobalData values", async (t) => {
   dataObj.setFileSystemSearch(new FileSystemSearch());
   let data = await dataObj.getGlobalData();
 
-  t.is(data.myFunction, "fn-value");
-  t.is(data.myPromise, "promise-value");
-  t.is(data.myAsync, "promise-value");
+  t.assert.strictEqual(data.myFunction, "fn-value");
+  t.assert.strictEqual(data.myPromise, "promise-value");
+  t.assert.strictEqual(data.myAsync, "promise-value");
 });
 
 test("addGlobalData should execute once.", async (t) => {
@@ -1031,8 +1020,8 @@ test("addGlobalData should execute once.", async (t) => {
 
   let data = await dataObj.getGlobalData();
 
-  t.is(data.count, 1);
-  t.is(count, 1);
+  t.assert.strictEqual(data.count, 1);
+  t.assert.strictEqual(count, 1);
 });
 
 test("addGlobalData complex key", async (t) => {
@@ -1048,9 +1037,9 @@ test("addGlobalData complex key", async (t) => {
   dataObj.setFileSystemSearch(new FileSystemSearch());
   let data = await dataObj.getGlobalData();
 
-  t.is(data.deep.existing, true);
-  t.is(data.deep.nested.one, "first");
-  t.is(data.deep.nested.two, "second");
+  t.assert.strictEqual(data.deep.existing, true);
+  t.assert.strictEqual(data.deep.nested.one, "first");
+  t.assert.strictEqual(data.deep.nested.two, "second");
 });
 
 test("eleventy.version and eleventy.generator returned from data", async (t) => {
@@ -1068,11 +1057,11 @@ test("eleventy.version and eleventy.generator returned from data", async (t) => 
 
   let version = semver.coerce(pkg.version).toString();
 
-  t.is(data.eleventy.version, version);
-  t.is(data.eleventy.generator, `Eleventy (Build Awesome) v${version}`);
+  t.assert.strictEqual(data.eleventy.version, version);
+  t.assert.strictEqual(data.eleventy.generator, `Eleventy (Build Awesome) v${version}`);
 
-  t.is(data.deep.nested.one, "first");
-  t.is(data.deep.nested.two, "second");
+  t.assert.strictEqual(data.deep.nested.one, "first");
+  t.assert.strictEqual(data.deep.nested.two, "second");
 });
 
 test("getGlobalData() empty json file", async (t) => {
@@ -1088,7 +1077,7 @@ test("getGlobalData() empty json file", async (t) => {
   dataObj.setFileSystemSearch(new FileSystemSearch());
 
   let data = await dataObj.getGlobalData();
-  t.deepEqual(data.empty, {});
+  t.assert.deepStrictEqual(data.empty, {});
 });
 
 test("ESM data file", async (t) => {
@@ -1103,70 +1092,70 @@ test("ESM data file", async (t) => {
   dataObj.setFileSystemSearch(new FileSystemSearch());
 
   let data = await dataObj.getGlobalData();
-  t.is(data.module.default, "es module default");
-  t.is(data.module.named, "es module named");
-  t.is(data.commonjs, "commonjs default");
+  t.assert.strictEqual(data.module.default, "es module default");
+  t.assert.strictEqual(data.module.named, "es module named");
+  t.assert.strictEqual(data.commonjs, "commonjs default");
 });
 
 test("Test collection names from data (empty assigned)", async (t) => {
-  t.deepEqual(TemplateData.getIncludedCollectionNames({
+  t.assert.deepStrictEqual(TemplateData.getIncludedCollectionNames({
     tags: [],
   }), ["all"]);
 
-  t.deepEqual(TemplateData.getIncludedCollectionNames({
+  t.assert.deepStrictEqual(TemplateData.getIncludedCollectionNames({
     tags: [],
     eleventyExcludeFromCollections: true
   }), []);
 
-  t.deepEqual(TemplateData.getIncludedCollectionNames({
+  t.assert.deepStrictEqual(TemplateData.getIncludedCollectionNames({
     tags: [],
     eleventyExcludeFromCollections: ["one"]
   }), ["all"]);
 });
 
 test("Test collection names from data (tags assigned)", async (t) => {
-  t.deepEqual(TemplateData.getIncludedCollectionNames({
+  t.assert.deepStrictEqual(TemplateData.getIncludedCollectionNames({
     tags: ["one", "two"],
   }), ["all", "one", "two"]);
 
-  t.deepEqual(TemplateData.getIncludedCollectionNames({
+  t.assert.deepStrictEqual(TemplateData.getIncludedCollectionNames({
     tags: ["one", "two"],
     eleventyExcludeFromCollections: true,
   }), []);
 
-  t.deepEqual(TemplateData.getIncludedCollectionNames({
+  t.assert.deepStrictEqual(TemplateData.getIncludedCollectionNames({
     tags: ["one", "two"],
     eleventyExcludeFromCollections: ["one"],
   }), ["all", "two"]);
 });
 
 test("Test tag names from data (empty assigned)", async (t) => {
-  t.deepEqual(TemplateData.getIncludedTagNames({
+  t.assert.deepStrictEqual(TemplateData.getIncludedTagNames({
     tags: [],
   }), []);
 
-  t.deepEqual(TemplateData.getIncludedTagNames({
+  t.assert.deepStrictEqual(TemplateData.getIncludedTagNames({
     tags: [],
     eleventyExcludeFromCollections: true
   }), []);
 
-  t.deepEqual(TemplateData.getIncludedTagNames({
+  t.assert.deepStrictEqual(TemplateData.getIncludedTagNames({
     tags: [],
     eleventyExcludeFromCollections: ["one"]
   }), []);
 });
 
 test("Test tag names from data (tags assigned)", async (t) => {
-  t.deepEqual(TemplateData.getIncludedTagNames({
+  t.assert.deepStrictEqual(TemplateData.getIncludedTagNames({
     tags: ["one", "two"],
   }), ["one", "two"]);
 
-  t.deepEqual(TemplateData.getIncludedTagNames({
+  t.assert.deepStrictEqual(TemplateData.getIncludedTagNames({
     tags: ["one", "two"],
     eleventyExcludeFromCollections: true,
   }), []);
 
-  t.deepEqual(TemplateData.getIncludedTagNames({
+  t.assert.deepStrictEqual(TemplateData.getIncludedTagNames({
     tags: ["one", "two"],
     eleventyExcludeFromCollections: ["one"],
   }), ["two"]);

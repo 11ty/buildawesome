@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 
 import { default as HtmlBasePlugin, applyBaseToUrl } from "../src/Plugins/HtmlBasePlugin.js";
 import Eleventy from "../src/Core.js";
@@ -13,84 +13,84 @@ test("Using the filter directly", async (t) => {
   // url, base, pathprefix
 
   // default pathprefix
-  t.is(applyBaseToUrl("/", "/"), "/");
-  t.is(applyBaseToUrl("/test/", "/"), "/test/");
-  t.is(applyBaseToUrl("subdir/", "/"), "subdir/");
-  t.is(applyBaseToUrl("../subdir/", "/"), "../subdir/");
-  t.is(applyBaseToUrl("./subdir/", "/"), "subdir/");
-  t.is(applyBaseToUrl("http://example.com/", "/"), "http://example.com/");
-  t.is(applyBaseToUrl("http://example.com/test/", "/"), "http://example.com/test/");
+  t.assert.strictEqual(applyBaseToUrl("/", "/"), "/");
+  t.assert.strictEqual(applyBaseToUrl("/test/", "/"), "/test/");
+  t.assert.strictEqual(applyBaseToUrl("subdir/", "/"), "subdir/");
+  t.assert.strictEqual(applyBaseToUrl("../subdir/", "/"), "../subdir/");
+  t.assert.strictEqual(applyBaseToUrl("./subdir/", "/"), "subdir/");
+  t.assert.strictEqual(applyBaseToUrl("http://example.com/", "/"), "http://example.com/");
+  t.assert.strictEqual(applyBaseToUrl("http://example.com/test/", "/"), "http://example.com/test/");
 
   // relative url pathprefix is ignored
-  t.is(applyBaseToUrl("/", "../"), "/");
-  t.is(applyBaseToUrl("/test/", "../"), "/test/");
-  t.is(applyBaseToUrl("subdir/", "../"), "subdir/");
-  t.is(applyBaseToUrl("../subdir/", "../"), "../subdir/");
-  t.is(applyBaseToUrl("./subdir/", "../"), "subdir/");
-  t.is(applyBaseToUrl("http://example.com/", "../"), "http://example.com/");
-  t.is(applyBaseToUrl("http://example.com/test/", "../"), "http://example.com/test/");
+  t.assert.strictEqual(applyBaseToUrl("/", "../"), "/");
+  t.assert.strictEqual(applyBaseToUrl("/test/", "../"), "/test/");
+  t.assert.strictEqual(applyBaseToUrl("subdir/", "../"), "subdir/");
+  t.assert.strictEqual(applyBaseToUrl("../subdir/", "../"), "../subdir/");
+  t.assert.strictEqual(applyBaseToUrl("./subdir/", "../"), "subdir/");
+  t.assert.strictEqual(applyBaseToUrl("http://example.com/", "../"), "http://example.com/");
+  t.assert.strictEqual(applyBaseToUrl("http://example.com/test/", "../"), "http://example.com/test/");
 
   // with a pathprefix
-  t.is(applyBaseToUrl("/", "/pathprefix/"), "/pathprefix/");
-  t.is(applyBaseToUrl("/test/", "/pathprefix/"), "/pathprefix/test/");
-  t.is(applyBaseToUrl("subdir/", "/pathprefix/"), "subdir/");
-  t.is(applyBaseToUrl("../subdir/", "/pathprefix/"), "../subdir/");
-  t.is(applyBaseToUrl("./subdir/", "/pathprefix/"), "subdir/");
-  t.is(applyBaseToUrl("#anchor", "/pathprefix/"), "#anchor");
-  t.is(applyBaseToUrl("/test/#anchor", "/pathprefix/"), "/pathprefix/test/#anchor");
-  t.is(applyBaseToUrl("/test/?param=value", "/pathprefix/"), "/pathprefix/test/?param=value");
-  t.is(applyBaseToUrl("http://url.com/", "/pathprefix/"), "http://url.com/");
-  t.is(applyBaseToUrl("http://url.com/test/", "/pathprefix/"), "http://url.com/test/");
+  t.assert.strictEqual(applyBaseToUrl("/", "/pathprefix/"), "/pathprefix/");
+  t.assert.strictEqual(applyBaseToUrl("/test/", "/pathprefix/"), "/pathprefix/test/");
+  t.assert.strictEqual(applyBaseToUrl("subdir/", "/pathprefix/"), "subdir/");
+  t.assert.strictEqual(applyBaseToUrl("../subdir/", "/pathprefix/"), "../subdir/");
+  t.assert.strictEqual(applyBaseToUrl("./subdir/", "/pathprefix/"), "subdir/");
+  t.assert.strictEqual(applyBaseToUrl("#anchor", "/pathprefix/"), "#anchor");
+  t.assert.strictEqual(applyBaseToUrl("/test/#anchor", "/pathprefix/"), "/pathprefix/test/#anchor");
+  t.assert.strictEqual(applyBaseToUrl("/test/?param=value", "/pathprefix/"), "/pathprefix/test/?param=value");
+  t.assert.strictEqual(applyBaseToUrl("http://url.com/", "/pathprefix/"), "http://url.com/");
+  t.assert.strictEqual(applyBaseToUrl("http://url.com/test/", "/pathprefix/"), "http://url.com/test/");
 
   // with a URL base
-  t.is(applyBaseToUrl("/", "http://example.com/"), "http://example.com/");
-  t.is(applyBaseToUrl("/test/", "http://example.com/"), "http://example.com/test/");
-  t.is(applyBaseToUrl("subdir/", "http://example.com/"), "http://example.com/subdir/");
-  t.is(applyBaseToUrl("../subdir/", "http://example.com/"), "http://example.com/subdir/");
-  t.is(applyBaseToUrl("./subdir/", "http://example.com/"), "http://example.com/subdir/");
-  t.is(applyBaseToUrl("http://url.com/", "http://example.com/"), "http://url.com/");
-  t.is(applyBaseToUrl("http://url.com/test/", "http://example.com/"), "http://url.com/test/");
-  t.is(applyBaseToUrl("#anchor", "http://example.com/"), "http://example.com/#anchor");
-	t.is(applyBaseToUrl("/test/#anchor", "http://example.com/"), "http://example.com/test/#anchor");
-	t.is(applyBaseToUrl("/test/?param=value#anchor", "http://example.com/"), "http://example.com/test/?param=value#anchor");
+  t.assert.strictEqual(applyBaseToUrl("/", "http://example.com/"), "http://example.com/");
+  t.assert.strictEqual(applyBaseToUrl("/test/", "http://example.com/"), "http://example.com/test/");
+  t.assert.strictEqual(applyBaseToUrl("subdir/", "http://example.com/"), "http://example.com/subdir/");
+  t.assert.strictEqual(applyBaseToUrl("../subdir/", "http://example.com/"), "http://example.com/subdir/");
+  t.assert.strictEqual(applyBaseToUrl("./subdir/", "http://example.com/"), "http://example.com/subdir/");
+  t.assert.strictEqual(applyBaseToUrl("http://url.com/", "http://example.com/"), "http://url.com/");
+  t.assert.strictEqual(applyBaseToUrl("http://url.com/test/", "http://example.com/"), "http://url.com/test/");
+  t.assert.strictEqual(applyBaseToUrl("#anchor", "http://example.com/"), "http://example.com/#anchor");
+	t.assert.strictEqual(applyBaseToUrl("/test/#anchor", "http://example.com/"), "http://example.com/test/#anchor");
+	t.assert.strictEqual(applyBaseToUrl("/test/?param=value#anchor", "http://example.com/"), "http://example.com/test/?param=value#anchor");
 
   // with a URL base with extra subdirectory
-  t.is(applyBaseToUrl("/", "http://example.com/ignored/"), "http://example.com/");
-  t.is(applyBaseToUrl("/test/", "http://example.com/ignored/"), "http://example.com/test/");
-  t.is(applyBaseToUrl("subdir/", "http://example.com/deep/"), "http://example.com/deep/subdir/");
-  t.is(applyBaseToUrl("../subdir/", "http://example.com/deep/"), "http://example.com/subdir/");
-  t.is(applyBaseToUrl("./subdir/", "http://example.com/deep/"), "http://example.com/deep/subdir/");
-  t.is(applyBaseToUrl("http://url.com/", "http://example.com/ignored/"), "http://url.com/");
-  t.is(
+  t.assert.strictEqual(applyBaseToUrl("/", "http://example.com/ignored/"), "http://example.com/");
+  t.assert.strictEqual(applyBaseToUrl("/test/", "http://example.com/ignored/"), "http://example.com/test/");
+  t.assert.strictEqual(applyBaseToUrl("subdir/", "http://example.com/deep/"), "http://example.com/deep/subdir/");
+  t.assert.strictEqual(applyBaseToUrl("../subdir/", "http://example.com/deep/"), "http://example.com/subdir/");
+  t.assert.strictEqual(applyBaseToUrl("./subdir/", "http://example.com/deep/"), "http://example.com/deep/subdir/");
+  t.assert.strictEqual(applyBaseToUrl("http://url.com/", "http://example.com/ignored/"), "http://url.com/");
+  t.assert.strictEqual(
     applyBaseToUrl("http://url.com/test/", "http://example.com/ignored/"),
     "http://url.com/test/"
   );
 
   // with a URL base and root pathprefix
-  t.is(applyBaseToUrl("/", "http://example.com/", { pathPrefix: "/" }), "http://example.com/");
-  t.is(
+  t.assert.strictEqual(applyBaseToUrl("/", "http://example.com/", { pathPrefix: "/" }), "http://example.com/");
+  t.assert.strictEqual(
     applyBaseToUrl("/test/", "http://example.com/", { pathPrefix: "/" }),
     "http://example.com/test/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("subdir/", "http://example.com/", { pathPrefix: "/" }),
     "http://example.com/subdir/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("../subdir/", "http://example.com/", { pathPrefix: "/" }),
     "http://example.com/subdir/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("./subdir/", "http://example.com/", { pathPrefix: "/" }),
     "http://example.com/subdir/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("http://url.com/", "http://example.com/", {
       pathPrefix: "/",
     }),
     "http://url.com/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("http://url.com/test/", "http://example.com/", {
       pathPrefix: "/",
     }),
@@ -98,41 +98,41 @@ test("Using the filter directly", async (t) => {
   );
 
   // with a base and pathprefix
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("/", "http://example.com/", { pathPrefix: "/pathprefix/" }),
     "http://example.com/pathprefix/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("/test/", "http://example.com/", {
       pathPrefix: "/pathprefix/",
     }),
     "http://example.com/pathprefix/test/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("subdir/", "http://example.com/", {
       pathPrefix: "/pathprefix/",
     }),
     "http://example.com/pathprefix/subdir/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("../subdir/", "http://example.com/", {
       pathPrefix: "/pathprefix/",
     }),
     "http://example.com/pathprefix/subdir/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("./subdir/", "http://example.com/", {
       pathPrefix: "/pathprefix/",
     }),
     "http://example.com/pathprefix/subdir/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("http://url.com/", "http://example.com/", {
       pathPrefix: "/pathprefix/",
     }),
     "http://url.com/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("http://url.com/test/", "http://example.com/", {
       pathPrefix: "/pathprefix/",
     }),
@@ -140,49 +140,49 @@ test("Using the filter directly", async (t) => {
   );
 
   // with a base and pathprefix and page url (for relative path urls)
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("/", "http://example.com/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
     }),
     "http://example.com/pathprefix/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("/test/", "http://example.com/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
     }),
     "http://example.com/pathprefix/test/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("subdir/", "http://example.com/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
     }),
     "http://example.com/pathprefix/deep/subdir/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("../subdir/", "http://example.com/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
     }),
     "http://example.com/pathprefix/subdir/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("./subdir/", "http://example.com/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
     }),
     "http://example.com/pathprefix/deep/subdir/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("http://url.com/", "http://example.com/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
     }),
     "http://url.com/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("http://url.com/test/", "http://example.com/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
@@ -192,49 +192,49 @@ test("Using the filter directly", async (t) => {
 
   // with a base (with extra subdir) and pathprefix and page url (for relative path urls)
   // Note: Extra subdir is ignored when pageUrl is in play
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("/", "http://example.com/ignored/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
     }),
     "http://example.com/pathprefix/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("/test/", "http://example.com/ignored/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
     }),
     "http://example.com/pathprefix/test/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("subdir/", "http://example.com/ignored/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
     }),
     "http://example.com/pathprefix/deep/subdir/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("../subdir/", "http://example.com/ignored/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
     }),
     "http://example.com/pathprefix/subdir/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("./subdir/", "http://example.com/ignored/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
     }),
     "http://example.com/pathprefix/deep/subdir/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("http://url.com/", "http://example.com/ignored/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
     }),
     "http://url.com/"
   );
-  t.is(
+  t.assert.strictEqual(
     applyBaseToUrl("http://url.com/test/", "http://example.com/ignored/", {
       pathPrefix: "/pathprefix/",
       pageUrl: "/deep/",
@@ -257,7 +257,7 @@ test("Using the HTML base plugin (default values)", async (t) => {
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/deep/index.html"),
     `<!doctype html>
 <html lang="en">
@@ -298,7 +298,7 @@ test("Using the HTML base plugin with pathPrefix: /test/", async (t) => {
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/deep/index.html"),
     `<!doctype html>
 <html lang="en">
@@ -341,7 +341,7 @@ test("Using the HTML base plugin with pathPrefix: /test/ and base: http://exampl
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/deep/index.html"),
     `<!doctype html>
 <html lang="en">
@@ -382,7 +382,7 @@ test("Using the HTML base plugin strips extra path in full URL base (default pat
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/deep/index.html"),
     `<!doctype html>
 <html lang="en">
@@ -425,7 +425,7 @@ test("Using the HTML base plugin strips extra path in full URL base (pathPrefix:
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/deep/index.html"),
     `<!doctype html>
 <html lang="en">
@@ -468,7 +468,7 @@ test("Opt out of the transform with falsy extensions list", async (t) => {
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/deep/index.html"),
     `<!doctype html>
 <html lang="en">
@@ -509,7 +509,7 @@ test("Base plugin with permalink: false, #2602", async (t) => {
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/deep/index.html"),
     `<!doctype html>
 <html lang="en">
@@ -549,7 +549,7 @@ test("Using the HTML base plugin with pathPrefix: /test/ and transformed attribu
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/deep/index.html"),
     `<!doctype html>
 <html lang="en">
@@ -578,12 +578,12 @@ test("HTML base plugin only adds once (unique)", async (t) => {
     configPath: false,
     config: function ($config) {
       // Runs before defaultConfig.js
-      t.is($config.plugins.length, 0);
+      t.assert.strictEqual($config.plugins.length, 0);
       $config.addPlugin(HtmlBasePlugin);
       $config.addPlugin(HtmlBasePlugin);
       $config.addPlugin(HtmlBasePlugin);
       $config.addPlugin(HtmlBasePlugin);
-      t.is($config.plugins.length, 1);
+      t.assert.strictEqual($config.plugins.length, 1);
     },
   });
   await elev.init();
@@ -595,7 +595,7 @@ test("HTML base plugin can resolve by name", async (t) => {
     configPath: false,
     config: async function ($config) {
       // Runs before defaultConfig.js
-      t.is($config.plugins.length, 0);
+      t.assert.strictEqual($config.plugins.length, 0);
 
       let plugin = await $config.resolvePlugin("@11ty/eleventy/html-base-plugin");
       $config.addPlugin(plugin);
@@ -607,7 +607,7 @@ test("HTML base plugin can resolve by name", async (t) => {
       $config.addPlugin(HtmlBasePlugin);
       $config.addPlugin(HtmlBasePlugin);
 
-      t.is($config.plugins.length, 1);
+      t.assert.strictEqual($config.plugins.length, 1);
     },
   });
   await elev.init();
@@ -642,7 +642,7 @@ permalink: /deep/
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(
+  t.assert.strictEqual(
     getContentFor(results, "/deep/index.html"),
     `<!doctype html>
 <html lang="en">
@@ -674,5 +674,5 @@ test("HTML base plugin skips attributes with no value", async (t) => {
   elev.disableLogger();
 
   let results = await elev.toJSON();
-  t.is(results[0].content, `<a href>Test</a><img src><a href="/prefixed/test/">Test</a>`);
+  t.assert.strictEqual(results[0].content, `<a href>Test</a><img src><a href="/prefixed/test/">Test</a>`);
 });

@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#3823 addCollection -> pagination over `collections`", async (t) => {
@@ -26,6 +26,6 @@ pagination:
   let results = await elev.toJSON();
   results.sort();
 
-  t.is(results.length, 3);
-  t.is(results.filter((entry) => entry.url === "/")[0]?.content.trim(), "posts")
+  t.assert.strictEqual(results.length, 3);
+  t.assert.strictEqual(results.filter((entry) => entry.url === "/")[0]?.content.trim(), "posts")
 });

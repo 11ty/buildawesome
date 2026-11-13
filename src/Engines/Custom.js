@@ -32,6 +32,12 @@ export default class CustomEngine extends TemplateEngine {
 		this._defaultEngine = defaultEngine;
 	}
 
+	// A default engine for an alias or override is not in the engine cache, so cascade here
+	removeConfigEventListeners() {
+		super.removeConfigEventListeners();
+		this._defaultEngine?.removeConfigEventListeners();
+	}
+
 	get cacheable() {
 		// Enable cacheability for this template
 		if (this.entry?.compileOptions?.cache !== undefined) {

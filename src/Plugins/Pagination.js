@@ -4,14 +4,16 @@ import { DeepCopy } from "@11ty/eleventy-utils";
 
 import BaseError from "../Errors/BaseError.js";
 import { ProxyWrap } from "../Util/Objects/ProxyWrap.js";
+import PathPrefixer from "../Util/PathPrefixer.js";
 // import { DeepFreeze } from "../Util/Objects/DeepFreeze.js";
 import TemplateData from "../Data/TemplateData.js";
-import { withoutTracking } from "../Data/GlobalDataReads.js";
+import { ResolveConfigurationData } from "../Data/ResolveConfigurationData.js";
+import { withoutTracking } from "../Data/InternalReads.js";
 
 const { set: lodashSet, get: lodashGet, chunk: lodashChunk } = lodash;
 
 class PaginationConfigError extends BaseError {}
-class PaginationError extends BaseError {}
+export class PaginationError extends BaseError {}
 
 class Pagination {
 	static NOT_FOUND_VALUE = "__NOT_FOUND_ERROR__";
@@ -34,8 +36,9 @@ class Pagination {
 		return "";
 	}
 
+	// Falsy values (e.g. from computed data) mean no pagination
 	static hasPagination(data) {
-		return "pagination" in data;
+		return Boolean(data.pagination);
 	}
 
 	hasPagination() {
@@ -49,7 +52,10 @@ class Pagination {
 
 	circularReferenceCheck(data) {
 		let key = data.pagination.data;
-		let includedTags = TemplateData.getIncludedTagNames(data);
+		// Computed `tags` reading pagination data aren’t resolved yet, Issue #1952
+		let includedTags = withoutTracking(() =>
+			TemplateData.getIncludedTagNames(data, this.config.keys.tags),
+		);
 
 		for (let tag of includedTags) {
 			if (`collections.${tag}` === key) {
@@ -68,11 +74,7 @@ class Pagination {
 			return;
 		}
 
-		if (!data.pagination) {
-			throw new Error(
-				`Misconfigured pagination data in template front matter${this.inputPathForErrorMessages} (YAML front matter precaution: did you use tabs and not spaces for indentation?).`,
-			);
-		} else if (!("size" in data.pagination)) {
+		if (!("size" in data.pagination)) {
 			throw new Error(
 				`Missing pagination size in front matter data${this.inputPathForErrorMessages}`,
 			);
@@ -272,9 +274,15 @@ class Pagination {
 		let links = [];
 		let hrefs = [];
 
-		let hasPermalinkField =
-			Boolean(this.data[this.config.keys.permalink]) ||
-			Boolean(this.data.eleventyComputed?.[this.config.keys.permalink]);
+		let hasPermalinkField = withoutTracking(
+			() =>
+				Boolean(this.data[this.config.keys.permalink]) ||
+				Boolean(
+					ResolveConfigurationData.getValue(this.data, this.config.keys.computed)?.[
+						this.config.keys.permalink
+					],
+				),
+		);
 
 		// Do *not* pass collections through DeepCopy, we’ll re-add them back in later.
 		let collections = this.data.collections;
@@ -363,7 +371,7 @@ class Pagination {
 				await cloned.getOutputLocations(clonedData);
 			// TODO subdirectory to links if the site doesn’t live at /
 			if (rawPath) {
-				links.push("/" + rawPath);
+				links.push(PathPrefixer.joinUrlParts("/", rawPath));
 			}
 
 			hrefs.push(href);

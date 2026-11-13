@@ -66,6 +66,11 @@ export class ErrorHandler {
 			showStack = false;
 		}
 
+		// Unwrap a top-level `cause` too, e.g. `new Error(…, { cause })` in TemplateMap
+		if (!e.originalError && e.cause) {
+			e.originalError = e.cause.originalError ?? e.cause;
+		}
+
 		let totalErrorCount = ErrorHandler.getTotalErrorCount(e);
 		let ref = e;
 		let index = 1;

@@ -1,7 +1,7 @@
 import markdownIt from "markdown-it";
 import markdownItAbbr from "markdown-it-abbr";
 
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#3816 amendLibrary and setLibrary together", async (t) => {
@@ -16,7 +16,7 @@ test("#3816 amendLibrary and setLibrary together", async (t) => {
         let before = mdLib.core.ruler.getRules("").length;
         mdLib.use(markdownItAbbr);
         let after = mdLib.core.ruler.getRules("").length;
-        t.is(after, before + 1);
+        t.assert.strictEqual(after, before + 1);
       });
     }
   });

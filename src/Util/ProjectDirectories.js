@@ -285,6 +285,13 @@ export default class ProjectDirectories {
 	// Inverse of getInputPath
 	// Removes input dir from path
 	getInputPathRelativeToInputDirectory(filePathRelativeToInputDir) {
+		// Paths outside the input directory keep their `../` prefix to match `addTemplate` keys, #4409
+		if (!DirContains(this.input, filePathRelativeToInputDir)) {
+			return TemplatePath.standardizeFilePath(
+				path.relative(this.input, filePathRelativeToInputDir),
+			);
+		}
+
 		let inputDir = TemplatePath.addLeadingDotSlash(TemplatePath.join(this.input));
 
 		// No leading dot slash
@@ -311,11 +318,9 @@ export default class ProjectDirectories {
 
 	// Removes layout dir from path
 	getLayoutPathRelativeToInputDirectory(filePathRelativeToLayoutDir) {
-		let layoutPath = this.getLayoutPath(filePathRelativeToLayoutDir);
-		let inputDir = TemplatePath.addLeadingDotSlash(TemplatePath.join(this.input));
-
-		// No leading dot slash
-		return TemplatePath.stripLeadingSubPath(layoutPath, inputDir);
+		return this.getInputPathRelativeToInputDirectory(
+			this.getLayoutPath(filePathRelativeToLayoutDir),
+		);
 	}
 
 	getProjectPath(filePath) {

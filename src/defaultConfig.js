@@ -1,4 +1,6 @@
 import fullBundleDefaultConfig from "./defaultConfigExtended.js";
+import { IsoDate } from "@11ty/parse-date-strings";
+
 import TransformsUtil from "./Util/TransformsUtil.js";
 
 /**
@@ -30,6 +32,7 @@ import TransformsUtil from "./Util/TransformsUtil.js";
  * @property {object} keys
  * @property {string} [keys.package='pkg'] - Global data property for package.json data
  * @property {string} [keys.layout='layout']
+ * @property {string|false} [keys.tags='tags'] - Data key used to create collections, `false` to skip
  * @property {string} [keys.permalink='permalink']
  * @property {string} [keys.permalinkRoot='permalinkBypassOutputDir']
  * @property {string} [keys.engineOverride='templateEngineOverride']
@@ -69,6 +72,9 @@ export default function (config) {
 		return input;
 	});
 
+	// Same parser used for `date` in the data cascade
+	config.addFilter("parseDateString", (dateString) => IsoDate.parse(dateString));
+
 	// Process arbitrary content with transforms
 	config.addFilter(
 		"renderTransforms",
@@ -99,6 +105,7 @@ export default function (config) {
 			// TODO breaking: use `false` by default
 			package: "pkg", // supports `false`
 			layout: "layout",
+			tags: "tags", // supports `false`
 			permalink: "permalink",
 			permalinkRoot: "permalinkBypassOutputDir",
 			engineOverride: "templateEngineOverride",

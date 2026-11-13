@@ -13,7 +13,7 @@ export default class JavaScript extends TemplateEngine {
 		super(name, templateConfig);
 		this.instances = {};
 
-		this.config.events.on("buildawesome#templatemodified", (inputPath, metadata = {}) => {
+		this.addConfigEventListener("buildawesome#templatemodified", (inputPath, metadata = {}) => {
 			let { usedByDependants, relevantLayouts } = metadata;
 			// Remove from cached instances when modified
 			let instancesToDelete = [

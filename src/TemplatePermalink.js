@@ -6,62 +6,38 @@ class TemplatePermalink {
 
 	// `link` with template syntax should have already been rendered in Template.js
 	constructor(link, extraSubdir, isDynamicPermalinkEnabled = true) {
-		let isLinkAnObject = isPlainObject(link);
-
-		this._isRendered = true;
+		link = TemplatePermalink.resolveBuildAlias(link);
 		this._writeToFileSystem = true;
 		this.#dynamicPermalinkEnabled = isDynamicPermalinkEnabled;
 
-		let buildLink;
-
-		if (isLinkAnObject) {
-			if ("build" in link) {
-				buildLink = link.build;
-			}
-
-			// find the first string key
-			for (let key in link) {
-				if (typeof key !== "string") {
-					continue;
-				}
-				break;
-			}
-		} else {
-			buildLink = link;
-		}
-
-		// permalink: false and permalink: build: false
-		if (typeof buildLink === "boolean") {
-			if (buildLink === false) {
+		// permalink: false
+		if (typeof link === "boolean") {
+			if (link === false) {
 				this._writeToFileSystem = false;
 			} else {
 				throw new Error(
-					`\`permalink: ${
-						isLinkAnObject ? "build: " : ""
-					}true\` is not a supported feature in Eleventy. Did you mean \`permalink: ${
-						isLinkAnObject ? "build: " : ""
-					}false\`?`,
+					"`permalink: true` is not a supported feature. Did you mean `permalink: false`?",
 				);
 			}
-		} else if (buildLink) {
-			if (typeof buildLink !== "string") {
-				let stringToString = "toString" in buildLink ? `:\n\n${buildLink.toString()}` : "";
+		} else if (link) {
+			if (typeof link !== "string") {
+				let stringToString = "toString" in link ? `:\n\n${link.toString()}` : "";
 				throw new Error(
-					`Expected permalink value to be a string. Received \`${typeof buildLink}\` (dynamicPermalink: ${this.#dynamicPermalinkEnabled})${stringToString}`,
+					`Expected permalink value to be a string. Received \`${typeof link}\` (dynamicPermalink: ${this.#dynamicPermalinkEnabled})${stringToString}`,
 				);
 			}
-			this.buildLink = buildLink;
-		}
-
-		if (isLinkAnObject) {
-			// default if permalink is an Object but does not have a `build` prop
-			if (!("build" in link)) {
-				this._writeToFileSystem = false;
-				this._isRendered = false;
-			}
+			this.buildLink = link;
 		}
 
 		this.extraPaginationSubdir = extraSubdir || "";
+	}
+
+	// Backwards compatibility: `permalink: { build }` is an alias for `permalink`.
+	static resolveBuildAlias(link) {
+		if (isPlainObject(link) && "build" in link) {
+			return link.build;
+		}
+		return link;
 	}
 
 	setUrlTransforms(transforms) {

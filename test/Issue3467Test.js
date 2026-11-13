@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("Empty collections api #3467 (return undefined)", async (t) => {
@@ -14,9 +14,9 @@ test("Empty collections api #3467 (return undefined)", async (t) => {
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `<h1>Hello</h1>`);
-	t.deepEqual(results[0].rawInput, `# Hello`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<h1>Hello</h1>`);
+	t.assert.deepStrictEqual(results[0].rawInput, `# Hello`);
 });
 
 test("Empty collections api #3467 (return false)", async (t) => {
@@ -32,9 +32,9 @@ test("Empty collections api #3467 (return false)", async (t) => {
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `<h1>Hello</h1>`);
-	t.deepEqual(results[0].rawInput, `# Hello`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<h1>Hello</h1>`);
+	t.assert.deepStrictEqual(results[0].rawInput, `# Hello`);
 });
 
 test("Empty collections api #3467 (return empty string)", async (t) => {
@@ -50,7 +50,7 @@ test("Empty collections api #3467 (return empty string)", async (t) => {
 
 	let results = await elev.toJSON();
 
-	t.deepEqual(results.length, 1);
-	t.deepEqual(results[0].content.trim(), `<h1>Hello</h1>`);
-	t.deepEqual(results[0].rawInput, `# Hello`);
+	t.assert.deepStrictEqual(results.length, 1);
+	t.assert.deepStrictEqual(results[0].content.trim(), `<h1>Hello</h1>`);
+	t.assert.deepStrictEqual(results[0].rawInput, `# Hello`);
 });

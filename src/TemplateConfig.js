@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { Merge, TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 
 import chalk from "./Adapters/Packages/chalk.js";
@@ -7,8 +8,8 @@ import { DynamicImportRaw } from "./Util/Require.js";
 import BaseError from "./Errors/BaseError.js";
 import UserConfig from "./UserConfig.js";
 import GlobalDependencyMap from "./GlobalDependencyMap.js";
+import { TemplateQueryRegistry } from "./Util/TemplateQuery.js";
 import ExistsCache from "./Util/ExistsCache.js";
-import eventBus from "./EventBus.js";
 import ProjectTemplateFormats from "./Util/ProjectTemplateFormats.js";
 import { expandEligibleJavaScriptFilePaths } from "./Util/FilePathUtil.js";
 
@@ -44,17 +45,22 @@ class PluginError extends BaseError {}
  */
 class TemplateConfig {
 	#templateFormats;
+	#cliTemplateFormats;
 	#runMode;
 	#configManuallyDefined = false;
 	/** @type {UserConfig} */
 	#userConfig = new UserConfig();
 	#existsCache = new ExistsCache();
 	#usesGraph;
+	#queryRegistry = new TemplateQueryRegistry();
 	#activeConfigPath;
 
 	constructor(customRootConfig, projectConfigPath) {
 		/** @type {object} */
 		this.overrides = {};
+
+		// Internal synchronous events, scoped to this instance (not cleared on config reset).
+		this.eventBus = new EventEmitter();
 
 		/**
 		 * @type {String}
@@ -97,10 +103,20 @@ class TemplateConfig {
 			return this.existsCache.exists(filePath);
 		};
 
+		this.#addInternalEventListeners();
+	}
+
+	#addInternalEventListeners() {
 		this.userConfig.events.on("buildawesome#templatemodified", (inputPath, metadata = {}) => {
 			// Issue #3569, the file may have been added (or deleted)
 			this.#existsCache.delete(inputPath);
 		});
+	}
+
+	// Internal (`#` prefixed) event listeners are singletons, cleared at the start of each build
+	resetUserConfigEvents() {
+		this.userConfig.events.reset();
+		this.#addInternalEventListeners();
 	}
 
 	get userConfig() {
@@ -126,6 +142,16 @@ class TemplateConfig {
 	/* Setter for TemplateFormats instance */
 	setTemplateFormats(templateFormats) {
 		this.#templateFormats = templateFormats;
+		this.#syncCommandLineTemplateFormats();
+	}
+
+	// Expose `--formats` as `$config.templateFormats` in the configuration callback.
+	#syncCommandLineTemplateFormats() {
+		let formats = this.#templateFormats?.getCommandLineFormats();
+		this.#cliTemplateFormats = formats ? Object.freeze(formats) : undefined;
+		if (this.#cliTemplateFormats) {
+			this.userConfig.templateFormats = this.#cliTemplateFormats;
+		}
 	}
 
 	get templateFormats() {
@@ -195,14 +221,16 @@ class TemplateConfig {
 	 */
 	async reset() {
 		this.#existsCache.reset();
-		this.userConfig.reset();
+		this.userConfig.reset(); // allocates a new event emitter
+		this.#addInternalEventListeners();
+		this.#syncCommandLineTemplateFormats();
 		this.usesGraph.reset(); // needs to be before forceReloadConfig #3711
 
 		// await this.initializeRootConfig();
 		await this.forceReloadConfig();
 
 		// Clear the compile cache
-		eventBus.emit("buildawesome.compilecachereset");
+		this.eventBus.emit("buildawesome.compilecachereset");
 	}
 
 	/**
@@ -284,6 +312,7 @@ class TemplateConfig {
 		if (pathPrefix && pathPrefix !== "/") {
 			debug("Setting pathPrefix to %o", pathPrefix);
 			this.overrides.pathPrefix = pathPrefix;
+			this.userConfig.pathPrefix = pathPrefix;
 		}
 	}
 
@@ -467,8 +496,11 @@ class TemplateConfig {
 			}
 		}
 
-		// `templateFormats` is an override via `setTemplateFormats`
-		if (this.userConfig?.templateFormats) {
+		// `templateFormats` is an override via `setTemplateFormats` (ignore the synced command line value)
+		if (
+			this.userConfig?.templateFormats &&
+			this.userConfig.templateFormats !== this.#cliTemplateFormats
+		) {
 			this.templateFormats.setViaConfig(this.userConfig.templateFormats);
 		} else if (localConfig?.templateFormats || this.rootConfig?.templateFormats) {
 			// Local project config or defaultConfig.js
@@ -546,6 +578,13 @@ class TemplateConfig {
 
 		debug("Current configuration: %o", mergedConfig);
 
+		let tagsKey = mergedConfig.keys?.tags;
+		if (typeof tagsKey === "string" && tagsKey.includes(".")) {
+			throw new ConfigError(
+				`Nested properties are not supported in \`keys.tags\`, received: ${JSON.stringify(tagsKey)}`,
+			);
+		}
+
 		// Add to the merged config too
 		mergedConfig.uses = this.usesGraph;
 
@@ -561,6 +600,11 @@ class TemplateConfig {
 			this.#usesGraph.setTemplateConfig(this);
 		}
 		return this.#usesGraph;
+	}
+
+	// `query`/`queryAll` calls from JavaScript front matter
+	get queryRegistry() {
+		return this.#queryRegistry;
 	}
 
 	/**

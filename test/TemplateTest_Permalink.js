@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import fs from "fs";
 
 import TemplateData from "../src/Data/TemplateData.js";
@@ -38,20 +38,20 @@ test("permalink: false", async (t) => {
   let data = await tmpl.getData();
 
   let entry = await getTemplateMapEntryWithContent(tmpl, data);
-  t.is(entry.template.behavior.isWriteable(), false);
-  t.is(entry.data.page.url, false);
-  t.is(entry.data.page.outputPath, false);
+  t.assert.strictEqual(entry.template.behavior.isWriteable(), false);
+  t.assert.strictEqual(entry.data.page.url, false);
+  t.assert.strictEqual(entry.data.page.outputPath, false);
 
   await writeMapEntry(entry);
 
   // Input file exists (sanity check for paths)
-  t.is(fs.existsSync("./test/stubs/permalink-false/"), true);
-  t.is(fs.existsSync("./test/stubs/permalink-false/test.md"), true);
+  t.assert.strictEqual(fs.existsSync("./test/stubs/permalink-false/"), true);
+  t.assert.strictEqual(fs.existsSync("./test/stubs/permalink-false/test.md"), true);
 
   // Output does not exist
-  t.is(fs.existsSync("./test/stubs/_site/permalink-false/"), false);
-  t.is(fs.existsSync("./test/stubs/_site/permalink-false/test/"), false);
-  t.is(fs.existsSync("./test/stubs/_site/permalink-false/test/index.html"), false);
+  t.assert.strictEqual(fs.existsSync("./test/stubs/_site/permalink-false/"), false);
+  t.assert.strictEqual(fs.existsSync("./test/stubs/_site/permalink-false/test/"), false);
+  t.assert.strictEqual(fs.existsSync("./test/stubs/_site/permalink-false/test/index.html"), false);
 });
 
 test("permalink: false inside of eleventyComputed, Issue #1754", async (t) => {
@@ -63,20 +63,20 @@ test("permalink: false inside of eleventyComputed, Issue #1754", async (t) => {
 
   let data = await tmpl.getData();
   let entry = await getTemplateMapEntryWithContent(tmpl, data);
-  t.is(entry.template.behavior.isWriteable(), false);
-  t.is(entry.data.page.url, false);
-  t.is(entry.data.page.outputPath, false);
+  t.assert.strictEqual(entry.template.behavior.isWriteable(), false);
+  t.assert.strictEqual(entry.data.page.url, false);
+  t.assert.strictEqual(entry.data.page.outputPath, false);
 
   await writeMapEntry(entry);
 
   // Input file exists (sanity check for paths)
-  t.is(fs.existsSync("./test/stubs/permalink-false-computed/"), true);
-  t.is(fs.existsSync("./test/stubs/permalink-false-computed/test.md"), true);
+  t.assert.strictEqual(fs.existsSync("./test/stubs/permalink-false-computed/"), true);
+  t.assert.strictEqual(fs.existsSync("./test/stubs/permalink-false-computed/test.md"), true);
 
   // Output does not exist
-  t.is(fs.existsSync("./test/stubs/_site/permalink-false-computed/"), false);
-  t.is(fs.existsSync("./test/stubs/_site/permalink-false-computed/test/"), false);
-  t.is(fs.existsSync("./test/stubs/_site/permalink-false-computed/test/index.html"), false);
+  t.assert.strictEqual(fs.existsSync("./test/stubs/_site/permalink-false-computed/"), false);
+  t.assert.strictEqual(fs.existsSync("./test/stubs/_site/permalink-false-computed/test/"), false);
+  t.assert.strictEqual(fs.existsSync("./test/stubs/_site/permalink-false-computed/test/index.html"), false);
 });
 
 test("permalink: true", async (t) => {
@@ -87,7 +87,7 @@ test("permalink: true", async (t) => {
   );
 
   let data = await tmpl.getData();
-  await t.throwsAsync(async () => {
+  await t.assert.rejects(async () => {
     await tmpl.getRawOutputPath(data);
   });
 });
@@ -100,10 +100,10 @@ test("Disable dynamic permalinks", async (t) => {
   );
   let data = await tmpl.getData();
 
-  t.is(await tmpl.getRawOutputPath(data), "/{{justastring}}/index.html");
-  t.is(await tmpl.getOutputHref(data), "/{{justastring}}/");
+  t.assert.strictEqual(await tmpl.getRawOutputPath(data), "/{{justastring}}/index.html");
+  t.assert.strictEqual(await tmpl.getOutputHref(data), "/{{justastring}}/");
   // TODO https://github.com/11ty/eleventy-plugin-webc/issues/32
-  // t.is(data.page.url, "/{{justastring}}/")
+  // t.assert.strictEqual(data.page.url, "/{{justastring}}/")
 });
 
 test("Permalink with variables!", async (t) => {
@@ -111,13 +111,13 @@ test("Permalink with variables!", async (t) => {
 
   let data = await tmpl.getData();
 
-  t.is(await tmpl.getOutputPath(data), "./dist/subdir/slug-candidate/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/slug-candidate/index.html");
 });
 
 test("Permalink with variables and JS front matter!", async (t) => {
   let tmpl = await getNewTemplate("./test/stubs/permalinkdata-jsfn.njk", "./test/stubs/", "./dist");
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./dist/subdir/slug/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/slug/index.html");
 });
 
 test("Use a JavaScript function for permalink in any template language", async (t) => {
@@ -128,23 +128,23 @@ test("Use a JavaScript function for permalink in any template language", async (
   );
 
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./dist/subdir/slug/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/slug/index.html");
 });
 
 test("Permalink with dates!", async (t) => {
   let tmpl = await getNewTemplate("./test/stubs/permalinkdate.liquid", "./test/stubs/", "./dist");
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./dist/2016/01/01/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/2016/01/01/index.html");
 });
 
-test.skip("Permalink with dates on file name regex!", async (t) => {
+test("Permalink with dates on file name regex!", async (t) => {
   let tmpl = await getNewTemplate(
     "./test/stubs/2016-02-01-permalinkdate.liquid",
     "./test/stubs/",
     "./dist"
   );
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./dist/2016/02/01/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/2016/02/01/index.html");
 });
 
 test("Reuse permalink in directory specific data file", async (t) => {
@@ -164,7 +164,7 @@ test("Reuse permalink in directory specific data file", async (t) => {
     dataObj
   );
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./dist/2016/01/01/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/2016/01/01/index.html");
 });
 
 test("Using slugify filter!", async (t) => {
@@ -174,7 +174,7 @@ test("Using slugify filter!", async (t) => {
     "./dist"
   );
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./dist/subdir/slug-love-candidate-lyublyu/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/slug-love-candidate-lyublyu/index.html");
 });
 
 test("Using slugify filter with comma and apostrophe", async (t) => {
@@ -184,7 +184,7 @@ test("Using slugify filter with comma and apostrophe", async (t) => {
     "./dist"
   );
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./dist/subdir/hi-i-m-zach/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/hi-i-m-zach/index.html");
 });
 
 test("Using slug filter with options params", async (t) => {
@@ -194,7 +194,7 @@ test("Using slug filter with options params", async (t) => {
     "./dist"
   );
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./dist/subdir/hi_i_am_zach/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/hi_i_am_zach/index.html");
 });
 
 test("Using slugify filter with options params", async (t) => {
@@ -204,7 +204,7 @@ test("Using slugify filter with options params", async (t) => {
     "./dist"
   );
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./dist/subdir/hi-i-m-z-ach/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/hi-i-m-z-ach/index.html");
 });
 
 test("Using slugify filter with a number #854", async (t) => {
@@ -214,7 +214,7 @@ test("Using slugify filter with a number #854", async (t) => {
     "./dist"
   );
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./dist/subdir/1/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/1/index.html");
 });
 
 test("Using slug filter with a number #854", async (t) => {
@@ -224,7 +224,7 @@ test("Using slug filter with a number #854", async (t) => {
     "./dist"
   );
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./dist/subdir/1/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/1/index.html");
 });
 
 test.skip("Using slugify filter with multibyte", async (t) => {
@@ -234,5 +234,5 @@ test.skip("Using slugify filter with multibyte", async (t) => {
     "./dist"
   );
   let data = await tmpl.getData();
-  t.is(await tmpl.getOutputPath(data), "./dist/subdir/test-猫/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/test-猫/index.html");
 });

@@ -17,13 +17,14 @@ import PathPrefixer from "./Util/PathPrefixer.js";
 import PathNormalizer from "./Util/PathNormalizer.js";
 import { isGlobMatch, isDynamicPattern } from "./Util/GlobMatcher.js";
 import { OutputHashes } from "./Util/OutputHashes.js";
-import eventBus from "./EventBus.js";
 
 const debug = createDebug("Core");
 
 export default class Core extends CoreFs {
 	/** @type {boolean} */
 	#isStopping = false;
+	/** @type {Watch|undefined} `addPassthroughCopy` sources bypass project ignores (#3543) */
+	#passthroughCopyWatcher;
 
 	/** @type {WatchQueue} */
 	#watchQueue;
@@ -54,6 +55,9 @@ export default class Core extends CoreFs {
 		if (!this.eleventyServe) {
 			/** @type {object} */
 			this.eleventyServe = new Serve();
+			this.eleventyServe.onPassthroughCopyChange((operation, path) =>
+				this.#updateEmulatedPassthroughCopy(operation, path),
+			);
 		}
 
 		this.eleventyServe.logger = this.logger;
@@ -95,6 +99,20 @@ export default class Core extends CoreFs {
 		}
 	}
 
+	// The dev server watches emulated passthrough copy files without triggering a build (#3007)
+	async #updateEmulatedPassthroughCopy(operation, path) {
+		this.fileSystemSearch[operation](path);
+		this.eleventyConfig.existsCache.delete(path);
+
+		if (operation === "add") {
+			try {
+				await this.passthroughManager.addEmulatedPassthroughFile(path);
+			} catch (e) {
+				this.reportError(e);
+			}
+		}
+	}
+
 	/**
 	 * @param {string} changedFilePath - File that triggered a re-run (added or modified)
 	 */
@@ -102,8 +120,8 @@ export default class Core extends CoreFs {
 		// v3.1.0: `eleventy.templateModified` is no longer used internally
 		// v4.0.0-alpha.8 `eleventy.templateModified` event removed
 
-		// These listeners are *global*, not cleared even on config reset (v4.0.0-alpha.8 removed some arguments here)
-		eventBus.emit("buildawesome.resourcemodified", changedFilePath);
+		// These listeners are not cleared on config reset (v4.0.0-alpha.8 removed some arguments here)
+		this.eleventyConfig.eventBus.emit("buildawesome.resourcemodified", changedFilePath);
 
 		this.config.events.emit("buildawesome#templatemodified", changedFilePath);
 	}
@@ -402,63 +420,56 @@ export default class Core extends CoreFs {
 		await this.#initWatchDependencies();
 		benchmark.after();
 
-		// Close previous watcher
-		if (this.watcher) {
-			await this.watcher.close();
-		}
+		// Close previous watchers
+		await Promise.all([this.watcher?.close(), this.#passthroughCopyWatcher?.close()]);
 
 		// TODO improve unwatching if JS dependencies are removed (or files are deleted)
-		let { targets, ignores } = await this.getWatchedTargets();
+		let { targets, passthroughCopyTargets, ignores, projectIgnores } =
+			await this.getWatchedTargets();
 		debug("Watching for changes to: %o", targets);
+		debug("Watching for passthrough copy changes to: %o", passthroughCopyTargets);
 
 		this.watcher = new Watch(this.eleventyConfig);
 		this.watcher.watchTargets(targets);
 		this.watcher.addIgnores(ignores);
+		this.watcher.addIgnores(projectIgnores);
 
-		await this.watcher.start();
+		this.#passthroughCopyWatcher = new Watch(this.eleventyConfig);
+		this.#passthroughCopyWatcher.watchTargets(passthroughCopyTargets);
+		this.#passthroughCopyWatcher.addIgnores(ignores);
+
+		let watchers = [this.watcher, this.#passthroughCopyWatcher];
+		await Promise.all(watchers.map((watcher) => watcher.start()));
 
 		// This logs in #rewatch for rebuilds
 		if (this.buildCount <= 1) {
 			this.logger.forceLog("Waiting…");
 		}
 
-		this.watcher.on("change", async (path) => {
-			// Emulated passthrough copy logs from the server
-			if (!this.eleventyServe.isEmulatedPassthroughCopyMatch(path)) {
-				this.logger.forceLog(
-					`File changed: ${TemplatePath.stripLeadingDotSlash(TemplatePath.standardizeFilePath(path))}${this.watchQueue.isBuildRunning() ? " (queued for next build)" : ""}`,
-				);
-			}
+		for (let watcher of watchers) {
+			watcher.on("change", (path) => this.#onWatchEvent("change", path));
+			watcher.on("add", (path) => this.#onWatchEvent("add", path));
+			watcher.on("unlink", (path) => this.#onWatchEvent("unlink", path));
+		}
+	}
 
-			// don’t await
-			this.triggerWatchRunForPath(path);
-		});
+	#onWatchEvent(event, path) {
+		// Emulated passthrough copy logs from the server
+		if (!this.eleventyServe.isEmulatedPassthroughCopyMatch(path)) {
+			let label = { change: "changed", add: "added", unlink: "deleted" }[event];
+			this.logger.forceLog(
+				`File ${label}: ${TemplatePath.stripLeadingDotSlash(TemplatePath.standardizeFilePath(path))}${this.watchQueue.isBuildRunning() ? " (queued for next build)" : ""}`,
+			);
+		}
 
-		this.watcher.on("add", async (path) => {
-			// Emulated passthrough copy logs from the server
-			if (!this.eleventyServe.isEmulatedPassthroughCopyMatch(path)) {
-				this.logger.forceLog(
-					`File added: ${TemplatePath.stripLeadingDotSlash(TemplatePath.standardizeFilePath(path))}${this.watchQueue.isBuildRunning() ? " (queued for next build)" : ""}`,
-				);
-			}
-
+		if (event === "add") {
 			this.fileSystemSearch.add(path);
-			// don’t await
-			this.triggerWatchRunForPath(path);
-		});
-
-		this.watcher.on("unlink", async (path) => {
-			// Emulated passthrough copy logs from the server
-			if (!this.eleventyServe.isEmulatedPassthroughCopyMatch(path)) {
-				this.logger.forceLog(
-					`File deleted: ${TemplatePath.stripLeadingDotSlash(TemplatePath.standardizeFilePath(path))}${this.watchQueue.isBuildRunning() ? " (queued for next build)" : ""}`,
-				);
-			}
-
+		} else if (event === "unlink") {
 			this.fileSystemSearch.delete(path);
-			// don’t await
-			this.triggerWatchRunForPath(path);
-		});
+		}
+
+		// don’t await
+		this.triggerWatchRunForPath(path);
 	}
 
 	/**
@@ -540,6 +551,8 @@ export default class Core extends CoreFs {
 		return {
 			targets: await this.watchTargets.getTargets(),
 			ignores: this.eleventyFiles.getGlobWatcherIgnores(),
+			passthroughCopyTargets: this.eleventyFiles.getGlobWatcherFilesForCopiedPassthroughCopy(),
+			projectIgnores: this.eleventyFiles.getGlobWatcherProjectIgnores(),
 		};
 	}
 
@@ -590,7 +603,11 @@ export default class Core extends CoreFs {
 		}
 
 		debug("Cleaning up chokidar and server instances, if they exist.");
-		this.#isStopping = Promise.all([this.eleventyServe.close(), this.watcher?.close()]).then(() => {
+		this.#isStopping = Promise.all([
+			this.eleventyServe.close(),
+			this.watcher?.close(),
+			this.#passthroughCopyWatcher?.close(),
+		]).then(() => {
 			this.#isStopping = false;
 		});
 

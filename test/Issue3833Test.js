@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("#3831 Computed Data regression", async (t) => {
@@ -13,6 +13,10 @@ date:
   });
   elev.disableLogger();
 
-  let e = await t.throwsAsync(() => elev.toJSON());
-  t.is(e.message, `Data cascade value for \`date\` (April 1, 2025) is invalid for ./test/noop/index.njk. Expected a JavaScript Date instance, luxon DateTime instance, or String value.`);
+  let e;
+  await t.assert.rejects(() => elev.toJSON(), (err) => {
+  	e = err;
+  	return true;
+  });
+  t.assert.strictEqual(e.message, `Data cascade value for \`date\` (April 1, 2025) is invalid for ./test/noop/index.njk. Expected a JavaScript Date instance, luxon DateTime instance, or String value.`);
 });

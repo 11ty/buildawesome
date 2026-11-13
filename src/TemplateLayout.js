@@ -2,7 +2,7 @@ import { Merge, TemplatePath } from "@11ty/eleventy-utils";
 
 import TemplateLayoutPathResolver from "./TemplateLayoutPathResolver.js";
 import TemplateContent from "./TemplateContent.js";
-import layoutCache from "./LayoutCache.js";
+import { getLayoutCache } from "./LayoutCache.js";
 
 // https://github.com/11ty/eleventy/issues/3954
 class CdataWrapper {
@@ -83,6 +83,7 @@ class TemplateLayout extends TemplateContent {
 
 		let inputDir = eleventyConfig.directories.input;
 		let fullKey = TemplateLayout.resolveFullKey(key, inputDir);
+		let layoutCache = getLayoutCache(eleventyConfig);
 		if (!layoutCache.has(fullKey)) {
 			let layout = new TemplateLayout(key, extensionMap, eleventyConfig);
 
@@ -176,6 +177,10 @@ class TemplateLayout extends TemplateContent {
 		let data = Merge({}, ...dataToMerge);
 		delete data[this.config.keys.layout];
 
+		// A layout’s `templateEngineOverride` applies only to that layout, not the page, Issue #445
+		delete data[this.config.keys.engineOverride];
+		delete data[`override:${this.config.keys.engineOverride}`];
+
 		return data;
 	}
 
@@ -189,7 +194,8 @@ class TemplateLayout extends TemplateContent {
 
 	async #getCachedCompiledLayoutFunction() {
 		let rawInput = await this.getPreRender();
-		return this.compile(rawInput);
+		let { data } = await this.getFrontMatterData();
+		return this.compile(rawInput, { engineOverride: this.getEngineOverride(data) });
 	}
 
 	// Do only cache this layout’s render function and delegate the rest to the other templates.
@@ -231,7 +237,7 @@ class TemplateLayout extends TemplateContent {
 
 			return fns;
 		} catch (e) {
-			layoutCache.clear();
+			getLayoutCache(this.eleventyConfig).clear();
 			throw e;
 		}
 	}
@@ -245,7 +251,7 @@ class TemplateLayout extends TemplateContent {
 	// This is called from Template->renderPageEntry
 	async renderLayoutPageEntry(pageEntry) {
 		let pageTemplateSyntax = pageEntry.template?.getEngineNames(
-			pageEntry.data[this.config.keys.engineOverride],
+			pageEntry.template.getEngineOverride(pageEntry.data),
 		);
 		let templateContent = pageEntry.templateContent;
 		let compiledFunctions = await this.getCompiledLayoutFunctions();
@@ -253,7 +259,10 @@ class TemplateLayout extends TemplateContent {
 		for (let { render, template } of compiledFunctions) {
 			await template.asyncTemplateInitialization();
 
-			let layoutTemplateSyntax = template.getEngineNames(); // templateEngineOverride not supported in layouts
+			let { data: layoutFrontMatterData } = await template.getFrontMatterData();
+			let layoutTemplateSyntax = template.getEngineNames(
+				template.getEngineOverride(layoutFrontMatterData),
+			);
 			let cdata = new CdataWrapper(pageTemplateSyntax, layoutTemplateSyntax);
 
 			let data = {

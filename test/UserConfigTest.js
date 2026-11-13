@@ -1,33 +1,33 @@
-import test from "ava";
+import test from "node:test";
 import UserConfig from "../src/UserConfig.js";
 import memoize from "../src/Util/MemoizeFunction.js";
 
 test("Template Formats", (t) => {
   let userCfg = new UserConfig();
 
-  t.falsy(userCfg.templateFormats);
+  t.assert.ok(!userCfg.templateFormats);
 
   userCfg.setTemplateFormats("njk,liquid");
-  t.deepEqual(userCfg.templateFormats, "njk,liquid");
+  t.assert.deepStrictEqual(userCfg.templateFormats, "njk,liquid");
 
   // setting multiple times takes the last one
   userCfg.setTemplateFormats("njk,liquid,pug");
   userCfg.setTemplateFormats("njk,liquid");
-  t.deepEqual(userCfg.templateFormats, "njk,liquid");
+  t.assert.deepStrictEqual(userCfg.templateFormats, "njk,liquid");
 });
 
 test("Template Formats (Arrays)", (t) => {
   let userCfg = new UserConfig();
 
-  t.falsy(userCfg.templateFormats);
+  t.assert.ok(!userCfg.templateFormats);
 
   userCfg.setTemplateFormats(["njk", "liquid"]);
-  t.deepEqual(userCfg.templateFormats, ["njk", "liquid"]);
+  t.assert.deepStrictEqual(userCfg.templateFormats, ["njk", "liquid"]);
 
   // setting multiple times takes the last one
   userCfg.setTemplateFormats(["njk", "liquid", "pug"]);
   userCfg.setTemplateFormats(["njk", "liquid"]);
-  t.deepEqual(userCfg.templateFormats, ["njk", "liquid"]);
+  t.assert.deepStrictEqual(userCfg.templateFormats, ["njk", "liquid"]);
 });
 
 // more in TemplateConfigTest.js
@@ -36,9 +36,9 @@ test("Events", async (t) => {
   await new Promise((resolve) => {
     let userCfg = new UserConfig();
     userCfg.on("testEvent", function (arg1, arg2, arg3) {
-      t.is(arg1, "arg1");
-      t.is(arg2, "arg2");
-      t.is(arg3, "arg3");
+      t.assert.strictEqual(arg1, "arg1");
+      t.assert.strictEqual(arg2, "arg2");
+      t.assert.strictEqual(arg3, "arg3");
       resolve();
     });
 
@@ -63,7 +63,7 @@ test("Async Events", async (t) => {
     );
 
     userCfg.emit("asyncTestEvent", "arg1").then(() => {
-      t.is(arg1, "arg1");
+      t.assert.strictEqual(arg1, "arg1");
       resolve();
     });
   });
@@ -72,14 +72,14 @@ test("Async Events", async (t) => {
 test("Add Collections", (t) => {
   let userCfg = new UserConfig();
   userCfg.addCollection("myCollection", function (collection) {});
-  t.deepEqual(Object.keys(userCfg.getCollections()), ["myCollection"]);
+  t.assert.deepStrictEqual(Object.keys(userCfg.getCollections()), ["myCollection"]);
 });
 
 test("Add Collections throws error on key collision", (t) => {
   let userCfg = new UserConfig();
   userCfg.addCollection("myCollectionCollision", function (collection) {});
 
-  t.throws(() => {
+  t.assert.throws(() => {
     userCfg.addCollection("myCollectionCollision", function (collection) {});
   });
 });
@@ -88,7 +88,7 @@ test("Set manual Pass-through File Copy (single call)", (t) => {
   let userCfg = new UserConfig();
   userCfg.addPassthroughCopy("img");
 
-  t.deepEqual(userCfg.passthroughCopies["img"], {
+  t.assert.deepStrictEqual(userCfg.passthroughCopies["img"], {
     outputPath: true,
     copyOptions: {},
   });
@@ -102,21 +102,31 @@ test("Set manual Pass-through File Copy (chained calls)", (t) => {
     .addPassthroughCopy({ "./src/static": "static" })
     .addPassthroughCopy({ "./src/empty": "./" });
 
-  t.deepEqual(userCfg.passthroughCopies["css"], {
+  t.assert.deepStrictEqual(userCfg.passthroughCopies["css"], {
     outputPath: true,
     copyOptions: {},
   });
-  t.deepEqual(userCfg.passthroughCopies["js"], {
+  t.assert.deepStrictEqual(userCfg.passthroughCopies["js"], {
     outputPath: true,
     copyOptions: {},
   });
-  t.deepEqual(userCfg.passthroughCopies["./src/static"], {
+  t.assert.deepStrictEqual(userCfg.passthroughCopies["./src/static"], {
     outputPath: "static",
     copyOptions: {},
   });
-  t.deepEqual(userCfg.passthroughCopies["./src/empty"], {
+  t.assert.deepStrictEqual(userCfg.passthroughCopies["./src/empty"], {
     outputPath: "./",
     copyOptions: {},
+  });
+});
+
+test("Set manual Pass-through File Copy (array)", (t) => {
+  let userCfg = new UserConfig();
+  userCfg.addPassthroughCopy(["img", "./src/**/*.css"], { dot: false });
+
+  t.assert.deepStrictEqual(userCfg.passthroughCopies, {
+    img: { outputPath: true, copyOptions: { dot: false } },
+    "./src/**/*.css": { outputPath: true, copyOptions: { dot: false } },
   });
 });
 
@@ -128,15 +138,15 @@ test("Set manual Pass-through File Copy (glob patterns)", (t) => {
   });
 
   // does not exist
-  t.is(userCfg.passthroughCopies["css/**"], undefined);
-  t.is(userCfg.passthroughCopies["js/**"], undefined);
+  t.assert.strictEqual(userCfg.passthroughCopies["css/**"], undefined);
+  t.assert.strictEqual(userCfg.passthroughCopies["js/**"], undefined);
 
   // exists
-  t.deepEqual(userCfg.passthroughCopies["./src/static/**/*"], {
+  t.assert.deepStrictEqual(userCfg.passthroughCopies["./src/static/**/*"], {
     outputPath: "renamed",
     copyOptions: {},
   });
-  t.deepEqual(userCfg.passthroughCopies["./src/markdown/*.md"], {
+  t.assert.deepStrictEqual(userCfg.passthroughCopies["./src/markdown/*.md"], {
     outputPath: "",
     copyOptions: {},
   });
@@ -145,25 +155,25 @@ test("Set manual Pass-through File Copy (glob patterns)", (t) => {
 test("Set Template Formats (string)", (t) => {
   let userCfg = new UserConfig();
   userCfg.setTemplateFormats("njk, liquid");
-  t.deepEqual(userCfg.templateFormats, "njk, liquid");
+  t.assert.deepStrictEqual(userCfg.templateFormats, "njk, liquid");
 });
 
 test("Set Template Formats (array)", (t) => {
   let userCfg = new UserConfig();
   userCfg.setTemplateFormats(["njk", "liquid"]);
-  t.deepEqual(userCfg.templateFormats, ["njk", "liquid"]);
+  t.assert.deepStrictEqual(userCfg.templateFormats, ["njk", "liquid"]);
 });
 
 test("Set Template Formats (js passthrough copy)", (t) => {
   let userCfg = new UserConfig();
   userCfg.setTemplateFormats("njk, liquid, js");
-  t.deepEqual(userCfg.templateFormats, "njk, liquid, js");
+  t.assert.deepStrictEqual(userCfg.templateFormats, "njk, liquid, js");
 });
 
 test("Set Template Formats (11ty.js)", (t) => {
   let userCfg = new UserConfig();
   userCfg.setTemplateFormats("njk, liquid, 11ty.js");
-  t.deepEqual(userCfg.templateFormats, "njk, liquid, 11ty.js");
+  t.assert.deepStrictEqual(userCfg.templateFormats, "njk, liquid, 11ty.js");
 });
 
 test("Add Template Formats", (t) => {
@@ -173,21 +183,25 @@ test("Add Template Formats", (t) => {
   userCfg.addTemplateFormats("liquid");
   userCfg.addTemplateFormats("11ty.js");
 
-  t.deepEqual(userCfg.templateFormatsAdded.sort(), ["11ty.js", "liquid", "njk", "webc"]);
+  t.assert.deepStrictEqual(userCfg.templateFormatsAdded.sort(), ["11ty.js", "liquid", "njk", "webc"]);
 });
 
 test("Resolve plugin", async (t) => {
   let userConfig = new UserConfig();
   let plugin = await userConfig.resolvePlugin("@11ty/eleventy/html-base-plugin");
-  t.truthy(typeof plugin === "function")
+  t.assert.ok(typeof plugin === "function")
 });
 
 test("Resolve plugin (invalid)", async (t) => {
   let userConfig = new UserConfig();
-  let e = await t.throwsAsync(async() => {
+  let e;
+  await t.assert.rejects(async() => {
     await userConfig.resolvePlugin("@11ty/eleventy/does-not-exist");
+  }, (err) => {
+  	e = err;
+  	return true;
   });
-  t.truthy(e.message.startsWith(`Invalid name "@11ty/eleventy/does-not-exist" passed to resolvePlugin.`));
+  t.assert.ok(e.message.startsWith(`Invalid name "@11ty/eleventy/does-not-exist" passed to resolvePlugin.`));
 });
 
 test("Memoize filters (control)", (t) => {
@@ -200,10 +214,10 @@ test("Memoize filters (control)", (t) => {
   let increment = userCfg.getFilter("increment");
   increment(3);
 
-  t.is(count, 3);
+  t.assert.strictEqual(count, 3);
 
   increment(3);
-  t.is(count, 6);
+  t.assert.strictEqual(count, 6);
 });
 
 test("Memoize filters (memoized)", (t) => {
@@ -218,18 +232,18 @@ test("Memoize filters (memoized)", (t) => {
   increment(1);
   increment(1);
   increment(1);
-  t.is(count, 1);
+  t.assert.strictEqual(count, 1);
 
   increment(2);
   increment(2);
   increment(2);
-  t.is(count, 3);
+  t.assert.strictEqual(count, 3);
 
   increment(3);
   increment(3);
   increment(3);
   increment(3);
-  t.is(count, 6);
+  t.assert.strictEqual(count, 6);
 });
 
 test("Memoize async filters (memoized)", async (t) => {
@@ -249,18 +263,18 @@ test("Memoize async filters (memoized)", async (t) => {
   await increment(1);
   await increment(1);
   await increment(1);
-  t.is(count, 1);
+  t.assert.strictEqual(count, 1);
 
   await increment(2);
   await increment(2);
   await increment(2);
-  t.is(count, 3);
+  t.assert.strictEqual(count, 3);
 
   await increment(3);
   await increment(3);
   await increment(3);
   await increment(3);
-  t.is(count, 6);
+  t.assert.strictEqual(count, 6);
 });
 
 // JavaScript functions are included here for backwards compatibility https://github.com/11ty/eleventy/issues/3365
@@ -268,7 +282,7 @@ test("addJavaScriptFunction feeds into `getFilter` #3365", (t) => {
   let userCfg = new UserConfig();
   userCfg.addJavaScriptFunction("increment", num => num++);
 
-  t.is(typeof userCfg.getFilter("increment"), "function");
+  t.assert.strictEqual(typeof userCfg.getFilter("increment"), "function");
 });
 
 test("setPassthroughCopyOptions replaces earlier calls", (t) => {
@@ -276,6 +290,6 @@ test("setPassthroughCopyOptions replaces earlier calls", (t) => {
   userCfg.setPassthroughCopyOptions({ junk: true });
   userCfg.setPassthroughCopyOptions({ dot: false });
 
-  t.deepEqual(userCfg.passthroughCopyOptions, { dot: false });
-  t.throws(() => userCfg.setPassthroughCopyOptions({ mode: "html-relative" }));
+  t.assert.deepStrictEqual(userCfg.passthroughCopyOptions, { dot: false });
+  t.assert.throws(() => userCfg.setPassthroughCopyOptions({ mode: "html-relative" }));
 });

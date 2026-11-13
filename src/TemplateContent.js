@@ -7,10 +7,11 @@ import JavaScriptFrontMatter from "./Engines/FrontMatter/JavaScript.js";
 import { createDebug } from "./Util/DebugLogUtil.js";
 import { EOL } from "./Util/NewLineAdapter.js";
 import TemplateData from "./Data/TemplateData.js";
+import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
 import TemplateRender from "./TemplateRender.js";
 import BaseError from "./Errors/BaseError.js";
 import ErrorUtil from "./Errors/ErrorUtil.js";
-import eventBus from "./EventBus.js";
+import { TemplateQueryRegistry } from "./Util/TemplateQuery.js";
 
 const { set: lodashSet } = lodash;
 const debug = createDebug("TemplateContent");
@@ -259,6 +260,12 @@ class TemplateContent {
 			try {
 				// Added in 3.0, passed along to front matter engines
 				options.filePath = this.inputPath;
+				if (this.config.experimentalFlags.includes(TemplateQueryRegistry.FLAGS.QUERY)) {
+					options.globals = this.eleventyConfig.queryRegistry.createApi(
+						this.inputPath,
+						this.eleventyConfig.directories,
+					);
+				}
 				fm = matter(content, options);
 			} catch (e) {
 				throw new TemplateContentFrontMatterError(
@@ -321,16 +328,29 @@ class TemplateContent {
 
 	/* Incremental builds cache the Template instances (in TemplateWriter) but
 	 * these template specific caches are important for Pagination */
-	static cache(path, content) {
-		this._inputCache.set(TemplatePath.absolutePath(path), content);
-	}
+	static #caches = new WeakMap();
 
-	static getCached(path) {
-		return this._inputCache.get(TemplatePath.absolutePath(path));
-	}
+	static getCaches(templateConfig) {
+		let caches = TemplateContent.#caches.get(templateConfig);
+		if (!caches) {
+			caches = {
+				input: new Map(),
+				compile: new Map(),
+			};
 
-	static deleteFromInputCache(path) {
-		this._inputCache.delete(TemplatePath.absolutePath(path));
+			templateConfig.eventBus.on("buildawesome.resourcemodified", (path) => {
+				caches.input.delete(TemplatePath.absolutePath(path));
+				caches.compile.get(TemplatePath.addLeadingDotSlash(path))?.clear();
+			});
+
+			// Used when the configuration file reset https://github.com/11ty/eleventy/issues/2147
+			templateConfig.eventBus.on("buildawesome.compilecachereset", () => {
+				caches.compile = new Map();
+			});
+
+			TemplateContent.#caches.set(templateConfig, caches);
+		}
+		return caches;
 	}
 
 	// Used via clone
@@ -364,7 +384,9 @@ class TemplateContent {
 		let content;
 
 		if (this.config.useTemplateCache) {
-			content = TemplateContent.getCached(this.inputPath);
+			content = TemplateContent.getCaches(this.eleventyConfig).input.get(
+				TemplatePath.absolutePath(this.inputPath),
+			);
 		}
 
 		if (!content && content !== "") {
@@ -373,7 +395,10 @@ class TemplateContent {
 			content = contentBuffer.toString("utf8");
 
 			if (this.config.useTemplateCache) {
-				TemplateContent.cache(this.inputPath, content);
+				TemplateContent.getCaches(this.eleventyConfig).input.set(
+					TemplatePath.absolutePath(this.inputPath),
+					content,
+				);
 			}
 		}
 
@@ -402,7 +427,7 @@ class TemplateContent {
 		if (virtualTemplateDefinition) {
 			virtualTemplateData = virtualTemplateDefinition.data;
 
-			TemplateData.cleanupData(virtualTemplateData, {
+			TemplateData.cleanupData(virtualTemplateData, this.config.keys.tags, {
 				file: this.inputPath,
 				isVirtualTemplate: Boolean(virtualTemplateData),
 			});
@@ -415,7 +440,7 @@ class TemplateContent {
 
 		let frontMatterData = Object.assign({}, fm.data);
 
-		TemplateData.cleanupData(frontMatterData, {
+		TemplateData.cleanupData(frontMatterData, this.config.keys.tags, {
 			file: this.inputPath,
 			isVirtualTemplate: Boolean(virtualTemplateData),
 		});
@@ -423,12 +448,14 @@ class TemplateContent {
 		let tr = await this.getTemplateRender();
 		let extraData = await tr.engine.getExtraDataFromFile(this.inputPath);
 
-		TemplateData.cleanupData(extraData, {
+		TemplateData.cleanupData(extraData, this.config.keys.tags, {
 			file: this.inputPath,
 			isVirtualTemplate: Boolean(virtualTemplateData),
 		});
 
-		let data = Object.assign(frontMatterData, extraData, virtualTemplateData);
+		let data = ResolveConfigurationData.normalize(
+			Object.assign(frontMatterData, extraData, virtualTemplateData),
+		);
 
 		return {
 			data,
@@ -449,10 +476,9 @@ class TemplateContent {
 		return this.templateRender.getEnginesList(engineOverride);
 	}
 
-	async getEngineOverride() {
-		return this.getFrontMatterData().then((data) => {
-			return data[this.config.keys.engineOverride];
-		});
+	// Pages pass the full data cascade, layouts pass their own front matter.
+	getEngineOverride(data) {
+		return data?.[this.config.keys.engineOverride];
 	}
 
 	// checks engines
@@ -466,10 +492,11 @@ class TemplateContent {
 	_getCompileCache(str) {
 		// Caches used to be bifurcated based on engine name, now they’re based on inputPath
 		// TODO does `cacheable` need to help inform whether a cache is used here?
-		let inputPathMap = TemplateContent._compileCache.get(this.inputPath);
+		let { compile } = TemplateContent.getCaches(this.eleventyConfig);
+		let inputPathMap = compile.get(this.inputPath);
 		if (!inputPathMap) {
 			inputPathMap = new Map();
-			TemplateContent._compileCache.set(this.inputPath, inputPathMap);
+			compile.set(this.inputPath, inputPathMap);
 		}
 
 		let cacheable = this.isTemplateCacheable();
@@ -555,29 +582,28 @@ class TemplateContent {
 		}
 	}
 
-	getParseForSymbolsFunction(str) {
-		let engine = this.engine;
+	// The engine computed data renders with (e.g. Liquid for Markdown), Issue #2131
+	async getComputedDataEngine(data) {
+		let tr = await this.getTemplateRender();
+		return tr.getTemplateOnlyEngine(this.getEngineOverride(data));
+	}
 
-		// Don’t use markdown as the engine to parse for symbols
-		// TODO pass in engineOverride here
-		if (this.#renderPreprocessorEngine) {
-			engine = this.#renderPreprocessorEngine;
+	// Returns `undefined` when the engine can’t parse for symbols.
+	parseForSymbols(str, engine) {
+		if (!engine || !("parseForSymbols" in engine)) {
+			return;
 		}
 
-		if ("parseForSymbols" in engine) {
-			return () => {
-				if (Array.isArray(str)) {
-					return str
-						.filter((entry) => typeof entry === "string")
-						.map((entry) => engine.parseForSymbols(entry))
-						.flat();
-				}
-				if (typeof str === "string") {
-					return engine.parseForSymbols(str);
-				}
-				return [];
-			};
+		if (Array.isArray(str)) {
+			return str
+				.filter((entry) => typeof entry === "string")
+				.map((entry) => engine.parseForSymbols(entry))
+				.flat();
 		}
+		if (typeof str === "string") {
+			return engine.parseForSymbols(str);
+		}
+		return [];
 	}
 
 	// used by computed data or for permalink functions
@@ -650,7 +676,7 @@ class TemplateContent {
 
 	_getPaginationLogSuffix(data) {
 		let suffix = [];
-		if ("pagination" in data) {
+		if (data.pagination) {
 			suffix.push(" (");
 			if (data.pagination.pages) {
 				suffix.push(
@@ -674,7 +700,7 @@ class TemplateContent {
 
 			let fn = await this.compile(str, {
 				templateOnly,
-				engineOverride: data[this.config.keys.engineOverride],
+				engineOverride: this.getEngineOverride(data),
 				type,
 			});
 
@@ -780,24 +806,5 @@ class TemplateContent {
 		return false;
 	}
 }
-
-TemplateContent._inputCache = new Map();
-TemplateContent._compileCache = new Map();
-eventBus.on("buildawesome.resourcemodified", (path) => {
-	// delete from input cache
-	TemplateContent.deleteFromInputCache(path);
-
-	// delete from compile cache
-	let normalized = TemplatePath.addLeadingDotSlash(path);
-	let compileCache = TemplateContent._compileCache.get(normalized);
-	if (compileCache) {
-		compileCache.clear();
-	}
-});
-
-// Used when the configuration file reset https://github.com/11ty/eleventy/issues/2147
-eventBus.on("buildawesome.compilecachereset", () => {
-	TemplateContent._compileCache = new Map();
-});
 
 export default TemplateContent;

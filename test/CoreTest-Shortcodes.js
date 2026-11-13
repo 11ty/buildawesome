@@ -1,4 +1,4 @@
-import test from "ava";
+import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test.skip("#3400: Both a paired and unpaired shortcode.", async (t) => {
@@ -18,5 +18,5 @@ test.skip("#3400: Both a paired and unpaired shortcode.", async (t) => {
   });
 
   let results = await elev.toJSON();
-  t.is(count, 2);
+  t.assert.strictEqual(count, 2);
 });
