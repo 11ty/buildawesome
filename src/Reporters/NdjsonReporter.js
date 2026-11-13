@@ -101,11 +101,10 @@ export class NdjsonReporter {
 		this.#emit({
 			v: SCHEMA_VERSION,
 			type: "build.error",
-			// null for errors outside of a build, like `durationMs`
+			// `id` and `durationMs` are null for errors outside of a build (e.g. configuration errors)
 			id: this.#buildId ?? null,
 			ts: Date.now(),
 			ok: false,
-			// null for errors outside of a build (e.g. configuration errors)
 			durationMs: this.#getDuration(performance.now()) ?? null,
 			error: {
 				message: error?.message,
@@ -166,8 +165,7 @@ export class NdjsonReporter {
 			this.#emit({
 				v: SCHEMA_VERSION,
 				type: "passthrough",
-				// The build it belongs to, like `build.end`
-				id: this.#buildId ?? null,
+				id: this.#buildId,
 				ts: Date.now(),
 				emulated: checkPassthroughCopyBehavior(eleventyConfig, this.#runMode),
 				map: toPosixMap(map),

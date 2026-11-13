@@ -225,6 +225,7 @@ describe("Command line", { concurrency: true }, () => {
           t.assert.strictEqual(buildError.ok, false);
           t.assert.strictEqual(typeof buildError.error.message, "string");
           t.assert.strictEqual(buildError.error.filePath, "./test/stubs/events-file-broken/index.njk");
+          t.assert.strictEqual(buildError.id, events[0].id);
           resolve();
         }
       );
@@ -243,6 +244,26 @@ describe("Command line", { concurrency: true }, () => {
           let events = readEvents(eventsFile);
           let buildError = events.find((e) => e.type === "build.error");
           t.assert.strictEqual(buildError.error.filePath, "./test/stubs/events-file-broken-data/_data/bad.json");
+          t.assert.strictEqual(buildError.id, events[0].id);
+          resolve();
+        }
+      );
+    });
+  });
+
+  // Warning: this test writes to the file system
+  test("Test command line --events-file writes build.error with a null id for a configuration error", async (t) => {
+    let eventsFile = "test/stubs/events-file-ok/_site/config-error/.events.ndjson";
+
+    await new Promise((resolve) => {
+      exec(
+        `node ./cmd.cjs --input=test/stubs/events-file-ok --formats=md --config=test/stubs/broken-config.cjs --events-file=${eventsFile} --dryrun`,
+        (error, stdout, stderr) => {
+          t.assert.strictEqual(error.code, 1);
+          let events = readEvents(eventsFile);
+          t.assert.deepStrictEqual(events.map((e) => e.type), ["build.error"]);
+          t.assert.strictEqual(events[0].id, null);
+          t.assert.strictEqual(events[0].durationMs, null);
           resolve();
         }
       );
