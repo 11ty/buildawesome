@@ -238,3 +238,22 @@ test("locale_url leaves fragment-only and external links unchanged", async (t) =
   let results = await elev.toJSON();
   t.assert.strictEqual(results[0].content, "#heading\nhttps://example.com/#heading");
 });
+
+test("locale_url swaps a language code already in a nested URL (#2791)", async (t) => {
+  let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, { defaultLanguage: "en" });
+      for (let lang of ["en", "ro", "it"]) {
+        $config.addTemplate(`${lang}/my-article.njk`, `{{ "/en/my-article/" | locale_url }}`);
+      }
+    },
+  });
+
+  let results = await elev.toJSON();
+  for (let lang of ["en", "ro", "it"]) {
+    t.assert.strictEqual(
+      results.find((entry) => entry.url === `/${lang}/my-article/`).content,
+      `/${lang}/my-article/`,
+    );
+  }
+});
