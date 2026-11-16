@@ -129,7 +129,6 @@
 		"@11ty/posthtml-urls": "^2.0.0",
 		"@11ty/recursive-copy": "^5.2.0",
 		"@sindresorhus/slugify": "^4.0.1",
-		"bcp-47-normalize": "^2.3.0",
 		"dependency-graph": "^1.0.0",
 		"entities": "^9.0.0",
 		"import-module-string": "^4.0.0",

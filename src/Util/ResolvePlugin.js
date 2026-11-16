@@ -11,7 +11,7 @@ export function resolvePlugin(name) {
 		// Async plugins:
 		// v4 moved RenderPlugin async for bundle size (Liquid import)
 		"@11ty/eleventy/render-plugin": "../Plugins/RenderPlugin.js", // Liquid is ~73KB min
-		"@11ty/eleventy/i18n-plugin": "../Plugins/I18nPlugin.js", // bcp-47-normalize is ~180KB min
+		"@11ty/eleventy/i18n-plugin": "../Plugins/I18nPlugin.js",
 	};
 
 	if (!filenameLookup[name]) {

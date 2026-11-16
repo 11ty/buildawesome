@@ -1,4 +1,3 @@
-import { bcp47Normalize } from "bcp-47-normalize";
 import iso639 from "iso-639-1";
 import { DeepCopy } from "@11ty/eleventy-utils";
 
@@ -46,6 +45,10 @@ class LangUtils {
 }
 
 class Comparator {
+	// Created lazily so importing core doesn’t require `Intl`.
+	static #scriptNames;
+	static #regionNames;
+
 	// https://en.wikipedia.org/wiki/IETF_language_tag#Relation_to_other_standards
 	// Requires a ISO-639-1 language code at the start (2 characters before the first -)
 	static isLangCode(code) {
@@ -53,7 +56,23 @@ class Comparator {
 		if (!iso639.validate(s)) {
 			return false;
 		}
-		if (!bcp47Normalize(code)) {
+		// Only language[-script][-region] with a real script and region, so names like `sv-feed` or `en-sitemap` don’t match.
+		let script;
+		let region;
+		try {
+			({ script, region } = new Intl.Locale(code));
+		} catch {
+			return false;
+		}
+		if (code.split("-").length !== 1 + Boolean(script) + Boolean(region)) {
+			return false;
+		}
+		Comparator.#scriptNames ??= new Intl.DisplayNames(["en"], { type: "script", fallback: "none" });
+		if (script && !Comparator.#scriptNames.of(script)) {
+			return false;
+		}
+		Comparator.#regionNames ??= new Intl.DisplayNames(["en"], { type: "region", fallback: "none" });
+		if (region && !Comparator.#regionNames.of(region)) {
 			return false;
 		}
 		return true;

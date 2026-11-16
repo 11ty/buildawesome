@@ -16,6 +16,14 @@ test("Comparator.isLangCode", (t) => {
   t.assert.strictEqual(Comparator.isLangCode("deed"), false);
   t.assert.strictEqual(Comparator.isLangCode("deede"), false);
   t.assert.strictEqual(Comparator.isLangCode("deedee"), false);
+
+  t.assert.strictEqual(Comparator.isLangCode("zh-hant-tw"), true);
+  t.assert.strictEqual(Comparator.isLangCode("es-419"), true);
+
+  // Valid BCP 47 syntax, but not a real script, region or plain language (#3766, #3352)
+  t.assert.strictEqual(Comparator.isLangCode("sv-feed"), false);
+  t.assert.strictEqual(Comparator.isLangCode("en-sitemap"), false);
+  t.assert.strictEqual(Comparator.isLangCode("om-meg"), false);
 });
 
 test("LangUtils.swapLanguageCode", (t) => {
