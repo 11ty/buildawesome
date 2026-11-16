@@ -36,5 +36,17 @@ jobs:
       - run: npm ci
       - run: npx playwright install
       - run: npm run test:browser
+  types:
+    name: Type check
+    if: ${{ !startsWith(github.ref, 'refs/heads/dependabot/github_actions/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # 7.0.1
+      - name: Setup node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # 7.1.0
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run test:types
 env:
   YARN_GPG: no

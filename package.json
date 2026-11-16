@@ -54,7 +54,8 @@
 	],
 	"scripts": {
 		"default": "npm run test",
-		"test": "npm run test:core && npm run test:browser",
+		"test": "npm run test:types && npm run test:core && npm run test:browser",
+		"test:types": "npm run typescript && tsc --noEmit --ignoreConfig --strict --module nodenext --types node types/index.d.ts",
 		"test:core": "node --test --test-timeout=20000 'test/[!_]*.js' 'test/_issues/**/*test.js'",
 		"test:browser": "cross-env CI=true npm run test --workspaces",
 		"format": "prettier . --write",
