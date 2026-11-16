@@ -1,6 +1,10 @@
 import test from "node:test";
 import getCollectionItemIndex from "../src/Filters/GetCollectionItemIndex.js";
 
+let noI18nConfig = {
+  getFilter: () => undefined,
+};
+
 test("getCollectionItemIndex", (t) => {
   let first = {
     inputPath: "hello.md",
@@ -16,12 +20,12 @@ test("getCollectionItemIndex", (t) => {
   };
   let collections = [first, second, third];
 
-  t.assert.deepStrictEqual(getCollectionItemIndex(collections, first), 0);
-  t.assert.deepStrictEqual(getCollectionItemIndex(collections, second), 1);
-  t.assert.deepStrictEqual(getCollectionItemIndex(collections, third), 2);
+  t.assert.deepStrictEqual(getCollectionItemIndex(noI18nConfig, collections, first), 0);
+  t.assert.deepStrictEqual(getCollectionItemIndex(noI18nConfig, collections, second), 1);
+  t.assert.deepStrictEqual(getCollectionItemIndex(noI18nConfig, collections, third), 2);
 
   t.assert.deepStrictEqual(
-    getCollectionItemIndex(collections, {
+    getCollectionItemIndex(noI18nConfig, collections, {
       inputPath: "unknown.md",
       outputPath: "/unknown/",
     }),

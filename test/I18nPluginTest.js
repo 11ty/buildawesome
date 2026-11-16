@@ -358,3 +358,32 @@ test("getPreviousCollectionItem and getNextCollectionItem skip translations when
   t.assert.strictEqual(getContent("/es/posts/first/"), "NONE,/es/posts/second/");
   t.assert.strictEqual(getContent("/es/posts/second/"), "/es/posts/first/,NONE");
 });
+
+test("getCollectionItemIndex is relative to the default language pages (#3207)", async (t) => {
+  let content = `{{ collections.posts | getCollectionItemIndex }}`;
+
+  let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, { defaultLanguage: "en", languages: ["en", "es"] });
+
+      for (let lang of ["en", "es"]) {
+        $config.addTemplate(`${lang}/posts/first.liquid`, content, {
+          tags: "posts",
+          date: "2024-01-01",
+        });
+        $config.addTemplate(`${lang}/posts/second.liquid`, content, {
+          tags: "posts",
+          date: "2024-01-02",
+        });
+      }
+    },
+  });
+
+  let results = await elev.toJSON();
+  let getContent = (url) => results.find((entry) => entry.url === url).content;
+
+  t.assert.strictEqual(getContent("/en/posts/first/"), "0");
+  t.assert.strictEqual(getContent("/es/posts/first/"), "0");
+  t.assert.strictEqual(getContent("/en/posts/second/"), "1");
+  t.assert.strictEqual(getContent("/es/posts/second/"), "1");
+});

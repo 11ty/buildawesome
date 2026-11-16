@@ -1,17 +1,18 @@
-// TODO locale-friendly, see GetLocaleCollectionItem.js)
-export default function getCollectionItemIndex(collection, page) {
+import { findCollectionItemIndex } from "./GetCollectionItem.js";
+import { getRootCollection, resolveRootPage } from "./LocaleCollection.js";
+
+export default function getCollectionItemIndex(config, collection, page) {
 	if (!page) {
 		page = this.page;
 	}
 
-	let j = 0;
-	for (let item of collection) {
-		if (
-			item.inputPath === page.inputPath &&
-			(item.outputPath === page.outputPath || item.url === page.url)
-		) {
-			return j;
-		}
-		j++;
+	// `page.lang` only exists when the i18n plugin is added
+	if (page.lang) {
+		return findCollectionItemIndex(
+			getRootCollection.call(this, config, collection),
+			resolveRootPage.call(this, config, page),
+		);
 	}
+
+	return findCollectionItemIndex(collection, page);
 }

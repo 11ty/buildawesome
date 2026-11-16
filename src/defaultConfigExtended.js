@@ -77,7 +77,7 @@ export default function ($config) {
 
 	// Collection Filters
 	$config.addFilter("getCollectionItemIndex", function (collection, pageOverride) {
-		return getCollectionItemIndex.call(this, collection, pageOverride);
+		return getCollectionItemIndex.call(this, $config, collection, pageOverride);
 	});
 	$config.addFilter("getCollectionItem", function (collection, pageOverride, langCode) {
 		return getLocaleCollectionItem.call(this, $config, collection, pageOverride, langCode, 0);
