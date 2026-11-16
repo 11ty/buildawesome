@@ -202,6 +202,13 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 	// If a non-localized file exists, returns the URL without a language assigned
 	// Fails if no file exists (localized and not localized)
 	eleventyConfig.addFilter(options.filters.url, function (url, langCodeOverride) {
+		let fragment = "";
+		let fragmentIndex = url.indexOf("#");
+		if (fragmentIndex > 0) {
+			fragment = url.slice(fragmentIndex);
+			url = url.slice(0, fragmentIndex);
+		}
+
 		let langCode =
 			langCodeOverride ||
 			LangUtils.getLanguageCodeFromUrl(this.page?.url) ||
@@ -215,7 +222,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 			for (let existingUrlObj of contentMaps.localeUrlsMap[url] ||
 				contentMaps.localeUrlsMap[`${url}/`]) {
 				if (Comparator.urlHasLangCode(existingUrlObj.url, langCode)) {
-					return existingUrlObj.url;
+					return existingUrlObj.url + fragment;
 				}
 			}
 		}
@@ -226,7 +233,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 			contentMaps.localeUrlsMap[prependedLangCodeUrl] ||
 			(!prependedLangCodeUrl.endsWith("/") && contentMaps.localeUrlsMap[`${prependedLangCodeUrl}/`])
 		) {
-			return prependedLangCodeUrl;
+			return prependedLangCodeUrl + fragment;
 		}
 
 		if (
@@ -246,7 +253,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 			);
 		}
 
-		return url;
+		return url + fragment;
 	});
 
 	// Refactor to use url
