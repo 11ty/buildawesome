@@ -492,3 +492,32 @@ test("locale_links matches paginated pages when the default language has no URL 
   t.assert.strictEqual(content("/de/blog/0/"), "/blog/0/ ");
   t.assert.strictEqual(content("/es/noticias/0/"), "");
 });
+
+test("buildawesomeTranslationKey groups paginated translations with different URLs", async (t) => {
+  let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, { defaultLanguage: "en" });
+      $config.addGlobalData("tagTranslations", [
+        { buildawesomeTranslationKey: "wood", en: "wood", de: "holz" },
+        // Legacy name
+        { eleventyPaginationGroupNumber: "metal", en: "metal", de: "metall" },
+      ]);
+      for (let lang of ["en", "de"]) {
+        $config.addTemplate(
+          `${lang}/tags.njk`,
+          `{% for link in page.url | locale_links %}{{ link.url }} {% endfor %}|{{ "/en/tags/wood/" | locale_url }}`,
+          {
+            pagination: { data: "tagTranslations", size: 1, alias: "tag" },
+            permalink: `/${lang}/tags/{{ tag.${lang} }}/`,
+          },
+        );
+      }
+    },
+  });
+
+  let results = await elev.toJSON();
+  let content = (url) => results.find((entry) => entry.url === url).content;
+  t.assert.strictEqual(content("/en/tags/wood/"), "/de/tags/holz/ |/en/tags/wood/");
+  t.assert.strictEqual(content("/de/tags/holz/"), "/en/tags/wood/ |/de/tags/holz/");
+  t.assert.strictEqual(content("/de/tags/metall/"), "/en/tags/metal/ |/de/tags/holz/");
+});

@@ -383,8 +383,10 @@ class Pagination {
 			entries.push({
 				pageNumber,
 
-				// This is used by i18n Plugin to allow subgroups of nested pagination to be separate
-				groupNumber: items[pageNumber]?.[0]?.eleventyPaginationGroupNumber,
+				// Used by i18n Plugin to group translations of the same item across languages
+				groupNumber:
+					items[pageNumber]?.[0]?.buildawesomeTranslationKey ??
+					items[pageNumber]?.[0]?.eleventyPaginationGroupNumber,
 
 				template: cloned,
 				data: clonedData,
