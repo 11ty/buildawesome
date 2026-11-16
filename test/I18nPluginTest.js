@@ -283,3 +283,49 @@ test("locale_url ignores file names that look like language codes (#3766)", asyn
   t.assert.strictEqual(results.find((entry) => entry.url === "/en/").content, "/site.webmanifest");
   t.assert.strictEqual(results.find((entry) => entry.url === "/sv/").content, "/sv/site.webmanifest");
 });
+
+test("Comparator.isLangCode with an explicit languages list", (t) => {
+  t.assert.strictEqual(Comparator.isLangCode("en", ["en", "ca-valencia"]), true);
+  t.assert.strictEqual(Comparator.isLangCode("ca-valencia", ["en", "ca-valencia"]), true);
+  t.assert.strictEqual(Comparator.isLangCode("to-do", ["en", "ca-valencia"]), false);
+  t.assert.strictEqual(Comparator.isLangCode("es", ["en", "ca-valencia"]), false);
+});
+
+test("languages option limits detected language codes", async (t) => {
+  let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, { defaultLanguage: "en", languages: ["ca-valencia"] });
+      $config.addTemplate("en/index.njk", "{{ page.lang }}");
+      $config.addTemplate("ca-valencia/index.njk", `{{ page.lang }} {{ "/" | locale_url }}`);
+      $config.addTemplate("to-do.njk", "{{ page.lang }}");
+    },
+  });
+
+  let results = await elev.toJSON();
+  let getContent = (url) => results.find((entry) => entry.url === url).content;
+  t.assert.strictEqual(getContent("/en/"), "en");
+  t.assert.strictEqual(getContent("/ca-valencia/"), "ca-valencia /ca-valencia/");
+  t.assert.strictEqual(getContent("/to-do/"), "en");
+});
+
+test("languages option must be an array", async (t) => {
+  let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, { defaultLanguage: "en", languages: "en,es" });
+    },
+  });
+  elev.disableLogger();
+  await t.assert.rejects(() => elev.toJSON(), (error) => /must be an array/.test(error.cause?.message));
+});
+
+test("languages option sets defaultLanguage to its first entry when missing", async (t) => {
+  let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, { languages: ["es", "en"] });
+      $config.addTemplate("about.njk", "{{ page.lang }}");
+    },
+  });
+
+  let results = await elev.toJSON();
+  t.assert.strictEqual(results[0].content, "es");
+});

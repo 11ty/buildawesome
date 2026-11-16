@@ -11,22 +11,22 @@ import { DeepCopy } from "@11ty/eleventy-utils";
 // e.g. --pathprefix=/en/ should return `/en/en/` for `/en/index.liquid`
 
 class LangUtils {
-	static getLanguageCodeFromInputPath(filepath) {
-		return (filepath || "").split("/").find((entry) => Comparator.isLangCode(entry));
+	static getLanguageCodeFromInputPath(filepath, languages) {
+		return (filepath || "").split("/").find((entry) => Comparator.isLangCode(entry, languages));
 	}
 
-	static getLanguageCodeFromUrl(url) {
+	static getLanguageCodeFromUrl(url, languages) {
 		let s = (url || "").split("/");
-		return s.length > 0 && Comparator.isLangCode(s[1]) ? s[1] : "";
+		return s.length > 0 && Comparator.isLangCode(s[1], languages) ? s[1] : "";
 	}
 
-	static swapLanguageCodeNoCheck(str, langCode) {
+	static swapLanguageCodeNoCheck(str, langCode, languages) {
 		let found = false;
 		return str
 			.split("/")
 			.map((entry) => {
 				// only match the first one
-				if (!found && Comparator.isLangCode(entry)) {
+				if (!found && Comparator.isLangCode(entry, languages)) {
 					found = true;
 					return langCode;
 				}
@@ -35,12 +35,12 @@ class LangUtils {
 			.join("/");
 	}
 
-	static swapLanguageCode(str, langCode) {
-		if (!Comparator.isLangCode(langCode)) {
+	static swapLanguageCode(str, langCode, languages) {
+		if (!Comparator.isLangCode(langCode, languages)) {
 			return str;
 		}
 
-		return LangUtils.swapLanguageCodeNoCheck(str, langCode);
+		return LangUtils.swapLanguageCodeNoCheck(str, langCode, languages);
 	}
 }
 
@@ -51,7 +51,12 @@ class Comparator {
 
 	// https://en.wikipedia.org/wiki/IETF_language_tag#Relation_to_other_standards
 	// Requires a ISO-639-1 language code at the start (2 characters before the first -)
-	static isLangCode(code) {
+	// An explicit `languages` list replaces detection entirely.
+	static isLangCode(code, languages) {
+		if (Array.isArray(languages)) {
+			return languages.includes(code);
+		}
+
 		let [s] = (code || "").split("-");
 		if (!iso639.validate(s)) {
 			return false;
@@ -78,8 +83,8 @@ class Comparator {
 		return true;
 	}
 
-	static urlHasLangCode(url, code) {
-		if (!Comparator.isLangCode(code)) {
+	static urlHasLangCode(url, code, languages) {
+		if (!Comparator.isLangCode(code, languages)) {
 			return false;
 		}
 
@@ -116,15 +121,16 @@ function getLocaleUrlsMap(urlToInputPath, extensionMap, options = {}) {
 		let { inputPath: originalFilepath, groupNumber } = urlToInputPath[url];
 		let filepath = normalizeInputPath(originalFilepath, extensionMap);
 		let replaced =
-			LangUtils.swapLanguageCodeNoCheck(filepath, "__11ty_i18n") + `_group:${groupNumber}`;
+			LangUtils.swapLanguageCodeNoCheck(filepath, "__11ty_i18n", options.languages) +
+			`_group:${groupNumber}`;
 
 		if (!filemap[replaced]) {
 			filemap[replaced] = [];
 		}
 
-		let langCode = LangUtils.getLanguageCodeFromInputPath(originalFilepath);
+		let langCode = LangUtils.getLanguageCodeFromInputPath(originalFilepath, options.languages);
 		if (!langCode) {
-			langCode = LangUtils.getLanguageCodeFromUrl(url);
+			langCode = LangUtils.getLanguageCodeFromUrl(url, options.languages);
 		}
 		if (!langCode) {
 			langCode = options.defaultLanguage;
@@ -177,6 +183,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 	let options = DeepCopy(
 		{
 			defaultLanguage: "",
+			languages: undefined, // e.g. ["en", "es"], skips language code detection
 			filters: {
 				url: "locale_url",
 				links: "locale_links",
@@ -186,10 +193,24 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 		opts,
 	);
 
+	if (options.languages !== undefined && !Array.isArray(options.languages)) {
+		throw new Error(
+			"The `languages` option in Eleventy’s Internationalization (I18N) plugin must be an array of language codes.",
+		);
+	}
+
+	if (!options.defaultLanguage) {
+		options.defaultLanguage = options.languages?.[0];
+	}
+
 	if (!options.defaultLanguage) {
 		throw new Error(
-			"You must specify a `defaultLanguage` in Eleventy’s Internationalization (I18N) plugin.",
+			"You must specify a `defaultLanguage` (or `languages`) in Eleventy’s Internationalization (I18N) plugin.",
 		);
+	}
+
+	if (options.languages) {
+		options.languages = Array.from(new Set([options.defaultLanguage, ...options.languages]));
 	}
 
 	let extensionMap;
@@ -213,7 +234,10 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 		// if addGlobalData receives a function it will execute it immediately,
 		// so we return a nested function for computed data
 		return (data) => {
-			return LangUtils.getLanguageCodeFromUrl(data.page.url) || options.defaultLanguage;
+			return (
+				LangUtils.getLanguageCodeFromUrl(data.page.url, options.languages) ||
+				options.defaultLanguage
+			);
 		};
 	});
 
@@ -232,7 +256,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 
 		let langCode =
 			langCodeOverride ||
-			LangUtils.getLanguageCodeFromUrl(this.page?.url) ||
+			LangUtils.getLanguageCodeFromUrl(this.page?.url, options.languages) ||
 			options.defaultLanguage;
 
 		// Already has a language code on it and has a relevant url with the target language code
@@ -242,7 +266,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 		) {
 			for (let existingUrlObj of contentMaps.localeUrlsMap[url] ||
 				contentMaps.localeUrlsMap[`${url}/`]) {
-				if (Comparator.urlHasLangCode(existingUrlObj.url, langCode)) {
+				if (Comparator.urlHasLangCode(existingUrlObj.url, langCode, options.languages)) {
 					return existingUrlObj.url + suffix;
 				}
 			}
@@ -306,7 +330,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 				}
 			}
 
-			let inputPath = LangUtils.swapLanguageCode(page.inputPath, languageCode);
+			let inputPath = LangUtils.swapLanguageCode(page.inputPath, languageCode, options.languages);
 
 			if (
 				!url ||
@@ -321,7 +345,11 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 				// // note that the permalink/slug may be different for the localized file!
 				url,
 				inputPath,
-				filePathStem: LangUtils.swapLanguageCode(page.filePathStem, languageCode),
+				filePathStem: LangUtils.swapLanguageCode(
+					page.filePathStem,
+					languageCode,
+					options.languages,
+				),
 				// outputPath is omitted here, not necessary for GetCollectionItem.js if url is provided
 				__locale_page_resolved: true,
 			};
