@@ -1085,7 +1085,8 @@ class Template extends TemplateContent {
 					template: pageEntry.template, // not on the docs but folks are relying on it
 					rawInput,
 					pageNumber: pageEntry.pageNumber,
-					groupNumber: pageEntry.groupNumber || 0,
+					// i18n plugin groups by URL when this is undefined
+					groupNumber: pageEntry.groupNumber,
 
 					data: pageEntry.data,
 

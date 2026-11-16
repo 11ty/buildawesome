@@ -120,9 +120,14 @@ function getLocaleUrlsMap(urlToInputPath, extensionMap, options = {}) {
 		// Group number comes from Pagination.js
 		let { inputPath: originalFilepath, groupNumber } = urlToInputPath[url];
 		let filepath = normalizeInputPath(originalFilepath, extensionMap);
-		let replaced =
-			LangUtils.swapLanguageCodeNoCheck(filepath, "__11ty_i18n", options.languages) +
-			`_group:${groupNumber}`;
+		let replaced = LangUtils.swapLanguageCodeNoCheck(filepath, "__11ty_i18n", options.languages);
+		if (groupNumber === undefined) {
+			// Paginated without `eleventyPaginationGroupNumber`: match pages by URL minus its language code
+			let urlLangCode = LangUtils.getLanguageCodeFromUrl(url, options.languages);
+			replaced += `_url:${urlLangCode ? url.slice(urlLangCode.length + 1) : url}`;
+		} else {
+			replaced += `_group:${groupNumber}`;
+		}
 
 		if (!filemap[replaced]) {
 			filemap[replaced] = [];

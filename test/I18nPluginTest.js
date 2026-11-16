@@ -444,3 +444,51 @@ for (let [ext, content, setup] of [
     t.assert.strictEqual(getContent("/es/posts/third/"), "/es/posts/second/,NONE");
   });
 }
+
+test("locale_links and locale_url match paginated pages by URL", async (t) => {
+  let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, { defaultLanguage: "en", errorMode: "never" });
+      let content = `{% for link in page.url | locale_links %}{{ link.url }} {% endfor %}|{{ "/en/story/gamma/" | locale_url }}`;
+      let stories = { en: ["alpha", "beta", "gamma"], fr: ["alpha", "gamma"] };
+      for (let lang in stories) {
+        $config.addTemplate(`${lang}/story.njk`, content, {
+          pagination: { data: "stories", size: 1, alias: "story" },
+          stories: stories[lang],
+          permalink: `/${lang}/story/{{ story }}/`,
+        });
+      }
+    },
+  });
+
+  let results = await elev.toJSON();
+  let content = (url) => results.find((entry) => entry.url === url).content;
+  t.assert.strictEqual(content("/en/story/alpha/"), "/fr/story/alpha/ |/en/story/gamma/");
+  t.assert.strictEqual(content("/en/story/beta/"), "|/en/story/gamma/");
+  t.assert.strictEqual(content("/fr/story/alpha/"), "/en/story/alpha/ |/fr/story/gamma/");
+  t.assert.strictEqual(content("/fr/story/gamma/"), "/en/story/gamma/ |/fr/story/gamma/");
+});
+
+test("locale_links matches paginated pages when the default language has no URL prefix", async (t) => {
+  let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, { defaultLanguage: "en" });
+      for (let lang of ["en", "de", "es"]) {
+        let prefix = lang === "en" ? "" : `/${lang}`;
+        // es has no matching translations
+        let permalink = lang === "es" ? "/es/noticias/{{ pagination.pageNumber }}/" : `${prefix}/blog/{{ pagination.pageNumber }}/`;
+        $config.addTemplate(`${lang}/blog.njk`, `{% for link in page.url | locale_links %}{{ link.url }} {% endfor %}`, {
+          pagination: { data: "posts", size: 1 },
+          posts: [1, 2],
+          permalink,
+        });
+      }
+    },
+  });
+
+  let results = await elev.toJSON();
+  let content = (url) => results.find((entry) => entry.url === url).content;
+  t.assert.strictEqual(content("/blog/1/"), "/de/blog/1/ ");
+  t.assert.strictEqual(content("/de/blog/0/"), "/blog/0/ ");
+  t.assert.strictEqual(content("/es/noticias/0/"), "");
+});
