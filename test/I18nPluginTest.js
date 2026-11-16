@@ -265,3 +265,21 @@ test("locale_url swaps a language code already in a nested URL (#2791)", async (
     );
   }
 });
+
+test("locale_url ignores file names that look like language codes (#3766)", async (t) => {
+  let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, { defaultLanguage: "en", errorMode: "never" });
+      for (let lang of ["en", "sv"]) {
+        let prefix = lang === "en" ? "" : `/${lang}`;
+        $config.addTemplate(`${lang}/index.njk`, `{{ "/site.webmanifest" | locale_url }}`);
+        $config.addTemplate(`${lang}-manifest.njk`, "", { permalink: `${prefix}/site.webmanifest` });
+        $config.addTemplate(`${lang}-feed.njk`, "", { permalink: `/${lang}/feed/feed.xml` });
+      }
+    },
+  });
+
+  let results = await elev.toJSON();
+  t.assert.strictEqual(results.find((entry) => entry.url === "/en/").content, "/site.webmanifest");
+  t.assert.strictEqual(results.find((entry) => entry.url === "/sv/").content, "/sv/site.webmanifest");
+});
