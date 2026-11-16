@@ -201,12 +201,14 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 	// Normalize a theoretical URL based on the current page’s language
 	// If a non-localized file exists, returns the URL without a language assigned
 	// Fails if no file exists (localized and not localized)
-	eleventyConfig.addFilter(options.filters.url, function (url, langCodeOverride) {
-		let fragment = "";
-		let fragmentIndex = url.indexOf("#");
-		if (fragmentIndex > 0) {
-			fragment = url.slice(fragmentIndex);
-			url = url.slice(0, fragmentIndex);
+	eleventyConfig.addFilter(options.filters.url, function (originalUrl, langCodeOverride) {
+		let url = originalUrl;
+		let suffix = "";
+		// Only root-relative URLs are localized, so split off their query string and fragment.
+		if (url.startsWith("/") && !url.startsWith("//")) {
+			let parsed = new URL(url, "http://localhost/");
+			url = decodeURI(parsed.pathname);
+			suffix = parsed.search + parsed.hash;
 		}
 
 		let langCode =
@@ -222,7 +224,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 			for (let existingUrlObj of contentMaps.localeUrlsMap[url] ||
 				contentMaps.localeUrlsMap[`${url}/`]) {
 				if (Comparator.urlHasLangCode(existingUrlObj.url, langCode)) {
-					return existingUrlObj.url + fragment;
+					return existingUrlObj.url + suffix;
 				}
 			}
 		}
@@ -233,7 +235,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 			contentMaps.localeUrlsMap[prependedLangCodeUrl] ||
 			(!prependedLangCodeUrl.endsWith("/") && contentMaps.localeUrlsMap[`${prependedLangCodeUrl}/`])
 		) {
-			return prependedLangCodeUrl + fragment;
+			return prependedLangCodeUrl + suffix;
 		}
 
 		if (
@@ -253,7 +255,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 			);
 		}
 
-		return url + fragment;
+		return originalUrl;
 	});
 
 	// Refactor to use url
