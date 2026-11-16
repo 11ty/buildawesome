@@ -1,4 +1,4 @@
-const DATA_KEYS = ["page", "eleventy"];
+const DATA_KEYS = ["page", "eleventy", "buildawesome", "collections"];
 
 export { DATA_KEYS as augmentKeys };
 
