@@ -1,5 +1,8 @@
 import getCollectionItem from "./GetCollectionItem.js";
 
+// Memoized per collection array, which Eleventy recreates on each build.
+const rootCollections = new WeakMap();
+
 // Work with I18n Plugin src/Plugins/I18nPlugin.js to retrieve root pages (not i18n pages)
 function resolveRootPage(config, pageOverride, languageCode) {
 	let localeFilter = config.getFilter("locale_page");
@@ -9,6 +12,25 @@ function resolveRootPage(config, pageOverride, languageCode) {
 
 	// returns root/default-language `page` object
 	return localeFilter.call(this, pageOverride, languageCode);
+}
+
+// Index arithmetic below assumes default-language pages only, so a collection holding
+// every language (e.g. from `tags`) would otherwise navigate to translations of itself.
+function getRootCollection(config, collection) {
+	if (rootCollections.has(collection)) {
+		return rootCollections.get(collection);
+	}
+
+	let filtered = [];
+	for (let item of collection) {
+		let page = item?.data?.page;
+		if (!page || resolveRootPage.call(this, config, page).url === page.url) {
+			filtered.push(item);
+		}
+	}
+
+	rootCollections.set(collection, filtered);
+	return filtered;
 }
 
 function getLocaleCollectionItem(config, collection, pageOverride, langCode, indexModifier = 0) {
@@ -22,7 +44,8 @@ function getLocaleCollectionItem(config, collection, pageOverride, langCode, ind
 	}
 
 	let rootPage = resolveRootPage.call(this, config, pageOverride); // implied current page, default language
-	let modifiedRootItem = getCollectionItem(collection, rootPage, indexModifier);
+	let rootCollection = getRootCollection.call(this, config, collection);
+	let modifiedRootItem = getCollectionItem(rootCollection, rootPage, indexModifier);
 	if (!modifiedRootItem) {
 		return; // no root item exists for the previous/next page
 	}

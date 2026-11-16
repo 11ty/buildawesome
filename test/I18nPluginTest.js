@@ -329,3 +329,32 @@ test("languages option sets defaultLanguage to its first entry when missing", as
   let results = await elev.toJSON();
   t.assert.strictEqual(results[0].content, "es");
 });
+
+test("getPreviousCollectionItem and getNextCollectionItem skip translations when the collection has every language (#3207)", async (t) => {
+  let content = `{% assign p = collections.posts | getPreviousCollectionItem %}{% assign n = collections.posts | getNextCollectionItem %}{{ p.url | default: "NONE" }},{{ n.url | default: "NONE" }}`;
+
+  let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, { defaultLanguage: "en", languages: ["en", "es"] });
+
+      for (let lang of ["en", "es"]) {
+        $config.addTemplate(`${lang}/posts/first.liquid`, content, {
+          tags: "posts",
+          date: "2024-01-01",
+        });
+        $config.addTemplate(`${lang}/posts/second.liquid`, content, {
+          tags: "posts",
+          date: "2024-01-02",
+        });
+      }
+    },
+  });
+
+  let results = await elev.toJSON();
+  let getContent = (url) => results.find((entry) => entry.url === url).content;
+
+  t.assert.strictEqual(getContent("/en/posts/first/"), "NONE,/en/posts/second/");
+  t.assert.strictEqual(getContent("/en/posts/second/"), "/en/posts/first/,NONE");
+  t.assert.strictEqual(getContent("/es/posts/first/"), "NONE,/es/posts/second/");
+  t.assert.strictEqual(getContent("/es/posts/second/"), "/es/posts/first/,NONE");
+});
