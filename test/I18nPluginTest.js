@@ -387,3 +387,35 @@ test("getCollectionItemIndex is relative to the default language pages (#3207)",
   t.assert.strictEqual(getContent("/en/posts/second/"), "1");
   t.assert.strictEqual(getContent("/es/posts/second/"), "1");
 });
+
+for (let [ext, content] of [
+  [
+    "liquid",
+    `{% assign p = collections.posts | getPreviousCollectionItem: page, "es" %}{% assign n = collections.posts | getNextCollectionItem: page, "es" %}{{ p.url | default: "NONE" }},{{ n.url | default: "NONE" }}`,
+  ],
+  [
+    "njk",
+    `{% set p = collections.posts | getPreviousCollectionItem(page, "es") %}{% set n = collections.posts | getNextCollectionItem(page, "es") %}{{ p.url if p else "NONE" }},{{ n.url if n else "NONE" }}`,
+  ],
+]) {
+  test(`getPreviousCollectionItem and getNextCollectionItem resolve a localized item from collections.all (${ext})`, async (t) => {
+    let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+      config: function ($config) {
+        $config.addPlugin(I18nPlugin, { defaultLanguage: "en", languages: ["en", "es"] });
+
+        for (let lang of ["en", "es"]) {
+          for (let [slug, date] of [["first", "2024-01-01"], ["second", "2024-01-02"], ["third", "2024-01-03"]]) {
+            $config.addTemplate(`${lang}/posts/${slug}.${ext}`, content, { tags: "posts", date });
+          }
+        }
+      },
+    });
+
+    let results = await elev.toJSON();
+    let getContent = (url) => results.find((entry) => entry.url === url).content;
+
+    t.assert.strictEqual(getContent("/en/posts/first/"), "NONE,/es/posts/second/");
+    t.assert.strictEqual(getContent("/en/posts/second/"), "/es/posts/first/,/es/posts/third/");
+    t.assert.strictEqual(getContent("/es/posts/third/"), "/es/posts/second/,NONE");
+  });
+}
