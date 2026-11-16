@@ -29,7 +29,7 @@ export interface CoreOptions {
 	/** Force the module mode: "esm", "cjs", or "auto" (detected from your package.json type). */
 	loader?: "esm" | "cjs" | "auto";
 	/** A configuration callback that receives the config API object. */
-	config?: (api: ? extends ConfigurationApi) => void;
+	config?: ConfigurationApi;
 }
 
 declare class Core {
