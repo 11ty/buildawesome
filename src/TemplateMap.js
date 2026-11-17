@@ -249,8 +249,7 @@ class TemplateMap {
 
 	// Tags that differ only by case create separate collections, which often collide once slugified
 	#checkTagCaseCollisions() {
-		let mode = this.userConfig?.errorReporting?.tagCaseCollisions;
-		if (mode === "allow") {
+		if (this.userConfig?.checkErrorReporting("tagCaseCollisions", "allow")) {
 			return;
 		}
 
@@ -284,7 +283,7 @@ class TemplateMap {
 			return;
 		}
 
-		if (mode !== "warn") {
+		if (!this.userConfig?.checkErrorReporting("tagCaseCollisions", "warn")) {
 			throw new Error(
 				`${messages.join("\n")}\nTo downgrade this to a warning, use \`$config.configureErrorReporting({ tagCaseCollisions: "warn" })\` (or \`"allow"\` to skip this check).`,
 			);
@@ -768,10 +767,9 @@ class TemplateMap {
 		let outputPaths = {};
 		let warnings = {};
 		// Outputs that differ only by case overwrite each other on macOS and Windows
-		let toKey =
-			this.userConfig?.errorReporting?.caseCollisions === "allow"
-				? (path) => path
-				: (path) => path.toLowerCase();
+		let toKey = this.userConfig?.checkErrorReporting("caseCollisions", "allow")
+			? (path) => path
+			: (path) => path.toLowerCase();
 		this.#onEachPage((page, template) => {
 			if (page.outputPath === false || page.url === false) {
 				// do nothing (also serverless)
@@ -833,7 +831,7 @@ class TemplateMap {
 
 	checkForMissingFileExtensions() {
 		// disabled in config
-		if (this.userConfig?.errorReporting?.missingExtensions === "allow") {
+		if (this.userConfig?.checkErrorReporting("missingExtensions", "allow")) {
 			return;
 		}
 

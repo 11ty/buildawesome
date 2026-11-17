@@ -612,6 +612,15 @@ Verbose Output: ${this.verboseMode}`;
 	}
 
 	/**
+	 * @param {string} name - `configureErrorReporting` option name
+	 * @param {string} value
+	 * @returns {boolean}
+	 */
+	checkErrorReporting(name, value) {
+		return this.eleventyConfig.userConfig.checkErrorReporting(name, value);
+	}
+
+	/**
 	 * Updates the verbose mode (logs more detailed information).
 	 *
 	 * @method

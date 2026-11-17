@@ -203,8 +203,12 @@ class TemplatePassthroughManager {
 				for (let src in map) {
 					let dest = map[src];
 					// Outputs that differ only by case overwrite each other on macOS and Windows
-					let destKey =
-						this.config.errorReporting?.caseCollisions === "allow" ? dest : dest.toLowerCase();
+					let destKey = this.templateConfig.userConfig.checkErrorReporting(
+						"caseCollisions",
+						"allow",
+					)
+						? dest
+						: dest.toLowerCase();
 					if (this.conflictMap[destKey]) {
 						if (src !== this.conflictMap[destKey]) {
 							let paths = [src, this.conflictMap[destKey]].sort();

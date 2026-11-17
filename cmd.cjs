@@ -45,6 +45,7 @@ async function exec() {
 	}
 
 	let reporter;
+	let handler;
 	try {
 		function getFallbackErrorHandler() {
 			let handler = new ErrorHandler();
@@ -78,7 +79,7 @@ async function exec() {
 		debug("Arguments: %o", argv);
 		const { default: Core } = await import("./src/Core.js");
 
-		let handler = getFallbackErrorHandler();
+		handler = getFallbackErrorHandler();
 
 		process.on("unhandledRejection", (error, promise) => {
 			handler.fatal(error, "Unhandled rejection in promise");
@@ -133,6 +134,12 @@ async function exec() {
 
 		await core.init();
 
+		// Log errors after all other build output (not watch/serve, which never exit)
+		if (!argv.serve && !argv.watch && !core.checkErrorReporting("logErrors", "immediate")) {
+			handler.deferErrors();
+			process.on("beforeExit", () => handler.flushErrors());
+		}
+
 		if (argv.to === "json") {
 			// override logging output
 			core.setIsVerbose(false);
@@ -185,8 +192,7 @@ async function exec() {
 		reporter?.error(error);
 
 		if(typeof ErrorHandler !== "undefined") {
-			let handler = getFallbackErrorHandler();
-			handler.fatal(error, "Fatal Error (CLI)");
+			(handler || getFallbackErrorHandler()).fatal(error, "Fatal Error (CLI)");
 		} else {
 			console.error(error);
 			process.exitCode = 1;

@@ -70,3 +70,28 @@ test("Log an error wrapped via top-level `cause`", (t) => {
   t.assert.strictEqual(str.includes("2. Original message (via TypeError)"), true);
   t.assert.strictEqual(str.includes("Original error stack trace: TypeError: Original message"), true);
 });
+
+test("Deferred errors log once on flush, after other output", (t) => {
+  let errorHandler = new ErrorHandler();
+  let output = [];
+  errorHandler.logger = {
+    message: (str) => output.push(str),
+  };
+
+  errorHandler.deferErrors();
+
+  let error = new Error("Deferred error");
+  errorHandler.once("error", error, "First");
+  errorHandler.error(error, "Second");
+  errorHandler.warn(new Error("Inline warning"), "Warning");
+  t.assert.strictEqual(output.length, 1);
+  t.assert.strictEqual(output[0].startsWith("Warning:"), true);
+
+  errorHandler.flushErrors();
+  t.assert.strictEqual(output.length, 2);
+  t.assert.strictEqual(output[1].startsWith("First:\nDeferred error"), true);
+
+  // No longer deferred after a flush
+  errorHandler.error(new Error("Later error"), "Later");
+  t.assert.strictEqual(output.length, 3);
+});

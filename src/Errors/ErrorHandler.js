@@ -6,6 +6,8 @@ const debug = createDebug("ErrorHandler");
 
 export class ErrorHandler {
 	#logger;
+	/** @type {Array<[Error, string]>|undefined} */
+	#deferredErrors;
 
 	get logger() {
 		if (!this.#logger) {
@@ -40,7 +42,28 @@ export class ErrorHandler {
 		});
 	}
 
+	// Hold errors until `flushErrors()` so they aren’t buried in the middle of other output.
+	deferErrors() {
+		this.#deferredErrors ??= [];
+	}
+
+	flushErrors() {
+		let errors = this.#deferredErrors || [];
+		this.#deferredErrors = undefined;
+
+		for (let [e, msg] of errors) {
+			this.error(e, msg);
+		}
+	}
+
 	error(e, msg) {
+		if (this.#deferredErrors) {
+			if (!this.#deferredErrors.some(([deferred]) => deferred === e)) {
+				this.#deferredErrors.push([e, msg]);
+			}
+			return;
+		}
+
 		this.log(e, "error", "red", true, [`${msg}:`]);
 	}
 

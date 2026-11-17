@@ -1233,6 +1233,7 @@ export default class UserConfig {
 	 * @param {boolean} [options.allowMissingExtensions] - Alias for `missingExtensions`
 	 * @param {"error"|"allow"} [options.caseCollisions]
 	 * @param {"error"|"warn"|"allow"} [options.tagCaseCollisions]
+	 * @param {"end"|"immediate"} [options.logErrors] - CLI builds log errors after all other output by default
 	 */
 	configureErrorReporting(options = {}) {
 		let { allowMissingExtensions, ...rest } = options;
@@ -1241,6 +1242,15 @@ export default class UserConfig {
 			rest.missingExtensions = allowMissingExtensions ? "allow" : "error";
 		}
 		Object.assign(this.errorReporting, rest);
+	}
+
+	/**
+	 * @param {string} name - `configureErrorReporting` option name
+	 * @param {string} value
+	 * @returns {boolean}
+	 */
+	checkErrorReporting(name, value) {
+		return this.errorReporting[name] === value;
 	}
 
 	/*
