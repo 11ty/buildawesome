@@ -1217,9 +1217,20 @@ export default class UserConfig {
 		this.layoutResolution = true;
 	}
 
+	/**
+	 * @param {object} [options]
+	 * @param {"error"|"allow"} [options.missingExtensions]
+	 * @param {boolean} [options.allowMissingExtensions] - Alias for `missingExtensions`
+	 * @param {"error"|"allow"} [options.caseCollisions]
+	 * @param {"error"|"warn"|"allow"} [options.tagCaseCollisions]
+	 */
 	configureErrorReporting(options = {}) {
-		// allowMissingExtensions: true, allowCaseCollisions: true
-		Object.assign(this.errorReporting, options);
+		let { allowMissingExtensions, ...rest } = options;
+		// `allowMissingExtensions` is an alias for `missingExtensions`
+		if (allowMissingExtensions !== undefined && rest.missingExtensions === undefined) {
+			rest.missingExtensions = allowMissingExtensions ? "allow" : "error";
+		}
+		Object.assign(this.errorReporting, rest);
 	}
 
 	/*

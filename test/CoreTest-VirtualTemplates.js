@@ -409,10 +409,10 @@ test("Virtual templates output to paths that differ only by case #4224", async (
 	t.assert.match(e.message, /→ \.\/test\/stubs-virtual-nowrite\/_site\/Output\.html/);
 });
 
-test("Virtual templates output to paths that differ only by case with allowCaseCollisions #4224", async (t) => {
+test(`Virtual templates output to paths that differ only by case with caseCollisions: "allow" #4224`, async (t) => {
 	let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
 		config: function ($config) {
-			$config.configureErrorReporting({ allowCaseCollisions: true });
+			$config.configureErrorReporting({ caseCollisions: "allow" });
 			$config.addTemplate("virtual-one.md", "", {
 				permalink: "/Output.html"
 			})

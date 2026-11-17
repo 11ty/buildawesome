@@ -244,11 +244,16 @@ class TemplateMap {
 			}
 		}
 
-		this.#warnOnTagCaseCollisions();
+		this.#checkTagCaseCollisions();
 	}
 
 	// Tags that differ only by case create separate collections, which often collide once slugified
-	#warnOnTagCaseCollisions() {
+	#checkTagCaseCollisions() {
+		let mode = this.userConfig?.errorReporting?.tagCaseCollisions;
+		if (mode === "allow") {
+			return;
+		}
+
 		let groups = new Map();
 		for (let tagName of this.collection.getTagNames()) {
 			let key = tagName.toLowerCase();
@@ -258,6 +263,7 @@ class TemplateMap {
 			groups.get(key).push(tagName);
 		}
 
+		let messages = [];
 		for (let tagNames of groups.values()) {
 			if (tagNames.length < 2) {
 				continue;
@@ -269,9 +275,23 @@ class TemplateMap {
 				);
 				return `\`${tagName}\` (${Array.from(inputPaths).join(", ")})`;
 			});
-			this.logger?.warn(
-				`Warning: tags that differ only by case create separate collections: ${details.join(", ")}`,
+			messages.push(
+				`tags that differ only by case create separate collections: ${details.join(", ")}`,
 			);
+		}
+
+		if (messages.length === 0) {
+			return;
+		}
+
+		if (mode !== "warn") {
+			throw new Error(
+				`${messages.join("\n")}\nTo downgrade this to a warning, use \`$config.configureErrorReporting({ tagCaseCollisions: "warn" })\` (or \`"allow"\` to skip this check).`,
+			);
+		}
+
+		for (let message of messages) {
+			this.logger?.warn(`Warning: ${message}`);
 		}
 	}
 
@@ -749,7 +769,7 @@ class TemplateMap {
 		let warnings = {};
 		// Outputs that differ only by case overwrite each other on macOS and Windows
 		let toKey =
-			this.userConfig?.errorReporting?.allowCaseCollisions === true
+			this.userConfig?.errorReporting?.caseCollisions === "allow"
 				? (path) => path
 				: (path) => path.toLowerCase();
 		this.#onEachPage((page, template) => {
@@ -813,7 +833,7 @@ class TemplateMap {
 
 	checkForMissingFileExtensions() {
 		// disabled in config
-		if (this.userConfig?.errorReporting?.allowMissingExtensions === true) {
+		if (this.userConfig?.errorReporting?.missingExtensions === "allow") {
 			return;
 		}
 
@@ -834,7 +854,7 @@ You *probably* want to add a file extension to your permalink so that hosts will
 
 Learn more: https://v3.11ty.dev/docs/permalinks/#trailing-slashes
 
-This is usually but not *always* an error so if you’d like to disable this error message, add \`eleventyAllowMissingExtension: true\` somewhere in the data cascade for this template or use \`$config.configureErrorReporting({ allowMissingExtensions: true });\` to disable this feature globally.`);
+This is usually but not *always* an error so if you’d like to disable this error message, add \`eleventyAllowMissingExtension: true\` somewhere in the data cascade for this template or use \`$config.configureErrorReporting({ missingExtensions: "allow" });\` to disable this feature globally.`);
 					e.skipOriginalStack = true;
 					throw e;
 				}

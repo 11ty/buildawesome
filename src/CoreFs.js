@@ -9,7 +9,7 @@ export class CoreFs extends CoreMinimal {
 		await super.initializeConfig(initOverrides);
 
 		this.eleventyConfig.existsCache.allowCaseCollisions =
-			this.eleventyConfig.getConfig().errorReporting?.allowCaseCollisions === true;
+			this.eleventyConfig.getConfig().errorReporting?.caseCollisions === "allow";
 		this.eleventyConfig.directories.checkCase(this.eleventyConfig.existsCache);
 
 		/** @type {object} */

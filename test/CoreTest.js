@@ -1799,7 +1799,7 @@ You *probably* want to add a file extension to your permalink so that hosts will
 
 Learn more: https://v3.11ty.dev/docs/permalinks/#trailing-slashes
 
-This is usually but not *always* an error so if you’d like to disable this error message, add \`eleventyAllowMissingExtension: true\` somewhere in the data cascade for this template or use \`$config.configureErrorReporting({ allowMissingExtensions: true });\` to disable this feature globally.`
+This is usually but not *always* an error so if you’d like to disable this error message, add \`eleventyAllowMissingExtension: true\` somewhere in the data cascade for this template or use \`$config.configureErrorReporting({ missingExtensions: "allow" });\` to disable this feature globally.`
   });
 });
 
@@ -2111,4 +2111,17 @@ test("--formats=* includes formats from setTemplateFormats in a config file #344
   await elev.init();
 
   t.assert.deepStrictEqual(elev.config.templateFormats, ["njk", "liquid"]);
+});
+
+test(`Truthy outputPath without a file extension error message is disabled via missingExtensions: "allow"`, async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: function ($config) {
+      $config.configureErrorReporting({ missingExtensions: "allow" });
+      $config.addTemplate("index.html", "", { permalink: "foo" })
+    },
+  });
+  elev.disableLogger();
+
+  let results = await elev.toJSON();
+  t.assert.strictEqual(results.length, 1);
 });
