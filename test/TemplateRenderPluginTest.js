@@ -2,8 +2,8 @@ import test from "node:test";
 
 import {
   RenderPlugin,
-  File as RenderPluginFile,
-  String as RenderPluginString,
+  RenderFile as RenderPluginFile,
+  RenderString as RenderPluginString,
   RenderManager,
 } from "../src/Plugins/RenderPlugin.js";
 import Eleventy from "../src/Core.js";

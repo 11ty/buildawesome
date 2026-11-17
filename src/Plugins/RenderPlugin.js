@@ -600,4 +600,4 @@ Object.assign(RenderPlugin, {
 	RenderManager,
 });
 
-export { RenderPlugin, compileFile as File, compile as String, RenderManager };
+export { RenderPlugin, compileFile as RenderFile, compile as RenderString, RenderManager };
