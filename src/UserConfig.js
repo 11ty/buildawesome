@@ -34,6 +34,9 @@ export default class UserConfig {
 	#uniqueId;
 	/** @type {number} */
 	#concurrency = 1;
+	// Nested addPlugin calls execute immediately and never land in `this.plugins`.
+	/** @type {Set<string>} */
+	#executedPluginNames = new Set();
 	// Before using os.availableParallelism(); see https://github.com/11ty/eleventy/issues/3596
 	#experimentalFlags = [];
 
@@ -195,6 +198,7 @@ export default class UserConfig {
 		this.quietMode = false;
 
 		this.plugins = [];
+		this.#executedPluginNames = new Set();
 
 		this.useTemplateCache = true;
 		this.dataFilterSelectors = new Set();
@@ -688,7 +692,10 @@ export default class UserConfig {
 			pluginName = this._getPluginName(plugin);
 		}
 
-		return this.plugins.some((entry) => this._getPluginName(entry.plugin) === pluginName);
+		return (
+			this.#executedPluginNames.has(pluginName) ||
+			this.plugins.some((entry) => this._getPluginName(entry.plugin) === pluginName)
+		);
 	}
 
 	addNunjucksLoader(options) {
@@ -717,6 +724,9 @@ export default class UserConfig {
 		let name = this._getPluginName(plugin);
 		let ret;
 		debug(`Adding %o plugin`, name || "anonymous");
+		if (name) {
+			this.#executedPluginNames.add(name);
+		}
 		let pluginBenchmark = this.benchmarks.aggregate.get("Configuration addPlugin");
 
 		if (typeof plugin === "function") {

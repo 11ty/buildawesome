@@ -589,6 +589,24 @@ test("HTML base plugin only adds once (unique)", async (t) => {
   await elev.init();
 });
 
+test("HTML base plugin only adds once when added from multiple nested plugins", async (t) => {
+  let nested = ($config) => {
+    $config.addPlugin($config.resolvePlugin("@11ty/eleventy/html-base-plugin"));
+  };
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    configPath: false,
+    pathPrefix: "/test/",
+    config: function ($config) {
+      $config.addTemplate("index.html", `<a href="/foo/">Foo</a>`);
+      $config.addPlugin(nested);
+      $config.addPlugin(nested);
+    },
+  });
+
+  let [result] = await elev.toJSON();
+  t.assert.strictEqual(result.content, `<a href="/test/foo/">Foo</a>`);
+});
+
 test("HTML base plugin can resolve by name", async (t) => {
   t.plan(2);
   let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
