@@ -335,3 +335,21 @@ test("File has default function export and another one for data too, issue #3359
 
   t.assert.strictEqual(results[0].content, "<h1>Hello World</h1>")
 });
+
+test("Shortcodes named `render` or `data` throw for 11ty.js templates, issue #2454", async (t) => {
+  for (let name of ["render", "data"]) {
+    let elev = new Eleventy("./test/stubs/class.11ty.cjs", "", {
+      config(eleventyConfig) {
+        eleventyConfig.addShortcode(name, () => "from shortcode");
+      }
+    });
+    elev.disableLogger();
+    await t.assert.rejects(elev.toJSON(), (error) => {
+      let messages = [];
+      for (let e = error; e; e = e.cause) {
+        messages.push(e.message);
+      }
+      return messages.some(msg => msg.includes(`named \`${name}\` conflicts`));
+    });
+  }
+});

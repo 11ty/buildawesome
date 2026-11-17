@@ -9,6 +9,8 @@ import { augmentFunction, augmentObject } from "./Util/ContextAugmenter.js";
 class JavaScriptTemplateNotDefined extends BaseError {}
 
 export default class JavaScript extends TemplateEngine {
+	static RESERVED_FUNCTION_NAMES = ["render", "data"];
+
 	constructor(name, templateConfig) {
 		super(name, templateConfig);
 		this.instances = {};
@@ -169,6 +171,13 @@ export default class JavaScript extends TemplateEngine {
 		let configFns = this.config.javascriptFunctions;
 
 		for (let key in configFns) {
+			// `render` and `data` are reserved for the template’s own API, issue #2454
+			if (JavaScript.RESERVED_FUNCTION_NAMES.includes(key)) {
+				throw new Error(
+					`A shortcode, filter, or JavaScript function named \`${key}\` conflicts with the reserved \`${key}\` property on 11ty.js templates. Rename it to use 11ty.js templates (e.g. Render plugin \`tagNameFile\` option).`,
+				);
+			}
+
 			// prefer pre-existing `page` javascriptFunction, if one exists
 			fns[key] = augmentFunction(configFns[key], {
 				source: inst,
