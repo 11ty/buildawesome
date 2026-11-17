@@ -440,3 +440,34 @@ test("Input-relative directories configured as project-root relative throw", t =
 	d.setData("does-not-exist");
 	d.checkInputRelative(new ExistsCache());
 });
+
+test("Directories relative to the project root", t => {
+	let d = new ProjectDirectories();
+	d.setInput("./test/");
+	d.setIncludes("test/stubs");
+	t.assert.strictEqual(d.includes, "./test/test/stubs/");
+
+	// Explicit values are re-resolved when the mode changes
+	d.setRelativeToProjectRoot(true);
+	t.assert.strictEqual(d.includes, "./test/stubs/");
+
+	d.setLayouts("test/stubs/_includes");
+	d.setData("");
+	t.assert.strictEqual(d.layouts, "./test/stubs/_includes/");
+	t.assert.strictEqual(d.data, "./");
+	d.checkInputRelative(new ExistsCache());
+
+	// Defaults stay input-relative
+	let defaults = new ProjectDirectories();
+	defaults.setInput("./test/stubs/");
+	defaults.setRelativeToProjectRoot(true);
+	t.assert.strictEqual(defaults.includes, "./test/stubs/_includes/");
+	t.assert.strictEqual(defaults.data, "./test/stubs/_data/");
+	t.assert.strictEqual(defaults.layouts, undefined);
+
+	// Changing input does not move root-relative directories
+	defaults.setIncludes("test/stubs/_includes");
+	defaults.setInput("./test/noop/");
+	t.assert.strictEqual(defaults.includes, "./test/stubs/_includes/");
+	t.assert.strictEqual(defaults.data, "./test/noop/_data/");
+});

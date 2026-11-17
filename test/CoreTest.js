@@ -1063,6 +1063,41 @@ test("setInputDirectory config method #1503", async (t) => {
   let results = await elev.toJSON();
 });
 
+test("setDirectoriesRelativeTo config method", async (t) => {
+  let elev = new Eleventy("./test/noop/", "./test/noop/_site", {
+    config: function ($config) {
+      $config.setDirectoriesRelativeTo(".");
+      $config.setIncludesDirectory("test/stubs/_includes");
+      $config.setDataDirectory("test/stubs/_data");
+      $config.addTemplate("index.liquid", `{% include "included.liquid" %} {{ globalData.datakey1 }}`);
+
+      $config.on("buildawesome.before", arg => {
+        t.assert.strictEqual(arg.directories.input, "./test/noop/");
+        t.assert.strictEqual(arg.directories.includes, "./test/stubs/_includes/");
+        t.assert.strictEqual(arg.directories.data, "./test/stubs/_data/");
+        t.assert.strictEqual(arg.directories.layouts, undefined);
+      })
+    },
+  });
+
+  let [result] = await elev.toJSON();
+  t.assert.strictEqual(result.content.trim(), "This is an include. datavalue1");
+});
+
+test("setDirectoriesRelativeTo only supports \".\"", async (t) => {
+  let elev = new Eleventy("./test/noop/", "./test/noop/_site", {
+    config: function ($config) {
+      $config.setDirectoriesRelativeTo("src");
+    },
+  });
+
+  await t.assert.rejects(elev.toJSON(), err => {
+    let messages = [];
+    for (let e = err; e; e = e.cause) messages.push(e.message);
+    return messages.some(m => m.includes('Only "." (the project root) is supported.'));
+  });
+});
+
 test("setIncludesDirectory config method #1503", async (t) => {
   t.plan(5);
   let elev = new Eleventy("./test/noop/", "./test/noop/_site", {

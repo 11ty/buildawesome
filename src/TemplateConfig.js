@@ -479,6 +479,10 @@ class TemplateConfig {
 		}
 
 		if (this.directories) {
+			if (this.userConfig.directoriesRelativeTo === ".") {
+				this.directories.setRelativeToProjectRoot(true);
+			}
+
 			if (Object.keys(this.userConfig.directoryAssignments || {}).length > 0) {
 				debug(
 					"Setting directories via set*Directory configuration APIs %o",

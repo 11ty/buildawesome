@@ -95,6 +95,7 @@ export default class UserConfig {
 
 		/** @type {Record<string, any>} */
 		this.directoryAssignments = {};
+		this.directoriesRelativeTo = undefined;
 		/** @type {Record<string, any>} */
 		this.collections = {};
 		/** @type {Record<string, any>} */
@@ -1143,6 +1144,21 @@ export default class UserConfig {
 
 	setLayoutsDirectory(dir) {
 		this.#setDirectory("layouts", dir);
+	}
+
+	// Resolve configured data, includes, and layouts directories from the project root (".") instead of the input directory
+	setDirectoriesRelativeTo(dir) {
+		if (this.isPluginExecution()) {
+			throw new Error(
+				"The `setDirectoriesRelativeTo` configuration API method is not yet allowed in plugins.",
+			);
+		}
+		if (dir !== ".") {
+			throw new Error(
+				`Invalid \`setDirectoriesRelativeTo\` value: ${JSON.stringify(dir)}. Only "." (the project root) is supported.`,
+			);
+		}
+		this.directoriesRelativeTo = dir;
 	}
 
 	// Some data keywords in Eleventy are reserved, throw an error if an application tries to set these.

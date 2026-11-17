@@ -18,6 +18,9 @@ export default class ProjectDirectories {
 	// no updates allowed, input/output set via CLI
 	#frozen = false;
 
+	// When true, explicitly configured data/includes/layouts are relative to the project root
+	#relativeToProjectRoot = false;
+
 	#raw = {};
 
 	#dirs = {};
@@ -42,7 +45,9 @@ export default class ProjectDirectories {
 	}
 
 	normalizeDirectoryPathRelativeToInputDirectory(filePath) {
-		return ProjectDirectories.normalizeDirectory(path.join(this.input, filePath));
+		return ProjectDirectories.normalizeDirectory(
+			path.join(this.#relativeToProjectRoot ? "" : this.input, filePath),
+		);
 	}
 
 	static addTrailingSlash(path) {
@@ -113,15 +118,31 @@ export default class ProjectDirectories {
 		}
 	}
 
+	setRelativeToProjectRoot(bool) {
+		this.#relativeToProjectRoot = Boolean(bool);
+		this.updateInputDependencies();
+	}
+
+	isRelativeToProjectRoot(name) {
+		return this.#relativeToProjectRoot && this.#raw[name] !== undefined;
+	}
+
 	updateInputDependencies() {
-		// raw first, fall back to Eleventy defaults if not yet set
-		this.setData(this.#raw.data ?? ProjectDirectories.defaults.data);
-		this.setIncludes(this.#raw.includes ?? ProjectDirectories.defaults.includes);
+		this.#resolve("data");
+		this.#resolve("includes");
 
 		// Should not include this if not explicitly opted-in
 		if (this.#raw.layouts !== undefined) {
-			this.setLayouts(this.#raw.layouts ?? ProjectDirectories.defaults.layouts);
+			this.#resolve("layouts");
 		}
+	}
+
+	// Defaults are always input-relative, explicit values follow `#relativeToProjectRoot`
+	#resolve(name) {
+		let dir = this.#raw[name] ?? ProjectDirectories.defaults[name];
+		let base = this.isRelativeToProjectRoot(name) ? "" : this.input;
+		// falsy or an empty string is valid (falls back to the base directory)
+		this.#dirs[name] = ProjectDirectories.normalizeDirectory(TemplatePath.join(base, dir || ""));
 	}
 
 	/* Relative to project root, must exist */
@@ -186,38 +207,29 @@ export default class ProjectDirectories {
 		this.updateInputDependencies();
 	}
 
-	/* Relative to input dir */
+	/* Relative to input dir (or project root) */
 	setIncludes(dir) {
 		if (dir !== undefined) {
-			// falsy or an empty string is valid (falls back to input dir)
 			this.#raw.includes = dir;
-			this.#dirs.includes = ProjectDirectories.normalizeDirectory(
-				TemplatePath.join(this.input, dir || ""),
-			);
+			this.#resolve("includes");
 		}
 	}
 
-	/* Relative to input dir */
+	/* Relative to input dir (or project root) */
 	/* Optional */
 	setLayouts(dir) {
 		if (dir !== undefined) {
-			// falsy or an empty string is valid (falls back to input dir)
 			this.#raw.layouts = dir;
-			this.#dirs.layouts = ProjectDirectories.normalizeDirectory(
-				TemplatePath.join(this.input, dir || ""),
-			);
+			this.#resolve("layouts");
 		}
 	}
 
-	/* Relative to input dir */
+	/* Relative to input dir (or project root) */
+	// TODO must exist if specified
 	setData(dir) {
 		if (dir !== undefined) {
-			// falsy or an empty string is valid (falls back to input dir)
-			// TODO must exist if specified
 			this.#raw.data = dir;
-			this.#dirs.data = ProjectDirectories.normalizeDirectory(
-				TemplatePath.join(this.input, dir || ""),
-			);
+			this.#resolve("data");
 		}
 	}
 
@@ -263,8 +275,8 @@ export default class ProjectDirectories {
 	checkInputRelative(existsCache) {
 		for (let name of ["data", "includes", "layouts"]) {
 			let dir = this[name];
-			let raw = this.#raw[name];
-			if (!dir || !raw || path.isAbsolute(raw)) {
+			let raw = this.#raw[name] ?? ProjectDirectories.defaults[name];
+			if (!dir || !raw || path.isAbsolute(raw) || this.isRelativeToProjectRoot(name)) {
 				continue;
 			}
 
