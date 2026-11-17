@@ -20,7 +20,7 @@ jobs:
           # Explicit opt out of cache (tanstack cache poison vuln)
           package-manager-cache: false
       - if: ${{ github.event.release.tag_name != '' && env.NPM_ELEVENTY_PUBLISH_TAG != '' && env.NPM_BUILDAWESOME_PUBLISH_TAG != '' }}
-        # Also runs npm ci and npm test
+        # Also runs npm ci
         run: ./scripts/release.sh
         env:
           NPM_ELEVENTY_PUBLISH_TAG: ${{ contains(github.event.release.tag_name, '-beta.') && 'beta' || contains(github.event.release.tag_name, '-alpha.') && 'canary' || 'latest' }}

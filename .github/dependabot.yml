@@ -14,11 +14,6 @@ updates:
     labels:
       - "dependency-updates"
     versioning-strategy: increase
-    allow:
-      - dependency-type: "production"
-    ignore:
-      - dependency-name: "moo"
-    assignees: [zachleat]
     groups:
       npm-minor-patch:
         update-types: ["minor", "patch"]
@@ -34,7 +29,6 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
-    assignees: [zachleat]
     groups:
       github-actions-minor-patch:
         update-types: ["minor", "patch"]
