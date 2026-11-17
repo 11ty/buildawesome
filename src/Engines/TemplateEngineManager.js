@@ -52,7 +52,11 @@ class TemplateEngineManager {
 
 			// Custom entries *can* overwrite default entries above
 			if ("extensionMap" in this.config) {
-				for (let entry of this.config.extensionMap) {
+				// Aliases go last so their targets exist regardless of registration order (plugins run after config).
+				let entries = Array.from(this.config.extensionMap);
+				entries.sort((a, b) => TemplateEngineManager.isAlias(a) - TemplateEngineManager.isAlias(b));
+
+				for (let entry of entries) {
 					// either the key does not already exist or it is not a simple alias and is an override: https://v3.11ty.dev/docs/languages/custom/#overriding-an-existing-template-language
 					let existingTarget = this._keyToClassNameMap[entry.key];
 					let isAlias = TemplateEngineManager.isAlias(entry);

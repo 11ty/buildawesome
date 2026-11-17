@@ -1538,6 +1538,41 @@ test("Custom Markdown Render with permalink, Issue #2780 #3339", async (t) => {
   t.assert.strictEqual(results[0].content.trim(), `<h1>Markdown?</h1>`);
 });
 
+test("Alias a custom template syntax registered after the alias, Issue #2827", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addTemplateFormats("foo,bar");
+      configApi.addExtension("bar", { key: "foo" });
+      configApi.addExtension("foo", { compile: (str) => () => `FOO(${str})` });
+
+      configApi.addTemplate("index.bar", `hi`);
+    }
+  });
+
+  let results = await elev.toJSON();
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, `FOO(hi)`);
+});
+
+test("Alias a custom template syntax added via plugin, Issue #2827", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: configApi => {
+      configApi.addPlugin(pluginApi => {
+        pluginApi.addTemplateFormats("foo");
+        pluginApi.addExtension("foo", { compile: (str) => () => `FOO(${str})` });
+      });
+      configApi.addTemplateFormats("bar");
+      configApi.addExtension("bar", { key: "foo" });
+
+      configApi.addTemplate("index.bar", `hi`);
+    }
+  });
+
+  let results = await elev.toJSON();
+  t.assert.strictEqual(results.length, 1);
+  t.assert.strictEqual(results[0].content, `FOO(hi)`);
+});
+
 test("Test input/output conflicts (input overwrites output), Issue #3327", async (t) => {
   let elev = new Eleventy("./test/stubs-virtual/", "./test/stubs-virtual/", {
     config: configApi => {
