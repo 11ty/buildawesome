@@ -412,3 +412,31 @@ test("Configured directories must match the casing on disk #4224", t => {
 		input.checkCase(new ExistsCache());
 	}, /`input`/);
 });
+
+test("Input-relative directories configured as project-root relative throw", t => {
+	let d = new ProjectDirectories();
+	d.setInput("./test/");
+	d.checkInputRelative(new ExistsCache());
+
+	d.setIncludes("stubs");
+	d.setLayouts("stubs");
+	d.checkInputRelative(new ExistsCache());
+
+	d.setIncludes("test/stubs");
+	t.assert.throws(() => d.checkInputRelative(new ExistsCache()), {
+		message:
+			'The `includes` directory is relative to the input directory: "test/stubs" resolves to "./test/test/stubs/", which doesn’t exist. Did you mean "./stubs/" (resolves to "./test/stubs/")?',
+	});
+
+	d.setIncludes("stubs");
+	d.setLayouts("./test/stubs/");
+	t.assert.throws(() => d.checkInputRelative(new ExistsCache()), /`layouts`/);
+
+	d.setLayouts("stubs");
+	d.setData("test/stubs");
+	t.assert.throws(() => d.checkInputRelative(new ExistsCache()), /`data`/);
+
+	// Missing in both places is not an error
+	d.setData("does-not-exist");
+	d.checkInputRelative(new ExistsCache());
+});

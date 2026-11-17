@@ -259,6 +259,31 @@ export default class ProjectDirectories {
 		}
 	}
 
+	// Catch input-relative directories that were configured as if they were project-root relative
+	checkInputRelative(existsCache) {
+		for (let name of ["data", "includes", "layouts"]) {
+			let dir = this[name];
+			let raw = this.#raw[name];
+			if (!dir || !raw || path.isAbsolute(raw)) {
+				continue;
+			}
+
+			let rootRelative = ProjectDirectories.normalizeDirectory(raw);
+			if (
+				rootRelative !== dir &&
+				!existsCache.exists(dir) &&
+				existsCache.isDirectory(rootRelative)
+			) {
+				let suggestion = ProjectDirectories.addTrailingSlash(
+					TemplatePath.standardizeFilePath(path.relative(this.input, rootRelative)),
+				);
+				throw new Error(
+					`The \`${name}\` directory is relative to the input directory: "${raw}" resolves to "${dir}", which doesn’t exist. Did you mean "${suggestion}" (resolves to "${rootRelative}")?`,
+				);
+			}
+		}
+	}
+
 	get input() {
 		return this.#dirs.input || ProjectDirectories.defaults.input;
 	}

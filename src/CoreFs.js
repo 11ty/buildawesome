@@ -13,6 +13,7 @@ export class CoreFs extends CoreMinimal {
 			"allow",
 		);
 		this.eleventyConfig.directories.checkCase(this.eleventyConfig.existsCache);
+		this.eleventyConfig.directories.checkInputRelative(this.eleventyConfig.existsCache);
 
 		/** @type {object} */
 		this.fileSystemSearch = new FileSystemSearch(this.eleventyConfig.existsCache);
