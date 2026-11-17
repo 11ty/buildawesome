@@ -1,1 +1,1 @@
-export { default as I18nPlugin } from "../../../src/Plugins/I18nPlugin.js";
+export { I18nPlugin } from "../../../src/Plugins/I18nPlugin.js";

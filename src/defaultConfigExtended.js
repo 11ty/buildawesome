@@ -10,7 +10,7 @@ import urlFilter from "./Filters/Url.js";
 import getLocaleCollectionItem from "./Filters/GetLocaleCollectionItem.js";
 import getCollectionItemIndex from "./Filters/GetCollectionItemIndex.js";
 import getParentDirectory from "./Filters/GetParentDirectory.js";
-import { FilterPlugin as InputPathToUrlFilterPlugin } from "./Plugins/InputPathToUrl.js";
+import { InputPathToUrlFilterPlugin } from "./Plugins/InputPathToUrl.js";
 
 /**
  * @typedef {object} config

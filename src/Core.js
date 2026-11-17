@@ -734,16 +734,13 @@ export { DynamicImport as ImportFile } from "./Util/Require.js";
 export { default as BundlePlugin } from "@11ty/eleventy-plugin-bundle";
 
 // Eleventy*Plugin names are backwards-compatibility legacy names
+export { RenderPlugin, RenderPlugin as EleventyRenderPlugin } from "./Plugins/RenderPlugin.js";
+export { I18nPlugin, I18nPlugin as EleventyI18nPlugin } from "./Plugins/I18nPlugin.js";
 export {
-	default as RenderPlugin,
-	default as EleventyRenderPlugin,
-} from "./Plugins/RenderPlugin.js";
-export { default as I18nPlugin, default as EleventyI18nPlugin } from "./Plugins/I18nPlugin.js";
-export {
-	default as HtmlBasePlugin,
-	default as EleventyHtmlBasePlugin,
+	HtmlBasePlugin,
+	HtmlBasePlugin as EleventyHtmlBasePlugin,
 } from "./Plugins/HtmlBasePlugin.js";
-export { TransformPlugin as InputPathToUrlTransformPlugin } from "./Plugins/InputPathToUrl.js";
+export { InputPathToUrlTransformPlugin } from "./Plugins/InputPathToUrl.js";
 export { IdAttributePlugin } from "./Plugins/IdAttributePlugin.js";
 
 export { PreserveClosingTagsPlugin } from "./Plugins/PreserveClosingTagsPlugin.js";

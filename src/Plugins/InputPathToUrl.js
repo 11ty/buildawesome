@@ -187,6 +187,7 @@ Object.defineProperty(TransformPlugin, "eleventyPluginOptions", {
 	},
 });
 
-export default TransformPlugin;
-
-export { FilterPlugin, TransformPlugin };
+export {
+	FilterPlugin as InputPathToUrlFilterPlugin,
+	TransformPlugin as InputPathToUrlTransformPlugin,
+};

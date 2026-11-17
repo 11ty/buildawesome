@@ -363,7 +363,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 	);
 }
 
-export { Comparator, LangUtils };
+export { I18nPlugin, Comparator, LangUtils };
 
 Object.defineProperty(I18nPlugin, "eleventyPackage", {
 	value: "@11ty/eleventy/i18n-plugin",
@@ -375,10 +375,8 @@ Object.defineProperty(I18nPlugin, "eleventyPluginOptions", {
 	},
 });
 
-// CommonJS friendly exports on .default
+// Legacy property access (e.g. `RenderPlugin.File`) for the root package exports.
 Object.assign(I18nPlugin, {
 	Comparator,
 	LangUtils,
 });
-
-export default I18nPlugin;

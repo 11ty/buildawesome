@@ -3,8 +3,8 @@ import fs from "node:fs";
 import { TemplatePath } from "@11ty/eleventy-utils";
 import { globSync } from "tinyglobby";
 
-import { TransformPlugin as InputPathToUrlTransformPlugin } from "../src/Plugins/InputPathToUrl.js";
-import { default as HtmlBasePlugin } from "../src/Plugins/HtmlBasePlugin.js";
+import { InputPathToUrlTransformPlugin } from "../src/Plugins/InputPathToUrl.js";
+import { HtmlBasePlugin } from "../src/Plugins/HtmlBasePlugin.js";
 import Eleventy from "../src/Core.js";
 import { deleteDirectory } from "./_testHelpers.js";
 

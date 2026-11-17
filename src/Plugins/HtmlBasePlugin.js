@@ -156,11 +156,9 @@ Object.defineProperty(HtmlBasePlugin, "eleventyPluginOptions", {
 	},
 });
 
-// CommonJS friendly exports on .default
+// Legacy property access (e.g. `RenderPlugin.File`) for the root package exports.
 Object.assign(HtmlBasePlugin, {
 	applyBaseToUrl: transformUrl,
 });
 
-export default HtmlBasePlugin;
-
-export { transformUrl as applyBaseToUrl };
+export { HtmlBasePlugin, transformUrl as applyBaseToUrl };

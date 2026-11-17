@@ -1,7 +1,7 @@
 import test from "node:test";
 
 import {
-  default as RenderPlugin,
+  RenderPlugin,
   File as RenderPluginFile,
   String as RenderPluginString,
   RenderManager,

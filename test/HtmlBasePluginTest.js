@@ -1,6 +1,6 @@
 import test from "node:test";
 
-import { default as HtmlBasePlugin, applyBaseToUrl } from "../src/Plugins/HtmlBasePlugin.js";
+import { HtmlBasePlugin, applyBaseToUrl } from "../src/Plugins/HtmlBasePlugin.js";
 import Eleventy from "../src/Core.js";
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 

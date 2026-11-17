@@ -593,13 +593,11 @@ Object.defineProperty(RenderPlugin, "eleventyPluginOptions", {
 	},
 });
 
-// CommonJS friendly exports on .default
+// Legacy property access (e.g. `RenderPlugin.File`) for the root package exports.
 Object.assign(RenderPlugin, {
 	File: compileFile,
 	String: compile,
 	RenderManager,
 });
 
-export default RenderPlugin;
-
-export { compileFile as File, compile as String, RenderManager };
+export { RenderPlugin, compileFile as File, compile as String, RenderManager };

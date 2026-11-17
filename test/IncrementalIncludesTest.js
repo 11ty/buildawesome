@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Eleventy from "../src/Core.js";
 import PathNormalizer from "../src/Util/PathNormalizer.js";
-import RenderPlugin from "../src/Plugins/RenderPlugin.js";
+import { RenderPlugin } from "../src/Plugins/RenderPlugin.js";
 import WebCPlugin from "@11ty/eleventy-plugin-webc";
 
 const ROOT = "test/_generated/incremental-includes";

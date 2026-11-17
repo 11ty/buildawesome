@@ -1,7 +1,7 @@
 import test from "node:test";
 
-import { TransformPlugin } from "../src/Plugins/InputPathToUrl.js";
-import { default as HtmlBasePlugin } from "../src/Plugins/HtmlBasePlugin.js";
+import { InputPathToUrlTransformPlugin as TransformPlugin } from "../src/Plugins/InputPathToUrl.js";
+import { HtmlBasePlugin } from "../src/Plugins/HtmlBasePlugin.js";
 import Eleventy from "../src/Core.js";
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 

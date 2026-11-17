@@ -2,9 +2,9 @@ import "./shims/shim-core.js";
 
 // @11ty/eleventy-plugin-bundle is not exported here (differing from Node package) but *is* bundled (and exposed via Configuration API)
 export { IdAttributePlugin } from "../../../src/Plugins/IdAttributePlugin.js";
-export { default as HtmlBasePlugin } from "../../../src/Plugins/HtmlBasePlugin.js";
-export { TransformPlugin as InputPathToUrlTransformPlugin } from "../../../src/Plugins/InputPathToUrl.js";
-export { default as RenderPlugin } from "../../../src/Plugins/RenderPlugin.js";
+export { HtmlBasePlugin } from "../../../src/Plugins/HtmlBasePlugin.js";
+export { InputPathToUrlTransformPlugin } from "../../../src/Plugins/InputPathToUrl.js";
+export { RenderPlugin } from "../../../src/Plugins/RenderPlugin.js";
 // i18n Plugin is separate (see BundleI18nPlugin.js and @11ty/client/i18n)
 
 // Note for future visitors, an attempt was made to separate these plugins the bundle (so that they could be exported separately)

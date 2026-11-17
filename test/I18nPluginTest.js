@@ -1,5 +1,5 @@
 import test from "node:test";
-import { Comparator, LangUtils, default as I18nPlugin } from "../src/Plugins/I18nPlugin.js";
+import { Comparator, LangUtils, I18nPlugin } from "../src/Plugins/I18nPlugin.js";
 import Eleventy from "../src/Core.js";
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 
