@@ -546,6 +546,10 @@ class Template extends TemplateContent {
 
 	// For incremental builds, a global data file change only affects the templates that read it
 	trackGlobalDataReads(data) {
+		if (!this.config.uses?.isIncremental) {
+			return;
+		}
+
 		let filesByKey = this.templateData?.getGlobalDataFilesByKey();
 		if (!filesByKey?.size) {
 			return;

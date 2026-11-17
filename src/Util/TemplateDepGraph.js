@@ -178,8 +178,17 @@ export class TemplateDepGraph extends DependencyGraph {
 		}
 		this.#tagConsumerEdges.clear();
 
+		// New edges start at `[userconfig]`, so they can’t change a tag’s result within this pass
+		let basicTags = new Map();
+		let isBasicTag = (tagName) => {
+			if (!basicTags.has(tagName)) {
+				basicTags.set(tagName, this.#isBasicTag(tagName));
+			}
+			return basicTags.get(tagName);
+		};
+
 		for (let [filePath, consumes] of this.#tagConsumers) {
-			if (this.hasNode(filePath) && consumes.every((tagName) => this.#isBasicTag(tagName))) {
+			if (this.hasNode(filePath) && consumes.every(isBasicTag)) {
 				this.uses(userconfigKey, filePath);
 				this.#tagConsumerEdges.add(filePath);
 			}

@@ -39,6 +39,9 @@ class GlobalDependencyMap {
 		this.#changedFiles = [];
 	}
 
+	// Global data read tracking is only useful when later builds can be incremental
+	isIncremental = false;
+
 	// Files changed since the previous build, e.g. from the watch queue
 	setChangedFiles(files = []) {
 		this.#changedFiles = files;

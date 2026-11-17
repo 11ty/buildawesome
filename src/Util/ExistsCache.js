@@ -7,6 +7,7 @@ class ExistsCache {
 	#exists = new Map();
 	#dirs = new Map();
 	#listings = new Map();
+	#resolved = new Map();
 
 	constructor() {
 		this.lookupCount = 0;
@@ -18,6 +19,7 @@ class ExistsCache {
 		this.#exists = new Map();
 		this.#dirs = new Map();
 		this.#listings = new Map();
+		this.#resolved = new Map();
 	}
 
 	get size() {
@@ -44,6 +46,7 @@ class ExistsCache {
 
 	// Ancestors too, since a new folder changes its parent’s listing
 	#deleteListings(filePath) {
+		this.#resolved.clear();
 		let dir = ExistsCache.#normalizeDir(path.dirname(filePath));
 		for (;;) {
 			this.#listings.delete(dir);
@@ -64,6 +67,11 @@ class ExistsCache {
 
 	// Seeded by directory walks that already happened (e.g. tinyglobby via FileSystemSearch)
 	addListing(dir, entries) {
+		this.#setListing(dir, entries);
+		this.#resolved.clear();
+	}
+
+	#setListing(dir, entries) {
 		let listing = { names: new Set(entries), lowercase: new Map() };
 		for (let entry of entries) {
 			let key = entry.toLowerCase();
@@ -78,7 +86,7 @@ class ExistsCache {
 		if (!this.#listings.has(key)) {
 			this.lookupCount++;
 			try {
-				this.addListing(key, readdirSync(key));
+				this.#setListing(key, readdirSync(key));
 			} catch {
 				this.#listings.set(key, undefined);
 			}
@@ -145,7 +153,10 @@ class ExistsCache {
 	// Returns the path with on-disk casing; throws when names differ only by case
 	resolve(filePath) {
 		if (filePath) {
-			return this.#walk(filePath, { caseSensitive: false });
+			if (!this.#resolved.has(filePath)) {
+				this.#resolved.set(filePath, this.#walk(filePath, { caseSensitive: false }));
+			}
+			return this.#resolved.get(filePath);
 		}
 	}
 

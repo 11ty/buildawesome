@@ -878,6 +878,7 @@ Verbose Output: ${this.verboseMode}`;
 		}
 		let rendersAllTemplates = !isIncrementalBuild && this.isRunInitialBuild;
 		this.eleventyConfig.usesGraph.setChangedFiles(incrementalFiles);
+		this.eleventyConfig.usesGraph.isIncremental = this.isIncremental;
 
 		let returnObj;
 		let hasError = false;
