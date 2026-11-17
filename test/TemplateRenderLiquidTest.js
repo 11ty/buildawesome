@@ -1261,3 +1261,15 @@ test("Use globals for page/eleventy/collections for use inside {% render %} #154
   let [result] = await elev.toJSON();
   t.assert.deepStrictEqual(result.content, `/ via script collections.all size: 1`);
 });
+
+test("Liquid {% layout %} tag resolves from a custom layouts directory #2233", async (t) => {
+  let elev = new Eleventy("./test/stubs/stubs-2233/", undefined, {
+    config: $config => {
+      $config.setLayoutsDirectory("layouts");
+      $config.addTemplate("index.liquid", `{% layout "base" %}{% block content %}Hi{% endblock %}`);
+    }
+  });
+
+  let [result] = await elev.toJSON();
+  t.assert.deepStrictEqual(result.content, `Before Hi After`);
+});

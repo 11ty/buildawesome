@@ -37,13 +37,18 @@ export default class Liquid extends TemplateEngine {
 
 	getLiquidOptions() {
 		let defaults = {
-			root: [this.dirs.includes, this.dirs.input], // supplemented in compile with inputPath below
+			root: [this.dirs.includes, this.dirs.input],
 			extname: ".liquid",
 			strictFilters: true,
 			// cache: true,
 			jsTruthy: true, // Breaking in v4 #3507
 			timezoneOffset: this.config.dateTimeZone?.zone ?? 0, // Match `setDateTimeZone` (or UTC) when parsing dates, breaking in v4 #1905
 		};
+
+		// liquidjs falls back to `root` for `{% layout %}` lookups, which would skip a custom layouts directory.
+		if (this.dirs.layouts) {
+			defaults.layouts = [this.dirs.layouts, ...defaults.root];
+		}
 
 		let options = Object.assign(defaults, this.liquidOptions || {});
 		// debug("Liquid constructor options: %o", options);
