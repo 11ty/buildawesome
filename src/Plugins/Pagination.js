@@ -83,7 +83,7 @@ class Pagination {
 
 		this.size = data.pagination.size;
 		this.alias = data.pagination.alias;
-		this.fullDataSet = this._get(this.data, this._getDataKey());
+		this.fullDataSet = this._getDataSet();
 		// this returns an array
 		this.target = this._resolveItems();
 		this.chunkedItems = this.pagedItems;
@@ -95,6 +95,15 @@ class Pagination {
 
 	_getDataKey() {
 		return this.data.pagination.data;
+	}
+
+	// An Array or Object is the data set itself instead of a key, Issue #4420
+	_getDataSet() {
+		let key = this._getDataKey();
+		if (Array.isArray(key) || isPlainObject(key)) {
+			return key;
+		}
+		return this._get(this.data, key);
 	}
 
 	shouldResolveDataToObjectValues() {

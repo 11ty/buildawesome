@@ -696,6 +696,34 @@ test("Pagination `before` Callback with a Filter", async (t) => {
   t.assert.deepStrictEqual(templates[0].data.myalias, "item2");
 });
 
+test("Pagination `data` as an Array, Issue #4420", async (t) => {
+  let tmpl = await getNewTemplate(
+    "./test/stubs/paged/paged-data-direct.njk",
+    "./test/stubs/",
+    "./dist"
+  );
+
+  let data = await tmpl.getData();
+  let templates = await tmpl.getTemplates(data);
+  t.assert.strictEqual(templates.length, 2);
+  t.assert.deepStrictEqual(templates[0].data.pagination.items, ["item1", "item2"]);
+  t.assert.deepStrictEqual(templates[1].data.pagination.items, ["item3"]);
+});
+
+test("Pagination `data` as an Object, Issue #4420", async (t) => {
+  let tmpl = await getNewTemplate(
+    "./test/stubs/paged/paged-data-direct-object.njk",
+    "./test/stubs/",
+    "./dist"
+  );
+
+  let data = await tmpl.getData();
+  let templates = await tmpl.getTemplates(data);
+  t.assert.strictEqual(templates.length, 2);
+  t.assert.deepStrictEqual(templates[0].data.pagination.items, ["item1"]);
+  t.assert.deepStrictEqual(templates[1].data.pagination.items, ["item2"]);
+});
+
 test("Pagination `before` Callback with `reverse: true` (test order of operations)", async (t) => {
   let tmpl = await getNewTemplate(
     "./test/stubs/paged/paged-before-and-reverse.njk",

@@ -125,7 +125,7 @@ class TemplateMap {
 	}
 
 	getPaginationTagTarget(entry) {
-		if (entry.data.pagination?.data) {
+		if (typeof entry.data.pagination?.data === "string") {
 			return this.getTagTarget(entry.data.pagination.data);
 		}
 	}
