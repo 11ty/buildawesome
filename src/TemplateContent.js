@@ -29,6 +29,7 @@ class TemplateContent {
 	#extensionMap;
 	#configOptions;
 	#frontMatterOptions;
+	#bodyLineOffset = 0;
 
 	constructor(inputPath, templateConfig) {
 		if (!templateConfig || templateConfig.constructor.name !== "TemplateConfig") {
@@ -245,6 +246,7 @@ class TemplateContent {
 
 	async #read() {
 		let content = await this.inputContent;
+		this.#bodyLineOffset = 0;
 
 		if (content || content === "") {
 			let tr = await this.getTemplateRender();
@@ -301,6 +303,12 @@ class TemplateContent {
 			// https://github.com/11ty/eleventy/issues/613#issuecomment-999637109
 			// https://github.com/11ty/eleventy/issues/2710#issuecomment-1373854834
 			// Removed this._frontMatter monkey patcher help in 3.0.0-alpha.7
+
+			// Skipped when the body was rewritten (e.g. excerpts) and no longer maps to source lines.
+			if (typeof fm.content === "string" && content.endsWith(fm.content)) {
+				this.#bodyLineOffset =
+					content.slice(0, content.length - fm.content.length).split("\n").length - 1;
+			}
 
 			return fm;
 		} else {
@@ -417,6 +425,18 @@ class TemplateContent {
 		let fm = this.frontMatterOverride ? this.frontMatterOverride : await this.read();
 
 		return fm.content;
+	}
+
+	// Engines only see the body, so shift their reported line numbers past the front matter.
+	async offsetBodyErrorLineNumbers(e, str) {
+		if (this.frontMatterOverride) {
+			return;
+		}
+
+		let body = await this.getPreRender();
+		if (str === body && this.#bodyLineOffset > 0) {
+			ErrorUtil.offsetLineNumbers(e, this.inputPath, this.#bodyLineOffset);
+		}
 	}
 
 	async #getFrontMatterData() {
@@ -574,6 +594,7 @@ class TemplateContent {
 			if (cacheable && key) {
 				cache.delete(key);
 			}
+			await this.offsetBodyErrorLineNumbers(e, str);
 			debug(`Having trouble compiling template ${this.inputPath}: %O`, str);
 			throw new TemplateContentCompileError(
 				`Having trouble compiling template ${this.inputPath}`,
@@ -734,6 +755,7 @@ class TemplateContent {
 			if (ErrorUtil.isPrematureTemplateContentError(e)) {
 				return Promise.reject(e);
 			} else {
+				await this.offsetBodyErrorLineNumbers(e, str);
 				let tr = await this.getTemplateRender();
 				let engine = tr.getReadableEnginesList();
 				debug(`Having trouble rendering ${engine} template ${this.inputPath}: %O`, str);

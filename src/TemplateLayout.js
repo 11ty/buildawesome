@@ -270,7 +270,12 @@ class TemplateLayout extends TemplateContent {
 				// This should come *after* data, so `content` have override `content` props set in data cascade
 				content: cdata.wrap(templateContent),
 			};
-			templateContent = cdata.unwrap(await render(data));
+			try {
+				templateContent = cdata.unwrap(await render(data));
+			} catch (e) {
+				await template.offsetBodyErrorLineNumbers(e, await template.getPreRender());
+				throw e;
+			}
 		}
 
 		// Don’t set `templateContent` on pageEntry because collection items should not have layout markup

@@ -56,6 +56,51 @@ export default class ErrorUtil {
 		);
 	}
 
+	static #lineOffsetErrors = new WeakSet();
+
+	// Shifts Liquid and Nunjucks line numbers reported for `filePath` by `offset` lines.
+	static offsetLineNumbers(e, filePath, offset) {
+		if (!offset || !filePath) {
+			return;
+		}
+
+		let seen = new Set();
+		// Liquid errors use `originalError` instead of `cause`.
+		for (let error = e; error && !seen.has(error); error = error.cause ?? error.originalError) {
+			seen.add(error);
+			if (ErrorUtil.#lineOffsetErrors.has(error) || typeof error.message !== "string") {
+				continue;
+			}
+
+			// Liquid appends `, line:N, col:N` from the token position.
+			if (typeof error.token?.getPosition === "function" && error.token.file === filePath) {
+				let [line, col] = error.token.getPosition();
+				let suffix = `, line:${line}, col:${col}`;
+				if (error.message.endsWith(suffix)) {
+					error.message =
+						error.message.slice(0, -suffix.length) + `, line:${line + offset}, col:${col}`;
+					ErrorUtil.#lineOffsetErrors.add(error);
+				}
+				continue;
+			}
+
+			// Nunjucks prefixes `(path) [Line N` for the template where the error occurred.
+			let prefix = `(${filePath}) [Line `;
+			if (error.message.startsWith(prefix)) {
+				let lineStr = String(parseInt(error.message.slice(prefix.length), 10));
+				if (lineStr !== "NaN" && error.message.startsWith(prefix + lineStr)) {
+					let line = Number(lineStr);
+					error.message =
+						prefix + (line + offset) + error.message.slice(prefix.length + lineStr.length);
+					if (error.lineno === line) {
+						error.lineno += offset;
+					}
+					ErrorUtil.#lineOffsetErrors.add(error);
+				}
+			}
+		}
+	}
+
 	static isPrematureTemplateContentError(e) {
 		let seen = new Set();
 		// Liquid errors use `originalError` instead of `cause`.
