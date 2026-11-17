@@ -1160,3 +1160,13 @@ test("Test tag names from data (tags assigned)", async (t) => {
     eleventyExcludeFromCollections: ["one"],
   }), ["two"]);
 });
+
+test("Tags are trimmed and deduplicated after trimming #2462", async (t) => {
+  t.assert.deepStrictEqual(TemplateData.getIncludedTagNames({
+    tags: "post, javascript ,post",
+  }), ["post", "javascript"]);
+
+  t.assert.deepStrictEqual(TemplateData.getIncludedTagNames({
+    tags: [" one", "one ", 1, "1"],
+  }), ["one", "1"]);
+});

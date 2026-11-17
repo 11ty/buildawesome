@@ -243,6 +243,36 @@ class TemplateMap {
 				await this.setCollectionByTagName(tagName);
 			}
 		}
+
+		this.#warnOnTagCaseCollisions();
+	}
+
+	// Tags that differ only by case create separate collections, which often collide once slugified
+	#warnOnTagCaseCollisions() {
+		let groups = new Map();
+		for (let tagName of this.collection.getTagNames()) {
+			let key = tagName.toLowerCase();
+			if (!groups.has(key)) {
+				groups.set(key, []);
+			}
+			groups.get(key).push(tagName);
+		}
+
+		for (let tagNames of groups.values()) {
+			if (tagNames.length < 2) {
+				continue;
+			}
+
+			let details = tagNames.map((tagName) => {
+				let inputPaths = new Set(
+					this.collection.getFilteredByTag(tagName).map((item) => item.inputPath),
+				);
+				return `\`${tagName}\` (${Array.from(inputPaths).join(", ")})`;
+			});
+			this.logger?.warn(
+				`Warning: tags that differ only by case create separate collections: ${details.join(", ")}`,
+			);
+		}
 	}
 
 	async #initDependencyMapEntry(map) {

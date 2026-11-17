@@ -822,9 +822,8 @@ class TemplateData {
 				);
 			}
 
-			// Deduplicate tags
-			// Coerce to string #3875
-			return [...new Set(tags)].map((entry) => String(entry));
+			// Coerce to string (#3875) and trim before deduplicating so equivalent entries collapse
+			return [...new Set(tags.map((entry) => String(entry).trim()))];
 		}
 
 		return tags;
