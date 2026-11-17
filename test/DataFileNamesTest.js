@@ -131,12 +131,33 @@ test("setDataFileNames empty arrays disable data files", async (t) => {
   t.assert.deepStrictEqual(paths, []);
 });
 
+test("setDataFileNames `false` disables a kind of data file", async (t) => {
+  let paths = await getPaths(function(cfg) {
+    cfg.setDataFileNames({ template: false, directory: ["_data.{ext}"] });
+  });
+  t.assert.deepStrictEqual(paths, ["./test/stubs/_data.json", "./test/stubs/component/_data.json"]);
+
+  paths = await getPaths(function(cfg) {
+    cfg.setDataFileNames({ directory: false });
+  }, "./test/stubs/component/other.liquid");
+  t.assert.ok(paths.length > 0);
+  t.assert.ok(paths.every((p) => p.startsWith("./test/stubs/component/other.")));
+});
+
+test("setDataFileNames(false) disables all data files", async (t) => {
+  let paths = await getPaths(function(cfg) {
+    cfg.setDataFileNames(false);
+  });
+
+  t.assert.deepStrictEqual(paths, []);
+});
+
 test("setDataFileNames validates its input", async (t) => {
   await t.assert.rejects(
     getPaths(function(cfg) {
       cfg.setDataFileNames({ directory: "_data.{ext}" });
     }),
-    { message: "`setDataFileNames` expects `directory` to be an Array of strings." },
+    { message: "`setDataFileNames` expects `directory` to be an Array of strings or `false`." },
   );
 });
 

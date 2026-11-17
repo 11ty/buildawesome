@@ -1059,17 +1059,28 @@ export default class UserConfig {
 	}
 
 	/**
-	 * @param {object} names
-	 * @param {Array<string>} [names.template] - Template data file name patterns, highest priority first.
-	 * @param {Array<string>} [names.directory] - Directory data file name patterns, highest priority first.
+	 * @param {{template?: Array<string>|false, directory?: Array<string>|false}|false} names - `false` disables data files.
 	 */
 	setDataFileNames(names = {}) {
-		for (let [key, patterns] of Object.entries(names)) {
-			if (!Array.isArray(patterns) || patterns.some((pattern) => typeof pattern !== "string")) {
-				throw new Error(`\`setDataFileNames\` expects \`${key}\` to be an Array of strings.`);
-			}
+		if (names === false) {
+			names = { template: false, directory: false };
 		}
-		this.dataFileNames = { ...this.dataFileNames, ...names };
+
+		let normalized = {};
+		for (let [key, patterns] of Object.entries(names)) {
+			if (patterns === false) {
+				patterns = [];
+			} else if (
+				!Array.isArray(patterns) ||
+				patterns.some((pattern) => typeof pattern !== "string")
+			) {
+				throw new Error(
+					`\`setDataFileNames\` expects \`${key}\` to be an Array of strings or \`false\`.`,
+				);
+			}
+			normalized[key] = patterns;
+		}
+		this.dataFileNames = { ...this.dataFileNames, ...normalized };
 	}
 
 	addTemplate(virtualInputPath, content, data) {
