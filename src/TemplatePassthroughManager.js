@@ -202,9 +202,11 @@ class TemplatePassthroughManager {
 			({ size, count, map, aliases }) => {
 				for (let src in map) {
 					let dest = map[src];
-					if (this.conflictMap[dest]) {
-						if (src !== this.conflictMap[dest]) {
-							let paths = [src, this.conflictMap[dest]].sort();
+					// Outputs that differ only by case overwrite each other on macOS and Windows
+					let destKey = dest.toLowerCase();
+					if (this.conflictMap[destKey]) {
+						if (src !== this.conflictMap[destKey]) {
+							let paths = [src, this.conflictMap[destKey]].sort();
 							throw new TemplatePassthroughManagerCopyError(
 								`Multiple passthrough copy files are trying to write to the same output file (${TemplatePath.standardizeFilePath(dest)}). ${paths.map((p) => TemplatePath.standardizeFilePath(p)).join(" and ")}`,
 							);
@@ -219,7 +221,7 @@ class TemplatePassthroughManager {
 						}
 					}
 
-					this.conflictMap[dest] = src;
+					this.conflictMap[destKey] = src;
 				}
 
 				if (pass.isDryRun) {

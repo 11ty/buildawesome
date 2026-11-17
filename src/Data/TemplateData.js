@@ -287,9 +287,10 @@ class TemplateData {
 	}
 
 	static calculateExtensionPriority(path, priorities) {
+		let normalized = path.toLowerCase();
 		for (let i = 0; i < priorities.length; i++) {
 			let ext = priorities[i];
-			if (path.endsWith(ext)) {
+			if (normalized.endsWith(ext)) {
 				return i;
 			}
 		}
@@ -510,14 +511,15 @@ class TemplateData {
 
 	async getTemplateDirectoryData(templatePath) {
 		if (!this.#templateDirectoryData[templatePath]) {
-			let localDataPaths = await this.getLocalDataPaths(templatePath);
+			// Data file names match case-insensitively (#4224)
+			let existsCache = this.templateConfig.existsCache;
+			let localDataPaths = (await this.getLocalDataPaths(templatePath))
+				.map((path) => existsCache.resolve(path))
+				.filter(Boolean);
 			let importedData = await this.combineLocalData(localDataPaths);
 
 			// For incremental builds, a changed data file only affects the templates using it
-			this.config.uses?.addDataFiles(
-				templatePath,
-				localDataPaths.filter((path) => this.exists(path)),
-			);
+			this.config.uses?.addDataFiles(templatePath, localDataPaths);
 
 			this.#templateDirectoryData[templatePath] = importedData;
 		}
@@ -590,7 +592,7 @@ class TemplateData {
 	}
 
 	async getDataValue(path) {
-		let extension = TemplatePath.getExtension(path);
+		let extension = TemplatePath.getExtension(path).toLowerCase();
 
 		if (this.#eligibleJavaScriptExtensions.includes(extension)) {
 			// JS data file or require’d JSON (no preprocessing needed)

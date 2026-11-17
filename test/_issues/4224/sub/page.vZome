@@ -1,0 +1,4 @@
+---
+layout: Base.VZOME
+---
+{{ fromDir }}

@@ -76,8 +76,9 @@ export default class ExtensionMap {
 	// on paths found from the file system glob search.
 	// TODO: Method name might just need to be renamed to something more accurate.
 	isFullTemplateFilePath(path) {
+		let normalized = (path || "").toLowerCase();
 		for (let extension of this.#getValidTemplateExtensions()) {
-			if (path.endsWith(`.${extension}`)) {
+			if (normalized.endsWith(`.${extension}`)) {
 				return true;
 			}
 		}
@@ -102,9 +103,10 @@ export default class ExtensionMap {
 	}
 
 	getValidExtensionsForPath(path) {
+		let normalized = (path || "").toLowerCase();
 		let extensions = new Set();
 		for (let extension in this.extensionToKeyMap) {
-			if (path.endsWith(`.${extension}`)) {
+			if (normalized.endsWith(`.${extension}`)) {
 				extensions.add(extension);
 			}
 		}
@@ -250,8 +252,9 @@ export default class ExtensionMap {
 	}
 
 	removeTemplateExtension(path) {
+		let normalized = (path || "").toLowerCase();
 		for (let extension in this.extensionToKeyMap) {
-			if (path === extension || path.endsWith("." + extension)) {
+			if (normalized === extension || normalized.endsWith("." + extension)) {
 				return path.slice(
 					0,
 					path.length - 1 - extension.length < 0 ? 0 : path.length - 1 - extension.length,

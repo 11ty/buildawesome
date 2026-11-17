@@ -960,7 +960,9 @@ export default class UserConfig {
 			extensions = (fileExtension || "").split(",");
 		}
 
-		for (let extension of extensions) {
+		for (let rawExtension of extensions) {
+			let extension = rawExtension.trim().toLowerCase();
+
 			if (this.extensionConflictMap[extension]) {
 				throw new Error(
 					`An attempt was made to override the "${extension}" template syntax twice (via the \`addExtension\` configuration API). A maximum of one override is currently supported.`,
@@ -977,6 +979,10 @@ export default class UserConfig {
 				},
 				options,
 			);
+
+			// File extensions are matched case-insensitively (#4224)
+			extensionOptions.key = String(extensionOptions.key ?? extension).toLowerCase();
+			extensionOptions.extension = String(extensionOptions.extension ?? extension).toLowerCase();
 
 			if (extensionOptions.key !== extensionOptions.extension) {
 				extensionOptions.aliasKey = extensionOptions.extension;
@@ -1000,7 +1006,7 @@ export default class UserConfig {
 			parser = options.parser;
 		}
 
-		let extensions = extensionList.split(",").map((s) => s.trim());
+		let extensions = extensionList.split(",").map((s) => s.trim().toLowerCase());
 		for (let extension of extensions) {
 			this.dataExtensions.set(extension, {
 				extension,

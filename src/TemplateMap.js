@@ -723,39 +723,49 @@ class TemplateMap {
 			} else {
 				// Make sure output doesn’t overwrite input (e.g. --input=. --output=.)
 				// Related to https://github.com/11ty/eleventy/issues/3327
-				if (page.outputPath === page.inputPath) {
+				if (page.outputPath.toLowerCase() === page.inputPath.toLowerCase()) {
 					throw new DuplicatePermalinkOutputError(
 						`The template at "${page.inputPath}" attempted to overwrite itself.`,
 					);
-				} else if (inputs[page.outputPath]) {
+				}
+
+				// Outputs that differ only by case overwrite each other on macOS and Windows
+				let outputKey = page.outputPath.toLowerCase();
+				if (inputs[outputKey]) {
 					throw new DuplicatePermalinkOutputError(
 						`The template at "${page.inputPath}" attempted to overwrite an existing template at "${page.outputPath}".`,
 					);
 				}
-				inputs[page.inputPath] = true;
+				inputs[page.inputPath.toLowerCase()] = true;
 
-				let entry = { inputPath: template.inputPath, pageNumber: page.pageNumber };
-				if (!outputPaths[page.outputPath]) {
-					outputPaths[page.outputPath] = [entry];
+				let entry = {
+					inputPath: template.inputPath,
+					outputPath: page.outputPath,
+					pageNumber: page.pageNumber,
+				};
+				if (!outputPaths[outputKey]) {
+					outputPaths[outputKey] = [entry];
 				} else {
-					let entries = [entry, ...outputPaths[page.outputPath]];
+					let entries = [entry, ...outputPaths[outputKey]];
+					let differsByCase = entries.some((e) => e.outputPath !== page.outputPath);
 					let list = entries
-						.map(({ inputPath, pageNumber }, index) => {
+						.map(({ inputPath, outputPath, pageNumber }, index) => {
 							let pageLabel =
 								typeof pageNumber === "number" ? ` (pagination.pageNumber: ${pageNumber})` : "";
-							return `  ${index + 1}. ${inputPath}${pageLabel}\n`;
+							let outputLabel = differsByCase ? ` → ${outputPath}` : "";
+							return `  ${index + 1}. ${inputPath}${pageLabel}${outputLabel}\n`;
 						})
 						.join("");
 
 					if (entries.every((e) => e.inputPath === template.inputPath)) {
 						// A template can only conflict with itself via pagination, Issue #1946
-						warnings[page.outputPath] =
+						warnings[outputKey] =
 							`Output conflict: multiple pages from pagination template \`${template.inputPath}\` are writing to \`${page.outputPath}\`. Often this means you used an unknown property which resolved to an empty string "" in your permalink.\n${list}`;
 					} else {
-						warnings[page.outputPath] =
+						warnings[outputKey] =
 							`Output conflict: multiple input files are writing to \`${page.outputPath}\`. Use distinct \`permalink\` values to resolve this conflict.\n${list}`;
 					}
-					outputPaths[page.outputPath].push(entry);
+					outputPaths[outputKey].push(entry);
 				}
 			}
 		});

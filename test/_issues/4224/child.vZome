@@ -1,0 +1,4 @@
+---
+layout: base
+---
+{{ fromTdf }}|{{ site.globalJson }}|{{ yml.value }}

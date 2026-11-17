@@ -8,8 +8,10 @@ export class CoreFs extends CoreMinimal {
 	async initializeConfig(initOverrides) {
 		await super.initializeConfig(initOverrides);
 
+		this.eleventyConfig.directories.checkCase(this.eleventyConfig.existsCache);
+
 		/** @type {object} */
-		this.fileSystemSearch = new FileSystemSearch();
+		this.fileSystemSearch = new FileSystemSearch(this.eleventyConfig.existsCache);
 	}
 
 	async init(options = {}) {

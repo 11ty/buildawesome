@@ -240,6 +240,25 @@ export default class ProjectDirectories {
 		}
 	}
 
+	// Configured directories must match on-disk casing, since only some file systems ignore case
+	checkCase(existsCache) {
+		let paths = {
+			input: this.inputFile || this.input,
+			data: this.data,
+			includes: this.includes,
+			layouts: this.layouts,
+			output: this.output,
+		};
+		for (let [name, dir] of Object.entries(paths)) {
+			let resolved = dir && existsCache.resolve(dir);
+			if (resolved && resolved !== dir) {
+				throw new Error(
+					`The \`${name}\` path "${dir}" doesn’t match the casing on disk: "${resolved}"`,
+				);
+			}
+		}
+	}
+
 	get input() {
 		return this.#dirs.input || ProjectDirectories.defaults.input;
 	}

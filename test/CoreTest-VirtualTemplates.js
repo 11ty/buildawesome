@@ -385,3 +385,26 @@ test("server.js Virtual Templates (object)", async (t) => {
 	t.assert.deepStrictEqual(results.length, 1);
 	t.assert.deepStrictEqual(results[0].content.trim(), `this is a test 2.`);
 });
+
+test("Virtual templates output to paths that differ only by case #4224", async (t) => {
+	let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
+		config: function ($config) {
+			$config.addTemplate("virtual-one.md", "", {
+				permalink: "/Output.html"
+			})
+			$config.addTemplate("virtual-two.md", "", {
+				permalink: "/output.html"
+			})
+		},
+	});
+	elev.disableLogger();
+
+	let e;
+	await t.assert.rejects(elev.toJSON(), (err) => {
+		e = err;
+		return true;
+	});
+	t.assert.ok(e instanceof DuplicatePermalinkOutputError);
+	t.assert.match(e.message, /^Output conflict: multiple input files are writing to/);
+	t.assert.match(e.message, /→ \.\/test\/stubs-virtual-nowrite\/_site\/Output\.html/);
+});

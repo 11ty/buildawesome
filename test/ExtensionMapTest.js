@@ -194,3 +194,23 @@ test("shouldSpiderJavaScriptDependencies", async (t) => {
   t.assert.deepStrictEqual(await map.shouldSpiderJavaScriptDependencies("template.11ty.mjs"), true);
   t.assert.deepStrictEqual(await map.shouldSpiderJavaScriptDependencies("template.server.js"), true);
 });
+
+test("Custom addExtension keys are mapped to lower case #4224", async (t) => {
+  let cfg = new TemplateConfig();
+  cfg.userConfig.addExtension("vZome", {
+    compile: () => (content) => content,
+  });
+
+  let map = await getExtensionMap(["vZome"], cfg);
+  t.assert.deepStrictEqual(map.getValidGlobs("."), ["./**/*.vzome"]);
+  t.assert.strictEqual(map.getKey("component.vZome"), "vzome");
+  t.assert.strictEqual(map.isFullTemplateFilePath("component.vZome"), true);
+  t.assert.deepStrictEqual(map.getValidExtensionsForPath("component.vZome"), ["vzome"]);
+  t.assert.strictEqual(map.removeTemplateExtension("component.vZome"), "component");
+});
+
+test("Custom addExtension detects mixed-case duplicates #4224", (t) => {
+  let cfg = new TemplateConfig();
+  cfg.userConfig.addExtension("vZome", {});
+  t.assert.throws(() => cfg.userConfig.addExtension("VZOME", {}), /"vzome" template syntax twice/);
+});

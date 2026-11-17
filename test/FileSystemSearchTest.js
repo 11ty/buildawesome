@@ -1,6 +1,9 @@
 import test from "node:test";
 import path from "node:path";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import FileSystemSearch from "../src/FileSystemSearch.js";
+import ExistsCache from "../src/Util/ExistsCache.js";
 
 test("Base", async (t) => {
   let fs = new FileSystemSearch();
@@ -95,4 +98,28 @@ test("Modifications during an in-flight search are applied", async (t) => {
   t.assert.deepStrictEqual(await fs.search("key", "./test/file-system-search/*.txt"), [
     "./test/file-system-search/virtual-file.txt",
   ]);
+});
+
+test("Glob search seeds ExistsCache directory listings", async (t) => {
+  let cache = new ExistsCache();
+  let fs = new FileSystemSearch(cache);
+  await fs.search("templates", ["./test/_issues/4224/**/*.vZome"]);
+
+  t.assert.strictEqual(cache.exists("./test/_issues/4224/sub/sub.JSON"), true);
+  t.assert.strictEqual(cache.resolve("./test/_issues/4224/child.11tydata.json"), "./test/_issues/4224/child.11TYDATA.json");
+  // Only the folders above the glob’s starting folder are read
+  t.assert.strictEqual(cache.lookupCount, 3);
+});
+
+test("Glob search throws on file names that differ only by case #4224", async (t) => {
+  let dir = mkdtempSync(path.join(os.tmpdir(), "ba-case-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(path.join(dir, "index.md"), "");
+  writeFileSync(path.join(dir, "INDEX.md"), "");
+  if (readdirSync(dir).length < 2) {
+    t.skip("Case-insensitive file system");
+    return;
+  }
+
+  await t.assert.rejects(new FileSystemSearch().search("x", [`${dir}/*.md`]), /differ only by case/);
 });

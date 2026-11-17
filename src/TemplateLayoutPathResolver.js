@@ -64,16 +64,33 @@ class TemplateLayoutPathResolver {
 	}
 
 	exists(layoutPath) {
+		return Boolean(this.resolve(layoutPath));
+	}
+
+	// Returns `layoutPath` with its on-disk casing (#4224)
+	resolve(layoutPath) {
 		if (this.getVirtualTemplate(layoutPath)) {
-			return true;
+			return layoutPath;
 		}
 		let fullPath = this.templateConfig.directories.getLayoutPath(layoutPath);
 		let existsCache = this.templateConfig.existsCache;
-		if (existsCache.exists(fullPath) && !existsCache.isDirectory(fullPath)) {
-			// #4191
-			return true;
+		let resolvedPath = existsCache.resolve(fullPath);
+		// #4191
+		if (resolvedPath && !existsCache.isDirectory(resolvedPath)) {
+			// Copy the on-disk casing onto the end of `layoutPath` that `fullPath` shares
+			let length = 0;
+			while (
+				length < layoutPath.length &&
+				length < fullPath.length &&
+				layoutPath.at(-1 - length).toLowerCase() === fullPath.at(-1 - length).toLowerCase()
+			) {
+				length++;
+			}
+			return (
+				layoutPath.slice(0, layoutPath.length - length) +
+				resolvedPath.slice(resolvedPath.length - length)
+			);
 		}
-		return false;
 	}
 
 	init() {
@@ -86,9 +103,10 @@ class TemplateLayoutPathResolver {
 
 		let useLayoutResolution = this.config.layoutResolution;
 
-		if (this.path.split(".").length > 0 && this.exists(this.path)) {
-			this.filename = this.path;
-			this.fullPath = this.templateConfig.directories.getLayoutPath(this.path);
+		let resolvedPath = this.path.split(".").length > 0 && this.resolve(this.path);
+		if (resolvedPath) {
+			this.filename = resolvedPath;
+			this.fullPath = this.templateConfig.directories.getLayoutPath(resolvedPath);
 		} else if (useLayoutResolution) {
 			this.filename = this.findFileName();
 			this.fullPath = this.templateConfig.directories.getLayoutPath(this.filename || "");
@@ -121,8 +139,9 @@ class TemplateLayoutPathResolver {
 
 	findFileName() {
 		for (let filename of this.extensionMap.getFileList(this.path)) {
-			if (this.exists(filename)) {
-				return filename;
+			let resolvedPath = this.resolve(filename);
+			if (resolvedPath) {
+				return resolvedPath;
 			}
 		}
 	}

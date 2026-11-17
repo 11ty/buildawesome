@@ -211,3 +211,19 @@ test("Layout has no alias and does not exist", async (t) => {
     tl.getFullPath();
   });
 });
+
+test("Layout with mixed-case extensions and folders #4224", async (t) => {
+  let eleventyConfig = await getTemplateConfigInstanceCustomCallback(
+    { input: "test/_issues/4224" },
+    function (cfg) {
+      cfg.addTemplateFormats("vZome");
+      cfg.addExtension("vZome", { compile: () => () => "" });
+    },
+  );
+  let map = new ExtensionMap(eleventyConfig);
+  map.setFormats(["vzome"]);
+
+  t.assert.strictEqual(new TemplateLayoutPathResolver("base", map, eleventyConfig).getFileName(), "base.vZome");
+  t.assert.strictEqual(new TemplateLayoutPathResolver("Base.VZOME", map, eleventyConfig).getFileName(), "base.vZome");
+  t.assert.strictEqual(new TemplateLayoutPathResolver("Partials/Inner", map, eleventyConfig).getFileName(), "partials/inner.vZome");
+});

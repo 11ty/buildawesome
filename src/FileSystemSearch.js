@@ -1,3 +1,4 @@
+import { readdir, readdirSync } from "node:fs";
 import { glob } from "tinyglobby";
 import { TemplatePath } from "@11ty/eleventy-utils";
 
@@ -8,12 +9,53 @@ import { isGlobMatch } from "./Util/GlobMatcher.js";
 const debug = createDebug("FileSystemSearch");
 
 class FileSystemSearch {
-	constructor() {
+	#fs;
+
+	constructor(existsCache) {
+		if (existsCache) {
+			// Share the directory listings tinyglobby reads with ExistsCache
+			this.#fs = {
+				readdir(dir, options, callback) {
+					readdir(dir, options, (error, entries) => {
+						if (!error) {
+							existsCache.addListing(
+								dir,
+								entries.map((entry) => entry.name),
+							);
+						}
+						callback(error, entries);
+					});
+				},
+				readdirSync(dir, options) {
+					let entries = readdirSync(dir, options);
+					existsCache.addListing(
+						dir,
+						entries.map((entry) => entry.name),
+					);
+					return entries;
+				},
+			};
+		}
+
 		this.inputs = {};
 		this.outputs = {};
 		this.promises = {};
 		this.pendingModifications = {};
 		this.count = 0;
+	}
+
+	// Case-insensitive file systems (macOS, Windows) can only keep one of these
+	static #checkCaseCollisions(paths) {
+		let seen = new Map();
+		for (let path of paths) {
+			let key = path.toLowerCase();
+			if (seen.has(key)) {
+				throw new Error(
+					`File names that differ only by case can’t be used, because case-insensitive file systems (macOS, Windows) keep only one: "${seen.get(key)}" and "${path}"`,
+				);
+			}
+			seen.set(key, path);
+		}
 	}
 
 	getCacheKey(key, globs, options) {
@@ -76,13 +118,15 @@ class FileSystemSearch {
 			options.caseSensitiveMatch ??= false; // insensitive
 			options.dot ??= true;
 
-			this.promises[cacheKey] = glob(globs, options).then((results) => {
+			this.promises[cacheKey] = glob(globs, { ...options, fs: this.#fs }).then((results) => {
 				this.outputs[cacheKey] = new Set(
 					results.map((entry) => {
 						let remapped = GlobRemap.remapOutput(entry, options.cwd);
 						return TemplatePath.standardizeFilePath(remapped);
 					}),
 				);
+
+				FileSystemSearch.#checkCaseCollisions(this.outputs[cacheKey]);
 
 				// Apply add/delete calls that arrived while the glob was running
 				for (let [setOperation, path] of this.pendingModifications[cacheKey] || []) {

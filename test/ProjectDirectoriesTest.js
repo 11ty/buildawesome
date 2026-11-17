@@ -1,5 +1,6 @@
 import test from "node:test";
 import ProjectDirectories from "../src/Util/ProjectDirectories.js";
+import ExistsCache from "../src/Util/ExistsCache.js";
 
 test("Implied input", t => {
 	let d = new ProjectDirectories();
@@ -392,4 +393,22 @@ test("isTemplateFile with the default input directory", t => {
 	t.assert.strictEqual(d.isTemplateFile("./_includes/base.njk"), false);
 	t.assert.strictEqual(d.isTemplateFile("./_data/site.json"), false);
 	t.assert.strictEqual(d.isTemplateFile("../index.njk"), false);
+});
+
+test("Configured directories must match the casing on disk #4224", t => {
+	let d = new ProjectDirectories();
+	d.setInput("./test/_issues/4224/");
+	d.checkCase(new ExistsCache());
+
+	d.setIncludes("_Includes");
+	t.assert.throws(() => d.checkCase(new ExistsCache()), {
+		message: 'The `includes` path "./test/_issues/4224/_Includes/" doesn’t match the casing on disk: "./test/_issues/4224/_includes/"',
+	});
+
+	// Linux fails earlier because the folder doesn’t exist
+	t.assert.throws(() => {
+		let input = new ProjectDirectories();
+		input.setInput("./test/_issues/4224/Sub/");
+		input.checkCase(new ExistsCache());
+	}, /`input`/);
 });
