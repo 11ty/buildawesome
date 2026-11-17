@@ -234,9 +234,16 @@ export default class JavaScript extends TemplateEngine {
 		}
 	}
 
+	#isVirtualTemplateContent(str, inputPath) {
+		let relativeInputPath =
+			this.eleventyConfig.directories.getInputPathRelativeToInputDirectory(inputPath);
+		return this.eleventyConfig.userConfig.virtualTemplates[relativeInputPath]?.content === str;
+	}
+
 	async compile(str, inputPath) {
 		let inst;
-		if (str) {
+		// Virtual template content reuses the cached instance so `data` and `render` share it.
+		if (str && !this.#isVirtualTemplateContent(str, inputPath)) {
 			// When str has a value, it's being used for permalinks in data
 			inst = this._getInstance(str);
 		} else {

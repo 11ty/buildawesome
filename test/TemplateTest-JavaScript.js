@@ -318,7 +318,22 @@ test("JavaScript template type (class with data permalink function using a filte
 });
 
 test("JavaScript template type (should use the same class instance for data and render)", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/oneinstance.11ty.cjs", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate("oneinstance.11ty.cjs", class {
+    constructor() {
+      this.rand = Math.random();
+    }
+
+    get data() {
+      return {
+        name: "Ted",
+        rand: this.rand
+      };
+    }
+
+    render({ name }) {
+      return `<p>${name}${this.rand}</p>`;
+    }
+  });
 
   let data = await tmpl.getData();
   let pages = await getRenderedTmpls(tmpl, data);
