@@ -10,8 +10,10 @@ const debug = createDebug("FileSystemSearch");
 
 class FileSystemSearch {
 	#fs;
+	#existsCache;
 
 	constructor(existsCache) {
+		this.#existsCache = existsCache;
 		if (existsCache) {
 			// Share the directory listings tinyglobby reads with ExistsCache
 			this.#fs = {
@@ -51,7 +53,7 @@ class FileSystemSearch {
 			let key = path.toLowerCase();
 			if (seen.has(key)) {
 				throw new Error(
-					`File names that differ only by case can’t be used, because case-insensitive file systems (macOS, Windows) keep only one: "${seen.get(key)}" and "${path}"`,
+					`File names that differ only by case can’t be used, because case-insensitive file systems (macOS, Windows) keep only one: "${seen.get(key)}" and "${path}". Use \`$config.configureErrorReporting({ allowCaseCollisions: true })\` to allow this on case-sensitive file systems (Linux).`,
 				);
 			}
 			seen.set(key, path);
@@ -126,7 +128,9 @@ class FileSystemSearch {
 					}),
 				);
 
-				FileSystemSearch.#checkCaseCollisions(this.outputs[cacheKey]);
+				if (!this.#existsCache?.allowCaseCollisions) {
+					FileSystemSearch.#checkCaseCollisions(this.outputs[cacheKey]);
+				}
 
 				// Apply add/delete calls that arrived while the glob was running
 				for (let [setOperation, path] of this.pendingModifications[cacheKey] || []) {

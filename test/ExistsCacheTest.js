@@ -83,3 +83,12 @@ test("delete forgets ancestor listings", async t => {
   cache.delete("test/stubs/new.md");
   t.assert.strictEqual(cache.exists("./test/stubs"), true);
 });
+
+test("resolve allows names that differ only by case with allowCaseCollisions #4224", async t => {
+  let cache = new ExistsCache();
+  cache.allowCaseCollisions = true;
+  cache.addListing("test/_issues/4224/_includes", ["base.vZome", "base.vzome"]);
+  t.assert.strictEqual(cache.resolve("./test/_issues/4224/_includes/base.vZome"), "./test/_issues/4224/_includes/base.vZome");
+  t.assert.strictEqual(cache.resolve("./test/_issues/4224/_includes/base.vzome"), "./test/_issues/4224/_includes/base.vzome");
+  t.assert.strictEqual(cache.resolve("./test/_issues/4224/_includes/BASE.VZOME"), undefined);
+});

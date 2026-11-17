@@ -10,6 +10,8 @@ class ExistsCache {
 
 	constructor() {
 		this.lookupCount = 0;
+		// Opt-in via `configureErrorReporting({ allowCaseCollisions: true })` for case-sensitive file systems
+		this.allowCaseCollisions = false;
 	}
 
 	reset() {
@@ -103,9 +105,15 @@ class ExistsCache {
 				}
 				let matches = listing.lowercase.get(name.toLowerCase());
 				if (!caseSensitive && matches?.length > 1) {
-					throw new Error(
-						`File names that differ only by case can’t be used, because case-insensitive file systems (macOS, Windows) keep only one: ${matches.map((entry) => JSON.stringify(TemplatePath.join(dir, entry))).join(" and ")}`,
-					);
+					if (!this.allowCaseCollisions) {
+						throw new Error(
+							`File names that differ only by case can’t be used, because case-insensitive file systems (macOS, Windows) keep only one: ${matches.map((entry) => JSON.stringify(TemplatePath.join(dir, entry))).join(" and ")}. Use \`$config.configureErrorReporting({ allowCaseCollisions: true })\` to allow this on case-sensitive file systems (Linux).`,
+						);
+					}
+					// Ambiguous without an exact match
+					if (!listing.names.has(name)) {
+						return;
+					}
 				}
 				if (!listing.names.has(name)) {
 					if (caseSensitive || !matches) {

@@ -408,3 +408,21 @@ test("Virtual templates output to paths that differ only by case #4224", async (
 	t.assert.match(e.message, /^Output conflict: multiple input files are writing to/);
 	t.assert.match(e.message, /→ \.\/test\/stubs-virtual-nowrite\/_site\/Output\.html/);
 });
+
+test("Virtual templates output to paths that differ only by case with allowCaseCollisions #4224", async (t) => {
+	let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
+		config: function ($config) {
+			$config.configureErrorReporting({ allowCaseCollisions: true });
+			$config.addTemplate("virtual-one.md", "", {
+				permalink: "/Output.html"
+			})
+			$config.addTemplate("virtual-two.md", "", {
+				permalink: "/output.html"
+			})
+		},
+	});
+	elev.disableLogger();
+
+	let results = await elev.toJSON();
+	t.assert.deepStrictEqual(results.map((entry) => entry.url).sort(), ["/Output.html", "/output.html"]);
+});

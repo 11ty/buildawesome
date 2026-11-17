@@ -717,26 +717,30 @@ class TemplateMap {
 		let inputs = {};
 		let outputPaths = {};
 		let warnings = {};
+		// Outputs that differ only by case overwrite each other on macOS and Windows
+		let toKey =
+			this.userConfig?.errorReporting?.allowCaseCollisions === true
+				? (path) => path
+				: (path) => path.toLowerCase();
 		this.#onEachPage((page, template) => {
 			if (page.outputPath === false || page.url === false) {
 				// do nothing (also serverless)
 			} else {
 				// Make sure output doesn’t overwrite input (e.g. --input=. --output=.)
 				// Related to https://github.com/11ty/eleventy/issues/3327
-				if (page.outputPath.toLowerCase() === page.inputPath.toLowerCase()) {
+				if (toKey(page.outputPath) === toKey(page.inputPath)) {
 					throw new DuplicatePermalinkOutputError(
 						`The template at "${page.inputPath}" attempted to overwrite itself.`,
 					);
 				}
 
-				// Outputs that differ only by case overwrite each other on macOS and Windows
-				let outputKey = page.outputPath.toLowerCase();
+				let outputKey = toKey(page.outputPath);
 				if (inputs[outputKey]) {
 					throw new DuplicatePermalinkOutputError(
 						`The template at "${page.inputPath}" attempted to overwrite an existing template at "${page.outputPath}".`,
 					);
 				}
-				inputs[page.inputPath.toLowerCase()] = true;
+				inputs[toKey(page.inputPath)] = true;
 
 				let entry = {
 					inputPath: template.inputPath,

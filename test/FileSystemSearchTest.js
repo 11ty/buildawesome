@@ -123,3 +123,19 @@ test("Glob search throws on file names that differ only by case #4224", async (t
 
   await t.assert.rejects(new FileSystemSearch().search("x", [`${dir}/*.md`]), /differ only by case/);
 });
+
+test("Glob search allows file names that differ only by case with allowCaseCollisions #4224", async (t) => {
+  let dir = mkdtempSync(path.join(os.tmpdir(), "ba-case-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(path.join(dir, "index.md"), "");
+  writeFileSync(path.join(dir, "INDEX.md"), "");
+  if (readdirSync(dir).length < 2) {
+    t.skip("Case-insensitive file system");
+    return;
+  }
+
+  let cache = new ExistsCache();
+  cache.allowCaseCollisions = true;
+  let results = await new FileSystemSearch(cache).search("x", [`${dir}/*.md`]);
+  t.assert.strictEqual(results.length, 2);
+});

@@ -1183,7 +1183,7 @@ export default class UserConfig {
 	}
 
 	configureErrorReporting(options = {}) {
-		// allowMissingExtensions: true
+		// allowMissingExtensions: true, allowCaseCollisions: true
 		Object.assign(this.errorReporting, options);
 	}
 
