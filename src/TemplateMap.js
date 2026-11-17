@@ -478,7 +478,7 @@ class TemplateMap {
 	}
 
 	async populateContentDataInMap(orderedMap) {
-		let usedTemplateContentTooEarlyMap = [];
+		let usedTemplateContentTooEarlySet = new Set();
 
 		// Note that empty pagination templates will be skipped here as not renderable
 		let filteredMap = orderedMap.filter((entry) => entry.template.isRenderable());
@@ -508,7 +508,7 @@ class TemplateMap {
 					} catch (e) {
 						if (ErrorUtil.isPrematureTemplateContentError(e)) {
 							// Add to list of templates that need to be processed again
-							usedTemplateContentTooEarlyMap.push(map);
+							usedTemplateContentTooEarlySet.add(map);
 
 							// Reset cached render promise
 							for (let pageEntry of map._pages) {
@@ -524,6 +524,10 @@ class TemplateMap {
 
 		// Process templates that had premature template content errors
 		// This is the second pass for templates that couldn't be rendered in the first pass
+		// Retry in template order, not failure order (which varies with concurrency)
+		let usedTemplateContentTooEarlyMap = filteredMap.filter((map) =>
+			usedTemplateContentTooEarlySet.has(map),
+		);
 		for (let map of usedTemplateContentTooEarlyMap) {
 			try {
 				for (let pageEntry of map._pages) {

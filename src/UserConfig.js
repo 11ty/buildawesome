@@ -33,11 +33,10 @@ export default class UserConfig {
 	/** @type {number|undefined} */
 	#uniqueId;
 	/** @type {number} */
-	#concurrency = 1;
+	#concurrency = 4;
 	// Nested addPlugin calls execute immediately and never land in `this.plugins`.
 	/** @type {Set<string>} */
 	#executedPluginNames = new Set();
-	// Before using os.availableParallelism(); see https://github.com/11ty/eleventy/issues/3596
 	#experimentalFlags = [];
 
 	constructor() {
@@ -229,8 +228,7 @@ export default class UserConfig {
 		/** @type {Record<string, any>} */
 		this.errorReporting = {};
 
-		// Before using os.availableParallelism(); see https://github.com/11ty/eleventy/issues/3596
-		this.#concurrency = 1;
+		this.#concurrency = 4;
 	}
 
 	// compatibleRange is optional in 2.0.0-beta.2

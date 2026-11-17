@@ -1,6 +1,7 @@
 import test from "node:test";
 import path from "node:path";
 
+import Eleventy from "../src/Core.js";
 import TemplateMap from "../src/TemplateMap.js";
 import TemplateCollection from "../src/TemplateCollection.js";
 import UsingCircularTemplateContentReferenceError from "../src/Errors/UsingCircularTemplateContentReferenceError.js";
@@ -556,6 +557,30 @@ test("TemplateMap circular references (map.templateContent)", async (t) => {
     },
     UsingCircularTemplateContentReferenceError,
   );
+});
+
+test("Premature templateContent retries run in template order with concurrency", async (t) => {
+  let wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  let contentOf = (all, name) => all.find((entry) => entry.inputPath.endsWith(`/${name}.11ty.js`)).templateContent;
+
+  // c fails before b in the first pass, but c needs b’s content on retry.
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: (eleventyConfig) => {
+      eleventyConfig.setConcurrency(4);
+      eleventyConfig.addTemplate("a.11ty.js", async () => {
+        await wait(30);
+        return "A";
+      });
+      eleventyConfig.addTemplate("b.11ty.js", async ({ collections }) => {
+        await wait(10);
+        return `B+${contentOf(collections.all, "a")}`;
+      });
+      eleventyConfig.addTemplate("c.11ty.js", ({ collections }) => `C+${contentOf(collections.all, "b")}`);
+    },
+  });
+
+  let results = await elev.toJSON();
+  t.assert.strictEqual(results.find((entry) => entry.url === "/c/").content, "C+B+A");
 });
 
 test("Issue #115, mixing pagination and collections", async (t) => {
