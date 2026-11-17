@@ -293,3 +293,13 @@ test("setPassthroughCopyOptions replaces earlier calls", (t) => {
   t.assert.deepStrictEqual(userCfg.passthroughCopyOptions, { dot: false });
   t.assert.throws(() => userCfg.setPassthroughCopyOptions({ mode: "html-relative" }));
 });
+
+test("setConcurrency throws on zero or negative values", (t) => {
+  let userCfg = new UserConfig();
+  t.assert.throws(() => userCfg.setConcurrency(0), /must be greater than 0/);
+  t.assert.throws(() => userCfg.setConcurrency(-1), /must be greater than 0/);
+  t.assert.throws(() => userCfg.setConcurrency(NaN), /must be greater than 0/);
+
+  userCfg.setConcurrency(2);
+  t.assert.equal(userCfg.getConcurrency(), 2);
+});

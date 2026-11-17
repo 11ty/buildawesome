@@ -1320,6 +1320,10 @@ export default class UserConfig {
 		if (typeof number !== "number") {
 			throw new UserConfigError("Argument passed to `setConcurrency` must be a number.");
 		}
+		// Also rejects NaN, which would otherwise skip rendering entirely.
+		if (!(number > 0)) {
+			throw new UserConfigError("Argument passed to `setConcurrency` must be greater than 0.");
+		}
 
 		this.#concurrency = number;
 	}
