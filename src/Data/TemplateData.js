@@ -241,36 +241,111 @@ class TemplateData {
 		return suffixesWithExtensions;
 	}
 
-	// This is used exclusively for --watch and --serve chokidar targets
-	getTemplateDataFileGlob() {
-		let suffixesSet = this.getAllDataFileSuffixes();
+	// Converts the legacy suffix and base name options to file name patterns
+	#getLegacyDataFileNames() {
+		let suffixes = this.getConfigurationDataFileSuffixes();
+		let baseName = this.config.dataFileDirBaseNameOverride;
+		let template = [];
+		let directory = [];
 
-		let paths = [];
-		if (suffixesSet.size > 0) {
-			paths.push(`${this.inputDir}**/*.{${Array.from(suffixesSet).join(",")}}`);
+		for (let suffix of suffixes) {
+			if (typeof suffix !== "string") {
+				continue;
+			}
+
+			let filePatterns = suffix
+				? [`{name}${suffix}.{js}`, `{name}${suffix}.{ext}`]
+				: ["{name}.{ext}"];
+			template.push(...filePatterns);
+
+			if (!baseName) {
+				directory.push(...filePatterns);
+			} else if (suffix) {
+				// A base name never matches suffix-less files (#1699)
+				directory.push(...filePatterns.map((pattern) => pattern.replace("{name}", baseName)));
+			}
 		}
 
-		return TemplatePath.addLeadingDotSlashArray(paths);
+		return { template, directory };
+	}
+
+	// Patterns are listed highest priority first
+	getDataFileNames() {
+		return Object.assign(this.#getLegacyDataFileNames(), this.config.dataFileNames);
+	}
+
+	// Highest priority first
+	#getPatternExtensions(token) {
+		if (token === "js") {
+			return this.#eligibleJavaScriptExtensions;
+		}
+		return ["json", ...this.getUserDataExtensions()];
+	}
+
+	#expandDataFileName(pattern, name) {
+		let fileName = pattern.replaceAll("{name}", name);
+		let match = fileName.match(/\{(ext|js)\}/);
+		if (!match) {
+			return [fileName];
+		}
+
+		return this.#getPatternExtensions(match[1]).flatMap((extension) =>
+			this.#expandDataFileName(fileName.replace(match[0], extension), name),
+		);
+	}
+
+	#pushDataFilePaths(paths, dir, patterns, name) {
+		for (let pattern of patterns) {
+			if (pattern.includes("{name}") && (!name || name === ".")) {
+				continue;
+			}
+			for (let fileName of this.#expandDataFileName(pattern, name)) {
+				paths.push(dir + "/" + fileName);
+			}
+		}
+	}
+
+	#getDataFileNameGlobs() {
+		let { template, directory } = this.getDataFileNames();
+		return unique(
+			[...template, ...directory].flatMap((pattern) => this.#expandDataFileName(pattern, "*")),
+		);
+	}
+
+	// Legacy glob format, kept unchanged when `setDataFileNames` is not used
+	#getLegacyDataFileGlob(filter = () => true) {
+		let suffixes = Array.from(this.getAllDataFileSuffixes()).filter(filter);
+		if (suffixes.length === 0) {
+			return [];
+		}
+		return TemplatePath.addLeadingDotSlashArray([`${this.inputDir}**/*.{${suffixes.join(",")}}`]);
+	}
+
+	#getDataFileGlob(fileNames) {
+		if (fileNames.length === 0) {
+			return [];
+		}
+
+		let fileGlob = fileNames.length === 1 ? fileNames[0] : `{${fileNames.join(",")}}`;
+		return TemplatePath.addLeadingDotSlashArray([`${this.inputDir}**/${fileGlob}`]);
+	}
+
+	// This is used exclusively for --watch and --serve chokidar targets
+	getTemplateDataFileGlob() {
+		if (!this.config.dataFileNames) {
+			return this.#getLegacyDataFileGlob();
+		}
+		return this.#getDataFileGlob(this.#getDataFileNameGlobs());
 	}
 
 	// For spidering dependencies
 	getTemplateJavaScriptDataFileGlob() {
-		let suffixes = Array.from(this.getAllDataFileSuffixes()).filter((entry) => {
-			let lastDotIndex = entry.lastIndexOf(".");
-			if (lastDotIndex === -1) {
-				return false;
-			}
-			let ext = entry.slice(lastDotIndex + 1);
-			// prune out any non-JS extensions
-			return this.#eligibleJavaScriptExtensions.includes(ext);
-		});
-
-		let paths = [];
-		if (suffixes.length > 0) {
-			paths.push(`${this.inputDir}**/*.{${suffixes.join(",")}}`);
+		let isJavaScript = (fileName) =>
+			this.#eligibleJavaScriptExtensions.includes(TemplatePath.getExtension(fileName));
+		if (!this.config.dataFileNames) {
+			return this.#getLegacyDataFileGlob(isJavaScript);
 		}
-
-		return TemplatePath.addLeadingDotSlashArray(paths);
+		return this.#getDataFileGlob(this.#getDataFileNameGlobs().filter(isJavaScript));
 	}
 
 	getGlobalDataGlob() {
@@ -659,51 +734,18 @@ class TemplateData {
 		}
 	}
 
-	_pushExtensionsToPaths(paths, curpath, extensions) {
-		for (let extension of extensions) {
-			paths.push(curpath + "." + extension);
-		}
-	}
-
-	_addBaseToPaths(paths, base, extensions, nonEmptySuffixesOnly = false) {
-		let suffixes = this.getConfigurationDataFileSuffixes();
-
-		for (let suffix of suffixes) {
-			suffix = suffix || "";
-
-			if (nonEmptySuffixesOnly && suffix === "") {
-				continue;
-			}
-
-			// data suffix
-			if (suffix) {
-				for (let extension of this.#eligibleJavaScriptExtensions) {
-					paths.push(base + suffix + "." + extension);
-				}
-			}
-			paths.push(base + suffix + ".json"); // default: .data.json
-
-			// inject user extensions
-			this._pushExtensionsToPaths(paths, base + suffix, extensions);
-		}
-	}
-
 	async getLocalDataPaths(templatePath) {
 		let paths = [];
 		let parsed = path.parse(templatePath);
-		let userExtensions = this.getUserDataExtensions();
 
 		if (parsed.dir) {
+			let { template } = this.getDataFileNames();
 			let fileNameNoExt = this.extensionMap.removeTemplateExtension(parsed.base);
 
-			// default dataSuffix: .data, is appended in _addBaseToPaths
-			debug("Using %o suffixes to find data files.", this.getConfigurationDataFileSuffixes());
+			debug("Using %o patterns to find template data files.", template);
+			this.#pushDataFilePaths(paths, parsed.dir, template, fileNameNoExt);
 
-			// Template data file paths
-			let filePathNoExt = parsed.dir + "/" + fileNameNoExt;
-			this._addBaseToPaths(paths, filePathNoExt, userExtensions);
-
-			paths.push(...this.#getDirectoryDataPaths(parsed.dir, userExtensions));
+			paths.push(...this.#getDirectoryDataPaths(parsed.dir));
 		}
 
 		debug("getLocalDataPaths(%o): %o", templatePath, paths);
@@ -711,7 +753,7 @@ class TemplateData {
 	}
 
 	// Shared by every template in the directory
-	#getDirectoryDataPaths(parsedDir, userExtensions) {
+	#getDirectoryDataPaths(parsedDir) {
 		let cached = this.#directoryDataPaths.get(parsedDir);
 		if (cached) {
 			return cached;
@@ -719,42 +761,23 @@ class TemplateData {
 
 		let paths = [];
 		let inputDir = this.inputDir;
+		let { directory } = this.getDataFileNames();
 
-		// Directory data file paths
-		let allDirs = TemplatePath.getAllDirs(parsedDir);
-
-		for (let dir of allDirs) {
-			let lastDir = TemplatePath.getLastPathSegment(dir);
-			let dirPathNoExt = dir + "/" + lastDir;
-
+		for (let dir of TemplatePath.getAllDirs(parsedDir)) {
 			// TODO use DirContains
 			if (!inputDir || (dir.startsWith(inputDir) && dir !== inputDir)) {
-				if (this.config.dataFileDirBaseNameOverride) {
-					let indexDataFile = dir + "/" + this.config.dataFileDirBaseNameOverride;
-					this._addBaseToPaths(paths, indexDataFile, userExtensions, true);
-				} else {
-					this._addBaseToPaths(paths, dirPathNoExt, userExtensions);
-				}
+				this.#pushDataFilePaths(paths, dir, directory, TemplatePath.getLastPathSegment(dir));
 			}
 		}
 
-		// 0.11.0+ include root input dir files
-		// if using `docs/` as input dir, looks for docs/docs.json et al
+		// 0.11.0+ include root input dir files, e.g. docs/docs.json for a `docs/` input dir
 		if (inputDir) {
-			let lastInputDir = TemplatePath.addLeadingDotSlash(
-				TemplatePath.join(inputDir, TemplatePath.getLastPathSegment(inputDir)),
+			let rootDir = TemplatePath.getDirFromFilePath(
+				TemplatePath.addLeadingDotSlash(
+					TemplatePath.join(inputDir, TemplatePath.getLastPathSegment(inputDir)),
+				),
 			);
-
-			// in root input dir, search for index.data.json et al
-			if (this.config.dataFileDirBaseNameOverride) {
-				let indexDataFile =
-					TemplatePath.getDirFromFilePath(lastInputDir) +
-					"/" +
-					this.config.dataFileDirBaseNameOverride;
-				this._addBaseToPaths(paths, indexDataFile, userExtensions, true);
-			} else if (lastInputDir !== "./") {
-				this._addBaseToPaths(paths, lastInputDir, userExtensions);
-			}
+			this.#pushDataFilePaths(paths, rootDir, directory, TemplatePath.getLastPathSegment(inputDir));
 		}
 
 		this.#directoryDataPaths.set(parsedDir, paths);

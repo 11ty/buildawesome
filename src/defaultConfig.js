@@ -25,6 +25,7 @@ import TransformsUtil from "./Util/TransformsUtil.js";
  * @property {Array<string>} templateFormats - An array of accepted template formats.
  * @property {Array<string>} dataFileSuffixes - Array of file suffixes for data files in the Data Cascade.
  * @property {boolean} [dataFileDirBaseNameOverride=false] - Use index.* instead of dirname.* for Directory Data File names
+ * @property {{template?: Array<string>, directory?: Array<string>}} [dataFileNames] - Data file name patterns (`{name}`, `{ext}`, `{js}`), overrides `dataFileSuffixes` and `dataFileDirBaseNameOverride`.
  * @property {string} [pathPrefix='/'] - The directory under which all output files should be written to.
  * @property {string} [markdownTemplateEngine='liquid'] - Template engine to process markdown files with.
  * @property {string} [htmlTemplateEngine='liquid'] - Template engine to process html files with.

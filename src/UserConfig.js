@@ -208,6 +208,8 @@ export default class UserConfig {
 		// Defaults in `defaultConfig.js`
 		this.dataFileSuffixesOverride = false;
 		this.dataFileDirBaseNameOverride = false;
+		/** @type {{template?: Array<string>, directory?: Array<string>} | undefined} */
+		this.dataFileNames = undefined;
 
 		/** @type {Record<string, any>} */
 		// Moved into TemplateContent->getFrontMatterParsingOptions
@@ -1040,12 +1042,34 @@ export default class UserConfig {
 		this.urlTransforms.push(callback);
 	}
 
+	/** @deprecated Use `setDataFileNames` instead. */
 	setDataFileSuffixes(suffixArray) {
+		this.logger?.warn(
+			'`setDataFileSuffixes` is deprecated, use `setDataFileNames` instead, e.g. `setDataFileNames({ template: ["{name}.data.{js}", "{name}.data.{ext}"] })`.',
+		);
 		this.dataFileSuffixesOverride = suffixArray;
 	}
 
+	/** @deprecated Use `setDataFileNames` instead. */
 	setDataFileBaseName(baseName) {
+		this.logger?.warn(
+			'`setDataFileBaseName` is deprecated, use `setDataFileNames` instead, e.g. `setDataFileNames({ directory: ["index.data.{js}", "index.data.{ext}"] })`.',
+		);
 		this.dataFileDirBaseNameOverride = baseName;
+	}
+
+	/**
+	 * @param {object} names
+	 * @param {Array<string>} [names.template] - Template data file name patterns, highest priority first.
+	 * @param {Array<string>} [names.directory] - Directory data file name patterns, highest priority first.
+	 */
+	setDataFileNames(names = {}) {
+		for (let [key, patterns] of Object.entries(names)) {
+			if (!Array.isArray(patterns) || patterns.some((pattern) => typeof pattern !== "string")) {
+				throw new Error(`\`setDataFileNames\` expects \`${key}\` to be an Array of strings.`);
+			}
+		}
+		this.dataFileNames = { ...this.dataFileNames, ...names };
 	}
 
 	addTemplate(virtualInputPath, content, data) {
@@ -1334,6 +1358,10 @@ export default class UserConfig {
 
 		if (this.dataFileDirBaseNameOverride) {
 			obj.dataFileDirBaseNameOverride = this.dataFileDirBaseNameOverride;
+		}
+
+		if (this.dataFileNames) {
+			obj.dataFileNames = this.dataFileNames;
 		}
 
 		// htmlTemplateEngine and markdownTemplateEngine are merged manually in TemplateConfig for config() ordering
