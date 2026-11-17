@@ -29,7 +29,7 @@ function getTextNodeContent(node) {
 		.join("");
 }
 
-export function IdAttributePlugin(eleventyConfig, options = {}) {
+export default function IdAttributePlugin(eleventyConfig, options = {}) {
 	if (!options.slugify) {
 		options.slugify = eleventyConfig.getFilter("slugify");
 	}
@@ -107,3 +107,5 @@ export function IdAttributePlugin(eleventyConfig, options = {}) {
 		},
 	);
 }
+
+export { IdAttributePlugin };

@@ -3,6 +3,8 @@
 		// "src/Core.js",
 		"src/UserConfig.js",
 		"src/Util/Git.js",
+		"src/Plugins/HtmlBasePlugin.js",
+		"src/Plugins/InputPathToUrl.js",
 	],
 	"exclude": [],
 

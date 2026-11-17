@@ -23,6 +23,8 @@ _site/
 # Don’t check-in generated types
 /types/*
 !/types/index.d.ts
+/packages/build-awesome/types/*
+!/packages/build-awesome/types/index.d.ts
 
 # Ignore test files
 .cache

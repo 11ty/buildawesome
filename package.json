@@ -16,6 +16,18 @@
 		"./UserConfig": {
 			"types": "./types/UserConfig.d.ts"
 		},
+		"./plugins/html-base": {
+			"types": "./types/Plugins/HtmlBasePlugin.d.ts",
+			"default": "./src/Plugins/HtmlBasePlugin.js"
+		},
+		"./plugins/i18n": "./src/Plugins/I18nPlugin.js",
+		"./plugins/id-attribute": "./src/Plugins/IdAttributePlugin.js",
+		"./plugins/input-path-to-url": {
+			"types": "./types/Plugins/InputPathToUrl.d.ts",
+			"default": "./src/Plugins/InputPathToUrl.js"
+		},
+		"./plugins/preserve-closing-tags": "./src/Plugins/PreserveClosingTagsPlugin.js",
+		"./plugins/render": "./src/Plugins/RenderPlugin.js",
 		"./utils/git": "./src/Util/Git.js",
 		"./cli": "./cmd.cjs"
 	},

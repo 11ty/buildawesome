@@ -1,6 +1,6 @@
 const POSTHTML_PLUGIN_NAME = "11ty/eleventy/preserve-closing-tags";
 
-export function PreserveClosingTagsPlugin(eleventyConfig, options = {}) {
+export default function PreserveClosingTagsPlugin(eleventyConfig, options = {}) {
 	// TODO error on non-void eligible tag names
 	if (!options.tags) {
 		// "meta"
@@ -32,3 +32,5 @@ export function PreserveClosingTagsPlugin(eleventyConfig, options = {}) {
 		},
 	);
 }
+
+export { PreserveClosingTagsPlugin };
