@@ -338,8 +338,21 @@ test("File has default function export and another one for data too, issue #3359
 
 test("Shortcodes named `render` or `data` throw for 11ty.js templates, issue #2454", async (t) => {
   for (let name of ["render", "data"]) {
-    let elev = new Eleventy("./test/stubs/class.11ty.cjs", "", {
+    let elev = new Eleventy("./test/stubs-virtual-nowrite/", "", {
       config(eleventyConfig) {
+        eleventyConfig.addTemplate("class.11ty.cjs", class Test {
+          returnsBill() {
+            return "Bill";
+          }
+
+          static returnsTed() {
+            return "Ted";
+          }
+
+          render({ name }) {
+            return `<p>${name}${this.returnsBill()}${Test.returnsTed()}</p>`;
+          }
+        });
         eleventyConfig.addShortcode(name, () => "from shortcode");
       }
     });

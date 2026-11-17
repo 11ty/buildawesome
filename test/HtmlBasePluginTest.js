@@ -4,6 +4,73 @@ import { HtmlBasePlugin, applyBaseToUrl } from "../src/Plugins/HtmlBasePlugin.js
 import Eleventy from "../src/Core.js";
 import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 
+const BASE_TEMPLATE = `---
+permalink: /deep/
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="">
+<title></title>
+<style>div { background-image: url(test.jpg); }</style>
+<style>div { background-image: url({{ "/test.jpg" | htmlBaseUrl }}); }</style>
+<link rel="stylesheet" href="/test.css">
+<script src="/test.js"></script>
+</head>
+<body>
+<a href="/">Home</a>
+<a href="subdir/">Test</a>
+<a href="./subdir/">Test</a>
+<a href="../subdir/">Test</a>
+</body>
+</html>`;
+
+const BASE_TEMPLATE_2602 = `---
+permalink: /deep/
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="">
+<title></title>
+<style>div { background-image: url(test.jpg); }</style>
+<style>div { background-image: url({{ "/test.jpg" | htmlBaseUrl }}); }</style>
+<link rel="stylesheet" href="/test.css">
+<script src="/test.js"></script>
+</head>
+<body>
+<a href="/">Home</a>
+<a href="subdir/">Test</a>
+<a href="../subdir/">Test</a>
+</body>
+</html>`;
+
+const BASE_TEMPLATE_CASE_SENSITIVE = `---
+permalink: /deep/
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="">
+<title></title>
+<style>div { background-image: url(test.jpg); }</style>
+<style>div { background-image: url({{ "/test.jpg" | htmlBaseUrl }}); }</style>
+<link rel="stylesheet" href="/test.css">
+<script SrC="/test.js"></script>
+</head>
+<body>
+<a hreF="/">Home</a>
+<a HrEf="subdir/">Test</a>
+<a href="../subdir/">Test</a>
+</body>
+</html>`;
+
 function getContentFor(results, filename) {
   let content = results.filter((entry) => entry.outputPath.endsWith(filename))[0].content;
   return normalizeNewLines(content.trim());
@@ -244,9 +311,10 @@ test("Using the filter directly", async (t) => {
 });
 
 test("Using the HTML base plugin (default values)", async (t) => {
-  let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     configPath: false,
     config: function ($config) {
+      $config.addTemplate("index.njk", BASE_TEMPLATE);
       $config.setUseTemplateCache(false);
       $config.addPlugin(HtmlBasePlugin);
     },
@@ -282,11 +350,12 @@ test("Using the HTML base plugin (default values)", async (t) => {
 });
 
 test("Using the HTML base plugin with pathPrefix: /test/", async (t) => {
-  let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     pathPrefix: "/test/",
 
     configPath: false,
     config: function ($config) {
+      $config.addTemplate("index.njk", BASE_TEMPLATE);
       $config.setUseTemplateCache(false);
       $config.addPlugin(HtmlBasePlugin);
     },
@@ -323,11 +392,12 @@ test("Using the HTML base plugin with pathPrefix: /test/", async (t) => {
 });
 
 test("Using the HTML base plugin with pathPrefix: /test/ and base: http://example.com/", async (t) => {
-  let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     pathPrefix: "/test/",
 
     configPath: false,
     config: function ($config) {
+      $config.addTemplate("index.njk", BASE_TEMPLATE);
       $config.setUseTemplateCache(false);
       $config.addPlugin(HtmlBasePlugin, {
         baseHref: "http://example.com/",
@@ -366,9 +436,10 @@ test("Using the HTML base plugin with pathPrefix: /test/ and base: http://exampl
 });
 
 test("Using the HTML base plugin strips extra path in full URL base (default pathPrefix)", async (t) => {
-  let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     configPath: false,
     config: function ($config) {
+      $config.addTemplate("index.njk", BASE_TEMPLATE);
       $config.setUseTemplateCache(false);
       $config.addPlugin(HtmlBasePlugin, {
         baseHref: "http://example.com/hello/", // extra path will be stripped
@@ -407,11 +478,12 @@ test("Using the HTML base plugin strips extra path in full URL base (default pat
 });
 
 test("Using the HTML base plugin strips extra path in full URL base (pathPrefix: /test/)", async (t) => {
-  let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     pathPrefix: "/test/",
 
     configPath: false,
     config: function ($config) {
+      $config.addTemplate("index.njk", BASE_TEMPLATE);
       $config.setUseTemplateCache(false);
       $config.addPlugin(HtmlBasePlugin, {
         baseHref: "http://example.com/hello/", // extra path will be stripped
@@ -450,11 +522,12 @@ test("Using the HTML base plugin strips extra path in full URL base (pathPrefix:
 });
 
 test("Opt out of the transform with falsy extensions list", async (t) => {
-  let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     pathPrefix: "/test/",
 
     configPath: false,
     config: function ($config) {
+      $config.addTemplate("index.njk", BASE_TEMPLATE);
       $config.setUseTemplateCache(false);
       $config.addPlugin(HtmlBasePlugin, {
         extensions: false,
@@ -493,11 +566,12 @@ test("Opt out of the transform with falsy extensions list", async (t) => {
 });
 
 test("Base plugin with permalink: false, #2602", async (t) => {
-  let elev = new Eleventy("./test/stubs-2602/", "./test/stubs-2602/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     pathPrefix: "/test/",
 
     configPath: false,
     config: function ($config) {
+      $config.addTemplate("index.njk", BASE_TEMPLATE_2602);
       $config.setUseTemplateCache(false);
       $config.addPlugin(HtmlBasePlugin);
     },
@@ -533,11 +607,12 @@ test("Base plugin with permalink: false, #2602", async (t) => {
 });
 
 test("Using the HTML base plugin with pathPrefix: /test/ and transformed attributes are *not* case sensitive", async (t) => {
-  let elev = new Eleventy("./test/stubs-base-case-sens/", "./test/stubs-base-case-sens/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     pathPrefix: "/test/",
 
     configPath: false,
     config: function ($config) {
+      $config.addTemplate("index.njk", BASE_TEMPLATE_CASE_SENSITIVE);
       $config.setUseTemplateCache(false);
       $config.addPlugin(HtmlBasePlugin);
     },
@@ -574,7 +649,7 @@ test("Using the HTML base plugin with pathPrefix: /test/ and transformed attribu
 
 test("HTML base plugin only adds once (unique)", async (t) => {
   t.plan(2);
-  let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     configPath: false,
     config: function ($config) {
       // Runs before defaultConfig.js
@@ -609,7 +684,7 @@ test("HTML base plugin only adds once when added from multiple nested plugins", 
 
 test("HTML base plugin can resolve by name", async (t) => {
   t.plan(2);
-  let elev = new Eleventy("./test/stubs-base/", "./test/stubs-base/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     configPath: false,
     config: async function ($config) {
       // Runs before defaultConfig.js

@@ -2,11 +2,19 @@ import test from "node:test";
 
 import { LayoutCache } from "../src/LayoutCache.js";
 import getNewTemplate from "./_getNewTemplateForTests.js";
+import { getTemplateConfigInstanceCustomCallback } from "./_testHelpers.js";
+
+async function getVirtualTemplate() {
+  let $config = await getTemplateConfigInstanceCustomCallback({ input: "./test/stubs/", output: "./dist" }, (cfg) => {
+    cfg.addTemplate("template.liquid", "");
+  });
+  return getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist", null, null, $config);
+}
 
 test("Cache can save templates", async (t) => {
   let templateCache = new LayoutCache();
 
-  let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate();
 
   templateCache.add(tmpl);
   t.assert.strictEqual(templateCache.size(), 1);
@@ -15,7 +23,7 @@ test("Cache can save templates", async (t) => {
 test("TemplateCache clear", async (t) => {
   let templateCache = new LayoutCache();
 
-  let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate();
 
   templateCache.add(tmpl);
   t.assert.strictEqual(templateCache.size(), 1);
@@ -26,7 +34,7 @@ test("TemplateCache clear", async (t) => {
 test("TemplateCache has", async (t) => {
   let templateCache = new LayoutCache();
 
-  let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate();
 
   templateCache.add(tmpl);
   // Only TemplateLayout is cached
@@ -36,7 +44,7 @@ test("TemplateCache has", async (t) => {
 test("TemplateCache get success", async (t) => {
   let templateCache = new LayoutCache();
 
-  let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate();
 
   templateCache.add(tmpl);
 
@@ -49,7 +57,7 @@ test("TemplateCache get success", async (t) => {
 test("TemplateCache get fail", async (t) => {
   let templateCache = new LayoutCache();
 
-  let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate();
 
   templateCache.add(tmpl);
   t.assert.throws(function () {

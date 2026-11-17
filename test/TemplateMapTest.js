@@ -1,4 +1,5 @@
 import test from "node:test";
+import path from "node:path";
 
 import TemplateMap from "../src/TemplateMap.js";
 import TemplateCollection from "../src/TemplateCollection.js";
@@ -7,7 +8,391 @@ import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 
 import getNewTemplateForTests from "./_getNewTemplateForTests.js";
 import { getRenderedTemplates as getRenderedTmpls, renderTemplate } from "./_getRenderedTemplates.js";
-import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback } from "./_testHelpers.js";
+import { getTemplateConfigInstanceCustomCallback as getConfigWithCallback } from "./_testHelpers.js";
+
+// Keyed by project-relative path; a shared date keeps the input path as the sort tiebreaker.
+const FIXTURES = {
+  "test/stubs/templateMapCollection/test1.md": `---
+title: Test Title
+date: 2020-01-01
+tags:
+  - post
+  - dog
+---
+
+# Test 1
+`,
+  "test/stubs/templateMapCollection/test2.md": `---
+date: 2020-01-01
+tags: cat
+---
+
+# Test 2
+`,
+  "test/stubs/templateMapCollection/test3.md": `---
+date: 2020-01-01
+tags: circle
+---
+
+# {{ collections.circle.length }}, {{ collections.circle[0].url }}
+`,
+  "test/stubs/templateMapCollection/test4.md": `---
+title: Test Title 4
+date: 2020-01-01
+tags:
+  - post
+  - dog
+---
+
+# Test 4
+`,
+  "test/stubs/templateMapCollection/test5.md": `---
+title: Test Title 5
+date: 2020-01-01
+---
+
+# Test 5
+`,
+  "test/stubs/templateMapCollection/templateContent.md": `---
+tags: circle
+---
+
+# Test
+
+{{ collections.circle[0].templateContent }}
+`,
+  "test/stubs/templateMapCollection/testWithLayout.md": `---
+layout: layouts/templateMapCollection.njk
+---
+
+{{ upstream }}
+`,
+  "test/stubs/templateMapCollection/paged-tag.md": `---
+title: Paged Test
+pagination:
+  data: collections.dog
+  size: 1
+---
+
+# {{ title }}
+`,
+  "test/stubs/templateMapCollection/paged-cfg.md": `---
+title: Paged Test
+pagination:
+  data: collections.userCollection
+  size: 1
+---
+
+# {{ title }}
+`,
+  "test/stubs/templateMapCollection/paged-cfg-permalink.md": `---
+title: Paged Test
+pagination:
+  data: collections.userCollection
+  size: 1
+  alias: item
+permalink: /{{ item.data.title | slugify }}/hello/
+---
+
+# {{ title }}
+`,
+  "test/stubs/templateMapCollection/paged-cfg-tagged.md": `---
+title: Paged Test
+tags:
+  - haha
+pagination:
+  data: collections.userCollection
+  size: 1
+  alias: item
+---
+
+# {{ title }}
+`,
+  "test/stubs/templateMapCollection/paged-cfg-tagged-apply-to-all.md": `---
+title: Paged Test
+tags:
+  - haha
+pagination:
+  data: collections.userCollection
+  size: 1
+  alias: item
+  addAllPagesToCollections: true
+---
+
+# {{ title }}
+`,
+  "test/stubs/templateMapCollection/paged-cfg-tagged-permalink.md": `---
+title: Paged Test
+tags:
+  - haha
+pagination:
+  data: collections.userCollection
+  size: 1
+  alias: item
+permalink: /{{ item.data.title | slugify }}/goodbye/
+---
+
+# {{ title }}
+`,
+  "test/stubs/templateMapCollection/paged-cfg-tagged-permalink-apply-to-all.md": `---
+title: Paged Test
+tags:
+  - haha
+pagination:
+  data: collections.userCollection
+  size: 1
+  alias: item
+  addAllPagesToCollections: true
+permalink: /{{ item.data.title | slugify }}/goodbye/
+---
+
+# {{ title }}
+`,
+  "test/stubs/templateMapCollection/paged-tag-dogs-templateContent.md": `---
+title: Paged Test
+pagination:
+  data: collections.dog
+  size: 1
+---
+
+Before
+{% for dog in pagination.items %}
+{{ dog.templateContent }}
+{% endfor %}
+After
+`,
+  "test/stubs/templateMapCollection/paged-tag-dogs-templateContent-alias.md": `---
+title: Paged Test
+pagination:
+  data: collections.dog
+  size: 2
+  alias: dogs
+---
+
+Before
+{% for dog in dogs %}
+{{ dog.templateContent }}
+{% endfor %}
+After
+`,
+  "test/stubs/_includes/layouts/templateMapCollection.njk": `---
+upstream: Inherited
+---
+
+{{ content | safe }}`,
+  "test/stubs/issue-115/index.liquid": `---
+title: My index page
+pagination:
+  data: collections.foos
+  size: 12
+---
+{% for foo in pagination.items -%}
+{{ foo.data.title }}
+{% endfor -%}
+{% for bar in collections.bars -%}
+{{ bar.data.title }}
+{% endfor -%}`,
+  "test/stubs/issue-115/index-with-layout.liquid": `---
+layout: layouts/issue-115.liquid
+title: My index page
+pagination:
+  data: collections.foos
+  size: 12
+---
+`,
+  "test/stubs/issue-115/template-bars.liquid": `---
+title: This page is bars
+tags:
+  - bars
+---
+Bars`,
+  "test/stubs/issue-115/template-foos.liquid": `---
+title: This page is foos
+tags:
+  - foos
+---
+Foos.`,
+  "test/stubs/_includes/layouts/issue-115.liquid": `{% for foo in pagination.items -%}
+{{ foo.data.title }}
+{% endfor -%}
+{% for bar in collections.bars -%}
+{{ bar.data.title }}
+{% endfor -%}`,
+  "test/stubs/tagged-pagination-multiples/test.njk": `---
+title: Paged Test
+tags:
+  - haha
+pagination:
+  data: collections.userCollection
+  size: 1
+  alias: item
+  addAllPagesToCollections: true
+---
+
+{{ title }}`,
+  "test/stubs/tagged-pagination-multiples-layout/test.njk": `---
+title: Paged Test
+layout: layouts/div-wrapper-layout.njk
+testdata:
+  - one
+  - two
+  - three
+pagination:
+  data: testdata
+  size: 1
+  alias: item
+  addAllPagesToCollections: true
+---
+{{ item }}`,
+  "test/stubs/collection-layout-wrap.njk": `---
+title: Layout Test
+layout: layouts/div-wrapper-layout.njk
+---
+{{ title }}`,
+  "test/stubs/_includes/layouts/div-wrapper-layout.njk": `<div>{{ content }}</div>`,
+  "test/stubs/page-target-collections/paginateall.njk": `---
+pagination:
+  data: collections.all
+  size: 1
+  alias: entry
+  filter:
+    - all
+  addAllPagesToCollections: true
+---
+INPUT PATH:{{ entry.inputPath }}`,
+  "test/stubs/page-target-collections/tagpages.njk": `---
+pagination:
+  data: collections
+  size: 1
+  alias: tag
+  filter:
+    - all
+---
+
+{{ tag }}`,
+  "test/stubs/page-target-collections/tagpagesall.njk": `---
+pagination:
+  data: collections
+  size: 1
+  alias: tag
+  filter:
+    - all
+  addAllPagesToCollections: true
+---
+
+{{ tag }}`,
+  "test/stubs/eleventyExcludeFromCollections.njk": `---
+title: Paged Test
+eleventyExcludeFromCollections: true
+tags:
+  - post
+  - dog
+---
+{{ title }}`,
+  "test/stubs/eleventyExcludeFromCollectionsPermalinkFalse.njk": `---
+title: Paged Test
+eleventyExcludeFromCollections: true
+permalink: false
+tags:
+  - post
+  - dog
+---
+{{ title }}`,
+  "test/stubs/permalink-conflicts/test1.md": `---
+title: Test Title
+tags:
+  - post
+  - dog
+permalink: /permalink-conflicts/
+---
+
+# Test 1
+`,
+  "test/stubs/permalink-conflicts/test2.md": `---
+title: Test Title
+tags:
+  - post
+  - dog
+permalink: /permalink-conflicts/
+---
+
+# Test 2
+`,
+  "test/stubs/permalink-conflicts/test3.md": `---
+title: Test Title
+tags:
+  - post
+  - dog
+permalink: permalink-conflicts/
+---
+
+# Test 3
+`,
+  "test/stubs/permalink-conflicts-false/test1.md": `---
+title: Test Title
+tags:
+  - post
+  - dog
+permalink: false
+---
+
+# Test 1
+`,
+  "test/stubs/permalink-conflicts-false/test2.md": `---
+title: Test Title
+tags:
+  - post
+  - dog
+permalink: false
+---
+
+# Test 2
+`,
+  "test/stubs/issue-522/excluded.md": `---
+eleventyExcludeFromCollections: true
+---
+
+# Test
+
+{{ collections.all[0].templateContent }}
+`,
+  "test/stubs/issue-522/template.md": `# Test
+`,
+  "test/stubs-virtual-nowrite/_includes/layout.njk": `<html><body>{{ content | safe }}</body></html>`,
+  "test/stubs-virtual-nowrite/transform-layout/transform-layout.njk": `---
+layout: layout.njk
+---
+This is content.`,
+  "test/stubs-virtual-nowrite/_includes/first.liquid": `---
+layout: second
+---
+{{ content }}`,
+  "test/stubs-virtual-nowrite/_includes/second.liquid": `---
+layout: third.liquid
+---
+{{ content }}`,
+  "test/stubs-virtual-nowrite/_includes/third.liquid": `{{ content }}`,
+  "test/stubs-virtual-nowrite/page.md": `---
+layout: first
+---
+`,
+};
+
+function getTemplateConfigInstanceCustomCallback(dirs, callback) {
+  return getConfigWithCallback(dirs, function (cfg) {
+    callback?.(cfg);
+    for (let [filePath, content] of Object.entries(FIXTURES)) {
+      let inputPath = path.posix.relative(dirs.input || ".", filePath);
+      if (!inputPath.startsWith("../")) {
+        cfg.addTemplate(inputPath, content);
+      }
+    }
+  });
+}
+
+function getTemplateConfigInstance(configObj) {
+  return getTemplateConfigInstanceCustomCallback(configObj?.dir || {});
+}
 
 function getNewTemplate(filename, input, output, eleventyConfig) {
   return getNewTemplateForTests(filename, input, output, null, null, eleventyConfig);
@@ -1235,16 +1620,16 @@ test("Test a transform with a layout (via templateMap)", async (t) => {
   t.plan(7);
   let eleventyConfig = await getTemplateConfigInstance({
 		dir: {
-			input: "./test/stubs-475/",
-			output: "./test/stubs-475/_site",
+			input: "./test/stubs-virtual-nowrite/",
+			output: "./test/stubs-virtual-nowrite/_site",
 		}
 	});
 
   let tm = new TemplateMap(eleventyConfig);
   let tmpl = await getNewTemplate(
-    "./test/stubs-475/transform-layout/transform-layout.njk",
-    "./test/stubs-475/",
-    "./test/stubs-475/_site",
+    "./test/stubs-virtual-nowrite/transform-layout/transform-layout.njk",
+    "./test/stubs-virtual-nowrite/",
+    "./test/stubs-virtual-nowrite/_site",
     eleventyConfig,
   );
 
@@ -1420,21 +1805,21 @@ test("eleventy.layouts Event", async (t) => {
 
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback(
     {
-			input: "./test/stubs-layouts-event/",
-			output: "./test/stubs-layouts-event/_site",
+			input: "./test/stubs-virtual-nowrite/",
+			output: "./test/stubs-virtual-nowrite/_site",
 		},
     function(cfg) {
       cfg.on("buildawesome.layouts", (layoutMap) => {
         t.assert.deepStrictEqual(layoutMap, {
-          "./test/stubs-layouts-event/_includes/first.liquid": ["./test/stubs-layouts-event/page.md"],
-          "./test/stubs-layouts-event/_includes/second.liquid": [
-            "./test/stubs-layouts-event/page.md",
-            "./test/stubs-layouts-event/_includes/first.liquid",
+          "./test/stubs-virtual-nowrite/_includes/first.liquid": ["./test/stubs-virtual-nowrite/page.md"],
+          "./test/stubs-virtual-nowrite/_includes/second.liquid": [
+            "./test/stubs-virtual-nowrite/page.md",
+            "./test/stubs-virtual-nowrite/_includes/first.liquid",
           ],
-          "./test/stubs-layouts-event/_includes/third.liquid": [
-            "./test/stubs-layouts-event/page.md",
-            "./test/stubs-layouts-event/_includes/first.liquid",
-            "./test/stubs-layouts-event/_includes/second.liquid",
+          "./test/stubs-virtual-nowrite/_includes/third.liquid": [
+            "./test/stubs-virtual-nowrite/page.md",
+            "./test/stubs-virtual-nowrite/_includes/first.liquid",
+            "./test/stubs-virtual-nowrite/_includes/second.liquid",
           ],
         });
       });
@@ -1443,9 +1828,9 @@ test("eleventy.layouts Event", async (t) => {
 
   let tm = new TemplateMap(eleventyConfig);
   let tmpl = await getNewTemplate(
-    "./test/stubs-layouts-event/page.md",
-    "./test/stubs-layouts-event/",
-    "./test/stubs-layouts-event/_site",
+    "./test/stubs-virtual-nowrite/page.md",
+    "./test/stubs-virtual-nowrite/",
+    "./test/stubs-virtual-nowrite/_site",
     eleventyConfig,
   );
 

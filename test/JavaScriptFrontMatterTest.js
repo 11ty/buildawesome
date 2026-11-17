@@ -2,7 +2,18 @@ import test from "node:test";
 import Eleventy from "../src/Core.js";
 
 test("Custom Front Matter Parsing Options (using JavaScript node-retrieve-globals)", async (t) => {
-  let elev = new Eleventy("./test/stubs/script-frontmatter/test.njk", "./_site");
+  let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
+    config: ($config) => {
+      $config.addTemplate("test.njk", `---js
+import {noopSync} from "@zachleat/noop";
+const myString = "Hi";
+
+// export a function
+function myFunction() { return "Bye" }
+---
+<div>{{ noopSync(myString) }}</div><div>{{ myFunction() }}</div>`);
+    },
+  });
   elev.disableLogger();
 
   let result = await elev.toJSON();
@@ -13,8 +24,16 @@ test("Custom Front Matter Parsing Options (using JavaScript node-retrieve-global
 });
 
 test("Custom Front Matter Parsing Options (using JavaScript node-retrieve-globals), override project-wide front matter default.", async (t) => {
-  let elev = new Eleventy("./test/stubs/script-frontmatter/test-default.njk", "./_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
     config: ($config) => {
+      $config.addTemplate("test-default.njk", `---
+import {noopSync} from "@zachleat/noop";
+const myString = "Hi";
+
+// export a function
+function myFunction() { return "Bye" }
+---
+<div>{{ noopSync(myString) }}</div><div>{{ myFunction() }}</div>`);
       $config.setFrontMatterParsingOptions({
         language: "js",
       });
@@ -30,7 +49,18 @@ test("Custom Front Matter Parsing Options (using JavaScript node-retrieve-global
 });
 
 test("Custom Front Matter Parsing Options (using backwards-compatible `js` instead of node-retrieve-globals)", async (t) => {
-  let elev = new Eleventy("./test/stubs/script-frontmatter/test-js.njk", "./_site");
+  let elev = new Eleventy("./test/stubs-virtual-nowrite", "./test/stubs-virtual-nowrite/_site", {
+    config: ($config) => {
+      $config.addTemplate("test-js.njk", `---javascript
+{
+	myFunction: function() {
+		return "HELLO!";
+	}
+}
+---
+<div>{{ myFunction() }}</div>`);
+    },
+  });
   elev.disableLogger();
 
   let result = await elev.toJSON();

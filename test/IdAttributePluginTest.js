@@ -18,7 +18,7 @@ test("Using the IdAttribute plugin #3356", async (t) => {
 
 test("Using the IdAttribute plugin, eleventy:ignore attribute #3356", async (t) => {
   let elev = new Eleventy({
-    input: "./test/stubs-3356/",
+    input: "./test/stubs-virtual/",
     // configPath: false,
     config: function ($config) {
       $config.addPlugin(IdAttributePlugin);
@@ -33,7 +33,7 @@ test("Using the IdAttribute plugin, eleventy:ignore attribute #3356", async (t) 
 
 test("Using the IdAttribute plugin, buildawesome:ignore attribute #3356", async (t) => {
   let elev = new Eleventy({
-    input: "./test/stubs-3356/",
+    input: "./test/stubs-virtual/",
     // configPath: false,
     config: function ($config) {
       $config.addPlugin(IdAttributePlugin);

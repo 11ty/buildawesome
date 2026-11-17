@@ -47,15 +47,63 @@ const OUTPUT_HTML_BASE = `<!doctype html>
 </body>
 </html>`;
 
+function addTemplates($config) {
+  $config.addTemplate("css.njk", `---
+permalink: output.css
+---`);
+  $config.addTemplate("tmpl.njk", ``);
+  $config.addTemplate("filter.njk", `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="">
+<title></title>
+<link rel="stylesheet" href="{{ 'css.njk' | inputPathToUrl }}">
+<script src="{{ 'css.njk' | inputPathToUrl }}"></script>
+</head>
+<body>
+<a href="/">Home</a>
+<a href="{{ 'tmpl.njk' | inputPathToUrl }}">Test</a>
+<a href="{{ 'tmpl.njk#anchor' | inputPathToUrl }}">Anchor</a>
+<a href="#anchor">Anchor</a>
+<a href="./#anchor">Anchor</a>
+<a href="?search=1">Search</a>
+<a href="./?search=1">Search</a>
+</body>
+</html>`);
+  $config.addTemplate("transform.njk", `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="">
+<title></title>
+<link rel="stylesheet" href="css.njk">
+<script src="css.njk"></script>
+</head>
+<body>
+<a href="/">Home</a>
+<a href="tmpl.njk">Test</a>
+<a href="tmpl.njk#anchor">Anchor</a>
+<a href="#anchor">Anchor</a>
+<a href="./#anchor">Anchor</a>
+<a href="?search=1">Search</a>
+<a href="./?search=1">Search</a>
+</body>
+</html>`);
+}
+
 function getContentFor(results, filename) {
   let content = results.filter((entry) => entry.outputPath.endsWith(filename))[0].content;
   return normalizeNewLines(content.trim());
 }
 
 test("Using the transform (and the filter too)", async (t) => {
-  let elev = new Eleventy("./test/stubs-pathtourl/", "./test/stubs-pathtourl/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     configPath: false,
     config: function ($config) {
+      addTemplates($config);
 			// FilterPlugin is available in the default config.
       $config.addPlugin(TransformPlugin);
     },
@@ -74,9 +122,10 @@ test("Using the transform (and the filter too)", async (t) => {
 });
 
 test("Using the filter", async (t) => {
-  let elev = new Eleventy("./test/stubs-pathtourl/", "./test/stubs-pathtourl/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
 		// FilterPlugin is available in the default config.
     configPath: false,
+    config: addTemplates,
   });
 
   let results = await elev.toJSON();
@@ -91,10 +140,11 @@ test("Using the filter", async (t) => {
 });
 
 test("Using the transform and the base plugin", async (t) => {
-  let elev = new Eleventy("./test/stubs-pathtourl/", "./test/stubs-pathtourl/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     configPath: false,
 		pathPrefix: "/gh-pages/",
     config: function ($config) {
+      addTemplates($config);
 			$config.addPlugin(TransformPlugin);
       $config.addPlugin(HtmlBasePlugin);
     },
@@ -112,10 +162,11 @@ test("Using the transform and the base plugin", async (t) => {
 });
 
 test("Using the transform and the base plugin, reverse order", async (t) => {
-  let elev = new Eleventy("./test/stubs-pathtourl/", "./test/stubs-pathtourl/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     configPath: false,
 		pathPrefix: "/gh-pages/",
     config: function ($config) {
+      addTemplates($config);
 			$config.addPlugin(HtmlBasePlugin);
 			$config.addPlugin(TransformPlugin);
     },

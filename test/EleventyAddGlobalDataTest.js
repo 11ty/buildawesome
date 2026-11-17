@@ -3,8 +3,9 @@ import Eleventy from "../src/Core.js";
 
 test("Eleventy addGlobalData should run once", async (t) => {
   let count = 0;
-  let elev = new Eleventy("./test/stubs-addglobaldata/", "./test/stubs-addglobaldata/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     config: function ($config) {
+      $config.addTemplate("test.liquid", "");
       $config.addGlobalData("count", () => {
         count++;
         return count;
@@ -36,8 +37,13 @@ test("Eleventy addGlobalData shouldn’t run if no input templates match!", asyn
 });
 
 test("Eleventy addGlobalData can feed layouts to populate data cascade with layout data, issue #1245", async (t) => {
-  let elev = new Eleventy("./test/stubs-2145/", "./test/stubs-2145/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     config: function ($config) {
+      $config.addTemplate("test.njk", "{{ layout }}");
+      $config.addTemplate($config.directories.getLayoutPathRelativeToInputDirectory("layout.njk"), `---
+LayoutData: 123
+---
+FromLayout{{ content }}`);
       $config.addGlobalData("layout", () => "layout.njk");
       $config.dataFilterSelectors.add("LayoutData");
     },

@@ -27,6 +27,109 @@ function cleanHtml(str) {
   return pretty(str, { ocd: true });
 }
 
+// Template keys are relative to the input directory.
+async function getVirtualConfig(dirs, templates, configCallback) {
+  return getTemplateConfigInstanceCustomCallback(dirs, (cfg) => {
+    configCallback?.(cfg);
+    for (let [inputPath, content] of Object.entries(templates)) {
+      cfg.addTemplate(inputPath, content);
+    }
+  });
+}
+
+async function getVirtualTemplate(path, inputDir, outputDir, templates) {
+  let eleventyConfig = await getVirtualConfig({ input: inputDir, output: outputDir }, templates);
+  return getNewTemplate(path, inputDir, outputDir, null, null, eleventyConfig);
+}
+
+async function getVirtualTemplateWithData(path, inputDir, outputDir, templates) {
+  let eleventyConfig = await getVirtualConfig({ input: inputDir, output: outputDir }, templates);
+  let dataObj = new TemplateData(eleventyConfig);
+  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
+  dataObj.setProjectUsingEsm(true);
+  return getNewTemplate(path, inputDir, outputDir, dataObj, null, eleventyConfig);
+}
+
+const TEMPLATE_FRONT_MATTER = `---
+key1: value1
+key2: value2
+key3: value3
+---
+c:{{ key1 }}:{{ key2 }}:{{ key3 }}`;
+
+const TEMPLATE_WITH_LAYOUT_CONTENT = `---
+layout: defaultLayoutLayoutContent
+keymain: valuemain
+title: 'Font Aliasing, or How to Rename a Font in CSS'
+permalink: /rename-font/
+---
+<p>Hello.</p>
+`;
+
+const PREMATURE_TEMPLATES = {
+  "test.njk": `{{ sample.templateContent }}`,
+  "test.liquid": `{{ collections.all[0].templateContent }}`,
+  "test.md": `{{ sample.templateContent }}
+`,
+  "filter.njk": `{{ samples | renderedContent }}
+`,
+  "test.wrapped": `sample
+`,
+  "test.11ty.cjs": function (data) {
+    return data.collections.all[0].templateContent;
+  },
+};
+
+const CUSTOM_FRONT_MATTER_TEMPLATES = {
+  "template-excerpt-comment.njk": `---
+front: hello
+---
+This is an excerpt.
+<!-- excerpt -->
+This is content.`,
+  "template-newline1.njk": `---
+front: hello
+---
+This is an excerpt.---
+This is content.`,
+  "template-newline2.njk": `---
+front: hello
+---
+This is an excerpt.---This is content.`,
+  "template-newline3.njk": `---
+front: hello
+---
+This is an excerpt.
+---This is content.`,
+  "template-toml.njk": `---toml
+front = "hello"
+---
+This is content.`,
+  "template.njk": `---
+front: hello
+---
+This is an excerpt.
+---
+This is content.`,
+};
+
+const HTML_TEMPLATE = `<html>
+<body>
+	This is an html template.
+</body>
+</html>`;
+
+const LAYOUT_DATA = `---
+keylayout: valuelayout
+postRank: 4
+daysPosted: 152
+yearsPosted: 0.4
+---
+
+<div id="layout">
+  {{ content }}
+</div>`;
+
 async function _testCompleteRender(tmpl) {
   let data = await tmpl.getData();
   let entry = await tmpl.getTemplateMapEntry(data);
@@ -44,21 +147,22 @@ async function _testCompleteRender(tmpl) {
 }
 
 test("getTemplateSubFolder", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist", { "template.liquid": "" });
   t.assert.strictEqual(tmpl.getTemplateSubfolder(), "");
 });
 
 test("getTemplateSubFolder, output is a subdir of input", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/template.liquid",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    { "template.liquid": "" }
   );
   t.assert.strictEqual(tmpl.getTemplateSubfolder(), "");
 });
 
 test("output path maps to an html file", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist", { "template.liquid": "" });
   t.assert.strictEqual(tmpl.inputDir, "./test/stubs/");
   t.assert.strictEqual(tmpl.outputDir, "./dist/");
   t.assert.strictEqual(tmpl.getTemplateSubfolder(), "");
@@ -68,10 +172,11 @@ test("output path maps to an html file", async (t) => {
 });
 
 test("subfolder outputs to a subfolder", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/subfolder/subfolder.liquid",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    { "subfolder/subfolder.liquid": "subfolder" }
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(tmpl.parsed.dir, "./test/stubs/subfolder");
@@ -80,10 +185,11 @@ test("subfolder outputs to a subfolder", async (t) => {
 });
 
 test("subfolder outputs to double subfolder", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/subfolder/subfolder/subfolder.liquid",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    { "subfolder/subfolder/subfolder.liquid": "" }
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(tmpl.parsed.dir, "./test/stubs/subfolder/subfolder");
@@ -92,22 +198,23 @@ test("subfolder outputs to double subfolder", async (t) => {
 });
 
 test("HTML files output to the same as the input directory have a file suffix added (only if index, this is not index).", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/testing.html", "./test/stubs", "./test/stubs");
+  let tmpl = await getVirtualTemplate("./test/stubs/testing.html", "./test/stubs", "./test/stubs", { "testing.html": HTML_TEMPLATE });
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./test/stubs/testing/index.html");
 });
 
 test("HTML files output to the same as the input directory have a file suffix added (only if index, this _is_ index).", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/index.html", "./test/stubs", "./test/stubs");
+  let tmpl = await getVirtualTemplate("./test/stubs/index.html", "./test/stubs", "./test/stubs", { "index.html": HTML_TEMPLATE });
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./test/stubs/index.html");
 });
 
 test("HTML files output to the same as the input directory have a file suffix added (only if index, this _is_ index, subfolder).", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/subfolder/index.html",
     "./test/stubs",
-    "./test/stubs"
+    "./test/stubs",
+    { "subfolder/index.html": "" }
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./test/stubs/subfolder/index.html");
@@ -115,10 +222,11 @@ test("HTML files output to the same as the input directory have a file suffix ad
 
 test("Test raw front matter from template (yaml)", async (t) => {
   // https://github.com/jonschlinkert/gray-matter/blob/master/examples/yaml.js
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/templateFrontMatter.liquid",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    { "templateFrontMatter.liquid": TEMPLATE_FRONT_MATTER }
   );
   t.assert.ok(await tmpl.getInputContent(), "template exists and can be opened.");
 
@@ -135,10 +243,18 @@ test("Test raw front matter from template (yaml)", async (t) => {
 
 test("Test raw front matter from template (json)", async (t) => {
   // https://github.com/jonschlinkert/gray-matter/blob/master/examples/json.js
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/templateFrontMatterJson.liquid",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    { "templateFrontMatterJson.liquid": `---json
+{
+  "key1": "value1",
+  "key2": "value2",
+  "key3": "value3"
+}
+---
+c:{{ key1 }}:{{ key2 }}:{{ key3 }}` }
   );
 
   t.assert.strictEqual((await tmpl._testGetFrontMatter()).data.key1, "value1");
@@ -154,10 +270,21 @@ test("Test raw front matter from template (json)", async (t) => {
 
 test("Test raw front matter from template (js)", async (t) => {
   // https://github.com/jonschlinkert/gray-matter/blob/master/examples/javascript.js
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/templateFrontMatterJs.njk",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    { "templateFrontMatterJs.njk": `---js
+{
+  key1: "value1",
+  key2: function(value) {
+    return value.toUpperCase();
+  },
+  key3: "value3"
+}
+---
+c:{{ key1 }}:{{ key2("value2") }}:{{ key3 }}
+` }
   );
 
   t.assert.strictEqual((await tmpl._testGetFrontMatter()).data.key1, "value1");
@@ -172,10 +299,11 @@ test("Test raw front matter from template (js)", async (t) => {
 });
 
 test("Test that getData() works", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/templateFrontMatter.liquid",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    { "templateFrontMatter.liquid": TEMPLATE_FRONT_MATTER }
   );
   let data = await tmpl.getData();
 
@@ -184,23 +312,22 @@ test("Test that getData() works", async (t) => {
 });
 
 test("One Layout (using new content var)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs",
-      output: "dist"
-    }
-  });
-
-  let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
-  dataObj.setProjectUsingEsm(true);
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplateWithData(
     "./test/stubs/templateWithLayoutKey.liquid",
     "./test/stubs/",
     "dist",
-    dataObj,
-    null,
-    eleventyConfig
+    {
+      "templateWithLayoutKey.liquid": `---
+layout: defaultLayout
+keymain: valuemain
+title: 'Font Aliasing, or How to Rename a Font in CSS'
+permalink: /rename-font/
+---
+
+<p>Hello.</p>`,
+      "_includes/defaultLayout.liquid": `${LAYOUT_DATA}
+`,
+    }
   );
 
   t.assert.strictEqual((await tmpl._testGetFrontMatter()).data[tmpl.config.keys.layout], "defaultLayout");
@@ -220,23 +347,14 @@ test("One Layout (using new content var)", async (t) => {
 });
 
 test("One Layout (using content)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs",
-      output: "dist"
-    }
-  });
-
-  let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
-  dataObj.setProjectUsingEsm(true);
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplateWithData(
     "./test/stubs/templateWithLayoutContent.liquid",
     "./test/stubs/",
     "dist",
-    dataObj,
-    null,
-    eleventyConfig
+    {
+      "templateWithLayoutContent.liquid": TEMPLATE_WITH_LAYOUT_CONTENT,
+      "_includes/defaultLayoutLayoutContent.liquid": LAYOUT_DATA,
+    }
   );
 
   t.assert.strictEqual((await tmpl._testGetFrontMatter()).data[tmpl.config.keys.layout], "defaultLayoutLayoutContent");
@@ -256,23 +374,14 @@ test("One Layout (using content)", async (t) => {
 });
 
 test("One Layout (layouts disabled)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs",
-      output: "dist"
-    }
-  });
-
-  let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
-  dataObj.setProjectUsingEsm(true);
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplateWithData(
     "./test/stubs/templateWithLayoutContent.liquid",
     "./test/stubs/",
     "dist",
-    dataObj,
-    null,
-    eleventyConfig
+    {
+      "templateWithLayoutContent.liquid": TEMPLATE_WITH_LAYOUT_CONTENT,
+      "_includes/defaultLayoutLayoutContent.liquid": LAYOUT_DATA,
+    }
   );
 
   t.assert.strictEqual((await tmpl._testGetFrontMatter()).data[tmpl.config.keys.layout], "defaultLayoutLayoutContent");
@@ -290,23 +399,28 @@ test("One Layout (layouts disabled)", async (t) => {
 });
 
 test("One Layout (liquid test)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs",
-      output: "dist"
-    }
-  });
-
-  let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
-  dataObj.setProjectUsingEsm(true);
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplateWithData(
     "./test/stubs/templateWithLayout.liquid",
     "./test/stubs/",
     "dist",
-    dataObj,
-    null,
-    eleventyConfig
+    {
+      "templateWithLayout.liquid": `---
+layout: layoutLiquid.liquid
+keymain: valuemain
+title: 'Font Aliasing, or How to Rename a Font in CSS'
+permalink: /rename-font/
+---
+
+<p>Hello.</p>`,
+      "_includes/layoutLiquid.liquid": `---
+keylayout: valuelayout
+---
+
+<div id="layout">
+  {{ content }}
+</div>
+`,
+    }
   );
 
   t.assert.strictEqual((await tmpl._testGetFrontMatter()).data[tmpl.config.keys.layout], "layoutLiquid.liquid");
@@ -326,23 +440,43 @@ test("One Layout (liquid test)", async (t) => {
 });
 
 test("Two Layouts", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs",
-      output: "dist"
-    }
-  });
-
-  let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
-  dataObj.setProjectUsingEsm(true);
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplateWithData(
     "./test/stubs/templateTwoLayouts.liquid",
     "./test/stubs/",
     "dist",
-    dataObj,
-    null,
-    eleventyConfig
+    {
+      "templateTwoLayouts.liquid": `---
+layout: layout-a
+key1: value1
+title: 'Font Aliasing, or How to Rename a Font in CSS'
+permalink: /rename-font/
+postRank: 4
+daysPosted: 152
+yearsPosted: 0.4
+---
+
+<p>{{ upstream }}</p>`,
+      "_includes/layout-a.liquid": `---
+layout: layout-b
+key1: value1-a
+upstream: value2-a
+---
+
+<div id="layout-a">
+  {{ content }}
+</div>
+`,
+      "_includes/layout-b.liquid": `---
+key1: value1-b
+upstream: value2-b
+daysPosted: 154
+---
+
+<div id="layout-b">
+  {{ content }}
+</div>
+`,
+    }
   );
 
   t.assert.strictEqual((await tmpl._testGetFrontMatter()).data[tmpl.config.keys.layout], "layout-a");
@@ -364,23 +498,16 @@ test("Two Layouts", async (t) => {
 });
 
 test("Liquid template", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs",
-      output: "dist"
-    }
-  });
-
-  let dataObj = new TemplateData(eleventyConfig);
-  dataObj.extensionMap = new ExtensionMap(eleventyConfig);
-  dataObj.setProjectUsingEsm(true);
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplateWithData(
     "./test/stubs/formatTest.liquid",
     "./test/stubs/",
     "dist",
-    dataObj,
-    null,
-    eleventyConfig
+    {
+      "formatTest.liquid": `---
+name: zach
+---
+<p>{{name | capitalize}}</p>`,
+    }
   );
 
   t.assert.strictEqual(await renderTemplate(tmpl, await tmpl.getData()), "<p>Zach</p>");
@@ -393,26 +520,51 @@ test("Liquid template with include", async (t) => {
 });
 
 test("Permalink output directory", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/permalinked.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate("./test/stubs/permalinked.liquid", "./test/stubs/", "./dist", {
+    "permalinked.liquid": `---
+permalink: permalinksubfolder/index.html
+---
+Current url: {{ permalink }}`,
+  });
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/permalinksubfolder/index.html");
 });
 
 test("Permalink output directory from layout", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/permalink-in-layout.liquid",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "permalink-in-layout.liquid": `---
+layout: permalink-in-layout/layout.liquid
+---
+Current url: {{ permalink }}`,
+      "_includes/permalink-in-layout/layout.liquid": `---
+permalink: hello/index.html
+---
+{{ content }}`,
+    }
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/hello/index.html");
 });
 
 test("Permalink output directory from layout (fileslug)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/permalink-in-layout-fileslug.liquid",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "permalink-in-layout-fileslug.liquid": `---
+layout: permalink-in-layout/layout-fileslug.liquid
+---
+Current url: {{ permalink }}`,
+      "_includes/permalink-in-layout/layout-fileslug.liquid": `---
+permalink: test/{{ page.fileSlug }}/
+---
+{{ content }}`,
+    }
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/test/permalink-in-layout-fileslug/index.html");
@@ -443,7 +595,11 @@ test("Layout from template-data-file that has a permalink (fileslug) Issue #121"
 });
 
 test("Fileslug in an 11ty.js template Issue #588", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/fileslug.11ty.cjs", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate("./test/stubs/fileslug.11ty.cjs", "./test/stubs/", "./dist", {
+    "fileslug.11ty.cjs": function (data) {
+      return `<p>${data.page.fileSlug}</p>`;
+    },
+  });
 
   let data = await tmpl.getData();
   let renderedTmpl = (await getRenderedTmpls(tmpl, data))[0];
@@ -780,7 +936,7 @@ test("Template and folder name are the same, make sure data imports work ok", as
 });
 
 test("Clone the template", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/default.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate("./test/stubs/default.liquid", "./test/stubs/", "./dist", { "default.liquid": `{{ "hi" }}` });
 
   let data = await tmpl.getData();
 
@@ -793,7 +949,7 @@ test("Clone the template", async (t) => {
 });
 
 test("getRenderedData() has all the page variables", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist", { "template.liquid": "" });
   let data = await getRenderedData(tmpl);
 
   t.assert.ok(data.page.url);
@@ -841,7 +997,7 @@ test("Issue #603: page.date.toUTCString() Nunjucks", async (t) => {
 });
 
 test("getTemplates() data has all the root variables", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist", { "template.liquid": "" });
   let data = await tmpl.getData();
   let templates = await tmpl.getTemplates(data);
 
@@ -854,7 +1010,7 @@ test("getTemplates() data has all the root variables", async (t) => {
 });
 
 test("getTemplates() data has all the page variables", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist", { "template.liquid": "" });
   let data = await tmpl.getData();
   let templates = await tmpl.getTemplates(data);
 
@@ -868,7 +1024,7 @@ test("getTemplates() data has all the page variables", async (t) => {
 
 // Warning `getRenderedTemplates()` is a test function now, so this might be a test testing the tests
 test("getRenderedTemplates() data has all the page variables", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate("./test/stubs/template.liquid", "./test/stubs/", "./dist", { "template.liquid": "" });
   let data = await tmpl.getData();
 
   let templates = await getRenderedTmpls(tmpl, data);
@@ -881,90 +1037,167 @@ test("getRenderedTemplates() data has all the page variables", async (t) => {
 });
 
 test("getRenderedData() has good slug (empty, index)", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/index.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate("./test/stubs/index.liquid", "./test/stubs/", "./dist", { "index.liquid": "" });
   let data = await getRenderedData(tmpl);
   t.assert.strictEqual(data.page.fileSlug, "");
   t.assert.strictEqual(data.page.filePathStem, "/index");
 });
 
 test("getRenderedData() has good slug", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/includer.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate("./test/stubs/includer.liquid", "./test/stubs/", "./dist", {
+    "includer.liquid": `<p>{% include 'included' %}</p>
+`,
+  });
   let data = await getRenderedData(tmpl);
   t.assert.strictEqual(data.page.fileSlug, "includer");
   t.assert.strictEqual(data.page.filePathStem, "/includer");
 });
 
 test("Override base templating engine from .liquid to njk", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/overrides/test-njk.liquid",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "overrides/test-njk.liquid": `---
+templateEngineOverride: njk
+title: My Title
+---
+{{ title }}
+`,
+    }
   );
 
   t.assert.strictEqual((await renderTemplate(tmpl, await tmpl.getData())).trim(), "My Title");
 });
 
 test("Override base templating engine from markdown to 11ty.js, then markdown", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/test-override-js-markdown.11ty.cjs",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "test-override-js-markdown.11ty.cjs": class {
+        data() {
+          return {
+            name: "markdown",
+            templateEngineOverride: "11ty.js,md"
+          };
+        }
+
+        render(data) {
+          return `# This is ${data.name}`;
+        }
+      },
+    }
   );
 
   t.assert.strictEqual((await renderTemplate(tmpl, await tmpl.getData())).trim(), "<h1>This is markdown</h1>");
 });
 
 test("Override base templating engine from .liquid to md", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/overrides/test-md.liquid",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "overrides/test-md.liquid": `---
+templateEngineOverride: md
+---
+# My Title
+`,
+    }
   );
 
   t.assert.strictEqual((await renderTemplate(tmpl, await tmpl.getData())).trim(), "<h1>My Title</h1>");
 });
 
 test("Override base templating engine from .liquid to njk,md", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/overrides/test-multiple.md",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "overrides/test-multiple.md": `---
+templateEngineOverride: njk,md
+title: My Title
+---
+
+# {{ title }}
+`,
+    }
   );
 
   t.assert.strictEqual((await renderTemplate(tmpl, await tmpl.getData())).trim(), "<h1>My Title</h1>");
 });
 
 test("Override base templating engine from .njk to liquid,md", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/overrides/test-multiple2.njk",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "overrides/test-multiple2.njk": `---
+templateEngineOverride: liquid,md
+title: My Title
+---
+# {{ title }}
+`,
+    }
   );
 
   t.assert.strictEqual((await renderTemplate(tmpl, await tmpl.getData())).trim(), "<h1>My Title</h1>");
 });
 
 test("Override base templating engine from .html to njk", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/overrides/test.html", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs/overrides/test.html",
+    "./test/stubs/",
+    "./dist",
+    {
+      "overrides/test.html": `---
+templateEngineOverride: njk
+title: My Title
+---
+<h2>{{ title }}</h2>
+`,
+    }
+  );
 
   t.assert.strictEqual((await renderTemplate(tmpl, await tmpl.getData())).trim(), "<h2>My Title</h2>");
 });
 
 test("Override base templating engine from .html to (nothing)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/overrides/test-empty.html",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "overrides/test-empty.html": `---
+templateEngineOverride:
+title: My Title
+---
+<h2>{{ title }}</h2>
+`,
+    }
   );
 
   t.assert.strictEqual((await renderTemplate(tmpl, await tmpl.getData())).trim(), "<h2>{{ title }}</h2>");
 });
 
 test("Override base templating engine should error with bad string", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/overrides/test-error.njk",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "overrides/test-error.njk": `---
+templateEngineOverride: liquid,njk
+title: My Title
+---
+# {{ title }}
+`,
+    }
   );
 
   await t.assert.rejects(async () => {
@@ -973,20 +1206,38 @@ test("Override base templating engine should error with bad string", async (t) =
 });
 
 test("Override base templating engine (bypasses markdown)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/overrides/test-bypass.md",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "overrides/test-bypass.md": `---
+templateEngineOverride: njk
+title: My Title
+---
+
+# {{ title }}
+`,
+    }
   );
 
   t.assert.strictEqual((await renderTemplate(tmpl, await tmpl.getData())).trim(), "# My Title");
 });
 
 test("Override base templating engine to (nothing)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/overrides/test-empty.md",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "overrides/test-empty.md": `---
+templateEngineOverride:
+title: My Title
+---
+
+# {{ title }}
+`,
+    }
   );
 
   // not parsed
@@ -994,16 +1245,46 @@ test("Override base templating engine to (nothing)", async (t) => {
 });
 
 test("Override base templating engine from .njk to liquid (with a layout that uses njk)", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/overrides/layout.njk", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs/overrides/layout.njk",
+    "./test/stubs/",
+    "./dist",
+    {
+      "overrides/layout.njk": `---
+templateEngineOverride: liquid
+title: My Title
+layout: layouts/engineOverrides.njk
+---
+<h2>{{ title | size }}</h2>`,
+      "_includes/layouts/engineOverrides.njk": `---
+layoutkey: layoutvalue
+---
+<div id="{{layoutkey}}">{{ content | safe }}</div>
+`,
+    }
+  );
 
   t.assert.strictEqual((await renderTemplate(tmpl, await tmpl.getData())).trim(), `<div id="layoutvalue"><h2>8</h2></div>`);
 });
 
 test("Override base templating engine from .njk to nothing (with a layout that uses njk)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/overrides/layoutfalse.njk",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "overrides/layoutfalse.njk": `---
+templateEngineOverride: false
+title: My Title
+layout: layouts/engineOverrides.njk
+---
+<h2><%= title %></h2>`,
+      "_includes/layouts/engineOverrides.njk": `---
+layoutkey: layoutvalue
+---
+<div id="{{layoutkey}}">{{ content | safe }}</div>
+`,
+    }
   );
 
   t.assert.strictEqual(
@@ -1013,7 +1294,26 @@ test("Override base templating engine from .njk to nothing (with a layout that u
 });
 
 test("Using a markdown source file (with a layout that uses njk), markdown shouldn’t render in layout file", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/overrides/test.md", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs/overrides/test.md",
+    "./test/stubs/",
+    "./dist",
+    {
+      "overrides/test.md": `---
+title: My Title
+layout: layouts/engineOverridesMd.njk
+---
+
+# {{ title }}
+`,
+      "_includes/layouts/engineOverridesMd.njk": `---
+layoutkey: layoutvalue
+---
+# Layout header
+
+<div id="{{layoutkey}}">{{ content | safe }}</div>`,
+    }
+  );
 
   t.assert.strictEqual(
     normalizeNewLines((await renderTemplate(tmpl, await tmpl.getData())).trim()),
@@ -1025,7 +1325,20 @@ test("Using a markdown source file (with a layout that uses njk), markdown shoul
 });
 
 test("renderDirect on a markdown file, permalink should not render markdown", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/permalink-markdown.md", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs/permalink-markdown.md",
+    "./test/stubs/",
+    "./dist",
+    {
+      "permalink-markdown.md": `---
+title: My Title
+permalink: /news/my-test-file/index.html
+---
+
+# <%= title %>
+`,
+    }
+  );
   let data = await tmpl.getData();
   t.assert.strictEqual(
     await tmpl.renderDirect("/news/my-test-file/index.html", {}, true),
@@ -1036,10 +1349,19 @@ test("renderDirect on a markdown file, permalink should not render markdown", as
 });
 
 test("renderDirect on a markdown file, permalink should not render markdown (with variable)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/permalink-markdown-var.md",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "permalink-markdown-var.md": `---
+title: My Title
+permalink: /news/{{ title | slugify }}/index.html
+---
+
+# <%= title %>
+`,
+    }
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(
@@ -1051,10 +1373,20 @@ test("renderDirect on a markdown file, permalink should not render markdown (wit
 });
 
 test("renderDirect on a markdown file, permalink should not render markdown (has override)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/permalink-markdown-override.md",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "permalink-markdown-override.md": `---
+title: My Title
+permalink: /news/my-test-file/index.html
+templateEngineOverride: html,md
+---
+
+# <%= title %>
+`,
+    }
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(
@@ -1069,10 +1401,13 @@ test("renderDirect on a markdown file, permalink should not render markdown (has
 test("Test a transform", async (t) => {
   t.plan(2);
 
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/template.liquid",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    {
+      "template.liquid": "",
+    }
   );
 
   tmpl.setTransforms({
@@ -1090,10 +1425,13 @@ test("Test a transform", async (t) => {
 test("Test a transform (does it have this.inputPath?)", async (t) => {
   t.plan(3);
 
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/template.liquid",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    {
+      "template.liquid": "",
+    }
   );
 
   tmpl.setTransforms({
@@ -1111,10 +1449,28 @@ test("Test a transform (does it have this.inputPath?)", async (t) => {
 test("Test a transform with pages", async (t) => {
   t.plan(5);
 
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/transform-pages/template.njk",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    {
+      "transform-pages/template.njk": `---
+pagination:
+  data: testdata
+  size: 4
+testdata:
+ - item1
+ - item2
+ - item3
+ - item4
+ - item5
+ - item6
+ - item7
+ - item8
+---
+<ol>{% for item in pagination.items %}<li>{{ item }}</li>{% endfor %}</ol>
+`,
+    }
   );
 
   tmpl.setTransforms({
@@ -1133,10 +1489,17 @@ test("Test a transform with pages", async (t) => {
 test("Test a transform with a layout", async (t) => {
   t.plan(3);
 
-  let tmpl = await getNewTemplate(
-    "./test/stubs-475/transform-layout/transform-layout.njk",
-    "./test/stubs-475/",
-    "./test/stubs-475/_site"
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs-virtual-nowrite/transform-layout/transform-layout.njk",
+    "./test/stubs-virtual-nowrite/",
+    "./test/stubs-virtual-nowrite/_site",
+    {
+      "transform-layout/transform-layout.njk": `---
+layout: layout.njk
+---
+This is content.`,
+      "_includes/layout.njk": `<html><body>{{ content | safe }}</body></html>`,
+    }
   );
 
   tmpl.setTransforms({
@@ -1154,10 +1517,13 @@ test("Test a transform with a layout", async (t) => {
 test("Test a single asynchronous transform", async (t) => {
   t.plan(2);
 
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/template.liquid",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    {
+      "template.liquid": "",
+    }
   );
 
   tmpl.setTransforms({
@@ -1179,10 +1545,13 @@ test("Test a single asynchronous transform", async (t) => {
 test("Test multiple asynchronous transforms", async (t) => {
   t.plan(3);
 
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/template.liquid",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    {
+      "template.liquid": "",
+    }
   );
 
   tmpl.setTransforms({
@@ -1214,10 +1583,28 @@ test("Test multiple asynchronous transforms", async (t) => {
 test("Test a linter", async (t) => {
   t.plan(4);
 
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/transform-pages/template.njk",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    {
+      "transform-pages/template.njk": `---
+pagination:
+  data: testdata
+  size: 4
+testdata:
+ - item1
+ - item2
+ - item3
+ - item4
+ - item5
+ - item6
+ - item7
+ - item8
+---
+<ol>{% for item in pagination.items %}<li>{{ item }}</li>{% endfor %}</ol>
+`,
+    }
   );
 
   tmpl.addLinter(function (str, inputPath, outputPath) {
@@ -1229,10 +1616,16 @@ test("Test a linter", async (t) => {
 });
 
 test("Front Matter Tags (Single)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/templatetest-frontmatter/single.njk",
     "./test/stubs/",
-    "dist"
+    "dist",
+    {
+      "templatetest-frontmatter/single.njk": `---
+tags: single-tag
+---
+{% if tags.includes("single-tag") %}Has single-tag{% endif %}`,
+    }
   );
   let { data: frontmatter } = await tmpl.getFrontMatterData();
   t.assert.deepStrictEqual(frontmatter.tags, ["single-tag"]);
@@ -1245,10 +1638,18 @@ test("Front Matter Tags (Single)", async (t) => {
 });
 
 test("Front Matter Tags (Multiple)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/templatetest-frontmatter/multiple.njk",
     "./test/stubs/",
-    "dist"
+    "dist",
+    {
+      "templatetest-frontmatter/multiple.njk": `---
+tags:
+  - multi-tag
+  - multi-tag-2
+---
+{% if tags.includes("multi-tag-2") %}Has multi-tag-2{% endif %}`,
+    }
   );
   let { data: frontmatter } = await tmpl.getFrontMatterData();
   t.assert.deepStrictEqual(frontmatter.tags, ["multi-tag", "multi-tag-2"]);
@@ -1262,9 +1663,14 @@ test("Front Matter Tags (Multiple)", async (t) => {
 
 test("Front matter date with quotes (liquid), issue #258", async (t) => {
 let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
-    input: "test/stubs/frontmatter-date/test.liquid",
+    input: "test/stubs-virtual-nowrite",
     output: "dist"
   }, function(cfg) {
+    cfg.addTemplate("test.liquid", `---
+mydate: 2009-04-15T12:34:34+01:00
+---
+{{ mydate | date: "%Y-%m-%d" }}`);
+
     const YAML_SCHEMA = yaml.CORE_SCHEMA.withTags(yaml.timestampTag);
     const YAML_LOAD = (str, options) => yaml.load(str, Object.assign({ schema: YAML_SCHEMA }, options));
 
@@ -1277,8 +1683,8 @@ let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
 
   let dataObj = new TemplateData(eleventyConfig);
   let tmpl = await getNewTemplate(
-    "./test/stubs/frontmatter-date/test.liquid",
-    "./test/stubs/",
+    "./test/stubs-virtual-nowrite/test.liquid",
+    "./test/stubs-virtual-nowrite/",
     "dist",
     dataObj,
     null,
@@ -1294,9 +1700,14 @@ let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
 
 test("Front matter date with quotes (njk), issue #258", async (t) => {
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
-    input: "test/stubs/frontmatter-date/test.njk",
+    input: "test/stubs-virtual-nowrite",
     output: "dist"
   }, function(cfg) {
+    cfg.addTemplate("test.njk", `---
+mydate: 2009-04-15T01:34:34+01:00
+---
+{{ mydate.toISOString() }}`);
+
     const YAML_SCHEMA = yaml.CORE_SCHEMA.withTags(yaml.timestampTag);
     const YAML_LOAD = (str, options) => yaml.load(str, Object.assign({ schema: YAML_SCHEMA }, options));
 
@@ -1309,8 +1720,8 @@ test("Front matter date with quotes (njk), issue #258", async (t) => {
 
   let dataObj = new TemplateData(eleventyConfig);
   let tmpl = await getNewTemplate(
-    "./test/stubs/frontmatter-date/test.njk",
-    "./test/stubs/",
+    "./test/stubs-virtual-nowrite/test.njk",
+    "./test/stubs-virtual-nowrite/",
     "dist",
     dataObj,
     null,
@@ -1450,10 +1861,11 @@ test('Local data inherits tags string ([tags] vs "tags") Deep Merge', async (t) 
 });
 
 test("Throws a Premature Template Content Error (njk)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/prematureTemplateContent/test.njk",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    { "prematureTemplateContent/test.njk": PREMATURE_TEMPLATES["test.njk"] }
   );
 
   let data = await tmpl.getData();
@@ -1471,7 +1883,8 @@ test("Throws a Premature Template Content Error (njk)", async (t) => {
 // Renders like TemplateMap (no layouts) so the error comes from the template, not the page entry’s own templateContent.
 async function getPrematureErrorFromRendering(t, inputPath, configCallback) {
   let sampleRead = false;
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, configCallback || function () {});
+  let fileName = inputPath.split("/").pop();
+  let eleventyConfig = await getVirtualConfig({}, { [inputPath]: PREMATURE_TEMPLATES[fileName] }, configCallback);
   let tmpl = await getNewTemplate(inputPath, "./test/stubs/", "./test/stubs/_site", null, null, eleventyConfig);
 
   let data = await tmpl.getData();
@@ -1547,10 +1960,11 @@ test("Premature Template Content Error detection handles cycles", (t) => {
 });
 
 test("Throws a Premature Template Content Error (liquid)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/prematureTemplateContent/test.liquid",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    { "prematureTemplateContent/test.liquid": PREMATURE_TEMPLATES["test.liquid"] }
   );
 
   let data = await tmpl.getData();
@@ -1566,10 +1980,11 @@ test("Throws a Premature Template Content Error (liquid)", async (t) => {
 });
 
 test("Throws a Premature Template Content Error (11ty.js)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/prematureTemplateContent/test.11ty.cjs",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    { "prematureTemplateContent/test.11ty.cjs": PREMATURE_TEMPLATES["test.11ty.cjs"] }
   );
 
   let data = await tmpl.getData();
@@ -1585,10 +2000,11 @@ test("Throws a Premature Template Content Error (11ty.js)", async (t) => {
 });
 
 test("Throws a Premature Template Content Error (md)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/prematureTemplateContent/test.md",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    { "prematureTemplateContent/test.md": PREMATURE_TEMPLATES["test.md"] }
   );
 
   let data = await tmpl.getData();
@@ -1609,21 +2025,30 @@ test("Throws a Premature Template Content Error from rendering (md)", async (t) 
 });
 
 test("Issue 413 weird date format", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/stubs-413/date-frontmatter.md",
-    "./test/stubs-413/",
-    "./dist"
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs-virtual-nowrite/date-frontmatter.md",
+    "./test/stubs-virtual-nowrite/",
+    "./dist",
+    {
+      "date-frontmatter.md": `---
+subtitle: New doc page
+date: 2019-03-13 20:18:42 +0000
+tags:
+  - docs
+---
+`,
+    }
   );
 
   await t.assert.rejects(async function () {
     await tmpl.getData();
   }, {
-    message: "Data cascade value for `date` (2019-03-13 20:18:42 +0000) is invalid for ./test/stubs-413/date-frontmatter.md"
+    message: "Data cascade value for `date` (2019-03-13 20:18:42 +0000) is invalid for ./test/stubs-virtual-nowrite/date-frontmatter.md"
   });
 });
 
 test("Custom Front Matter Parsing Options", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
+  let eleventyConfig = await getVirtualConfig({}, { "test/stubs/custom-frontmatter/template.njk": CUSTOM_FRONT_MATTER_TEMPLATES["template.njk"] }, function(cfg) {
     cfg.setFrontMatterParsingOptions({
       excerpt: true,
     })
@@ -1653,7 +2078,7 @@ This is content.`
 });
 
 test("Custom Front Matter Parsing Options (using alias)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
+  let eleventyConfig = await getVirtualConfig({}, { "test/stubs/custom-frontmatter/template.njk": CUSTOM_FRONT_MATTER_TEMPLATES["template.njk"] }, function(cfg) {
     cfg.setFrontMatterParsingOptions({
       excerpt: true,
       excerpt_alias: "my_excerpt",
@@ -1683,7 +2108,7 @@ This is content.`
 });
 
 test("Custom Front Matter Parsing Options (no newline before excerpt separator)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
+  let eleventyConfig = await getVirtualConfig({}, { "test/stubs/custom-frontmatter/template-newline1.njk": CUSTOM_FRONT_MATTER_TEMPLATES["template-newline1.njk"] }, function(cfg) {
     cfg.setFrontMatterParsingOptions({
       excerpt: true,
     })
@@ -1712,7 +2137,7 @@ This is content.`
 });
 
 test("Custom Front Matter Parsing Options (no newline after excerpt separator)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
+  let eleventyConfig = await getVirtualConfig({}, { "test/stubs/custom-frontmatter/template-newline3.njk": CUSTOM_FRONT_MATTER_TEMPLATES["template-newline3.njk"] }, function(cfg) {
     cfg.setFrontMatterParsingOptions({
       excerpt: true,
     })
@@ -1735,7 +2160,7 @@ This is content.`
 });
 
 test("Custom Front Matter Parsing Options (no newlines before or after excerpt separator)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
+  let eleventyConfig = await getVirtualConfig({}, { "test/stubs/custom-frontmatter/template-newline2.njk": CUSTOM_FRONT_MATTER_TEMPLATES["template-newline2.njk"] }, function(cfg) {
     cfg.setFrontMatterParsingOptions({
       excerpt: true,
     })
@@ -1755,7 +2180,7 @@ test("Custom Front Matter Parsing Options (no newlines before or after excerpt s
 });
 
 test("Custom Front Matter Parsing Options (html comment separator)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({}, function(cfg) {
+  let eleventyConfig = await getVirtualConfig({}, { "test/stubs/custom-frontmatter/template-excerpt-comment.njk": CUSTOM_FRONT_MATTER_TEMPLATES["template-excerpt-comment.njk"] }, function(cfg) {
     cfg.setFrontMatterParsingOptions({
       excerpt: true,
       excerpt_separator: "<!-- excerpt -->",
@@ -1786,10 +2211,11 @@ This is content.`
 
 test("Custom Front Matter Parsing Options (using TOML)", async (t) => {
   // Currently fails on Windows, needs https://github.com/jonschlinkert/gray-matter/issues/92
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/custom-frontmatter/template-toml.njk",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    { "custom-frontmatter/template-toml.njk": CUSTOM_FRONT_MATTER_TEMPLATES["template-toml.njk"] }
   );
   tmpl.config.frontMatterParsingOptions = {
     engines: {
@@ -1808,10 +2234,16 @@ test("Custom Front Matter Parsing Options (using TOML)", async (t) => {
 });
 
 test("global variable with dashes Issue #567 (liquid)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/global-dash-variable.liquid",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "global-dash-variable.liquid": `---
+is-it-tasty: Yes
+---
+{{ is-it-tasty }}`,
+    }
   );
 
   let data = await tmpl.getData();
@@ -1822,10 +2254,23 @@ test("global variable with dashes Issue #567 (liquid)", async (t) => {
 });
 
 test("Issue #446: Layout has a permalink with a different template language than content", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/stubs/layout-permalink-difflang/test.md",
-    "./test/stubs/layout-permalink-difflang/",
-    "dist"
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs-virtual-nowrite/test.md",
+    "./test/stubs-virtual-nowrite/",
+    "dist",
+    {
+      "test.md": `---
+layout: test.njk
+templateEngineOverride: md
+---
+
+# Title
+`,
+      "_includes/test.njk": `---
+permalink: "/{{ page.fileSlug }}/"
+---
+{{ content }}`,
+    }
   );
 
   let data = await tmpl.getData();
@@ -1837,43 +2282,53 @@ test("Issue #446: Layout has a permalink with a different template language than
 });
 
 test("Get Layout Chain", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/stubs-incremental/layout-chain/test.njk",
-    "./test/stubs-incremental/layout-chain/",
-    "./dist"
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs-virtual-nowrite/test.njk",
+    "./test/stubs-virtual-nowrite/",
+    "./dist",
+    {
+      "test.njk": `---
+layout: base.njk
+---`,
+      "_includes/base.njk": `---
+layout: parent.njk
+---`,
+      "_includes/parent.njk": ``,
+    }
   );
 
   let data = await tmpl.getData();
   let layout = tmpl.getLayout(data.layout);
 
   t.assert.deepStrictEqual(await layout.getLayoutChain(), [
-    "./test/stubs-incremental/layout-chain/_includes/base.njk",
-    "./test/stubs-incremental/layout-chain/_includes/parent.njk",
+    "./test/stubs-virtual-nowrite/_includes/base.njk",
+    "./test/stubs-virtual-nowrite/_includes/parent.njk",
   ]);
 });
 
 test("Engine Singletons", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs/engine-singletons",
-      output: "dist"
-    }
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
+    output: "dist"
+  }, {
+    "first.njk": "",
+    "second.njk": "",
   });
 
   let map = new ExtensionMap(eleventyConfig);
   map.engineManager = new TemplateEngineManager(eleventyConfig);
   map.setFormats(["njk"]);
   let tmpl1 = await getNewTemplate(
-    "./test/stubs/engine-singletons/first.njk",
-    "./test/stubs/engine-singletons/",
+    "./test/stubs-virtual-nowrite/first.njk",
+    "./test/stubs-virtual-nowrite/",
     "./dist",
     null,
     map,
     eleventyConfig
   );
   let tmpl2 = await getNewTemplate(
-    "./test/stubs/engine-singletons/second.njk",
-    "./test/stubs/engine-singletons/",
+    "./test/stubs-virtual-nowrite/second.njk",
+    "./test/stubs-virtual-nowrite/",
     "./dist",
     null,
     map,
@@ -1980,10 +2435,19 @@ test("Add Extension via Configuration (txt file)", async (t) => {
 });
 
 test("permalink object with build", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/permalink-build/permalink-build.md",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    {
+      "permalink-build/permalink-build.md": `---
+permalink:
+  build: /url/
+---
+
+This should be the same as \`permalink: /url/\`
+`,
+    }
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getRawOutputPath(data), "/url/index.html");
@@ -1994,10 +2458,18 @@ test("permalink object with build", async (t) => {
 });
 
 test("Permalink object without build throws", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/permalink-empty-object/empty-object.md",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    {
+      "permalink-empty-object/empty-object.md": `---
+permalink: {}
+---
+
+This should be the same as if permalink was not set at all.
+`,
+    }
   );
 
   await t.assert.rejects(() => tmpl._getLink({ permalink: { someotherkey: "/build/" } }), {
@@ -2006,10 +2478,18 @@ test("Permalink object without build throws", async (t) => {
 });
 
 test("Permalink is an object but an empty object (inherit default behavior)", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/permalink-empty-object/empty-object.md",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    {
+      "permalink-empty-object/empty-object.md": `---
+permalink: {}
+---
+
+This should be the same as if permalink was not set at all.
+`,
+    }
   );
   let data = await tmpl.getData();
 
@@ -2028,16 +2508,51 @@ test("Permalink is an object but an empty object (inherit default behavior)", as
   t.assert.strictEqual(path, "./test/stubs/_site/permalink-empty-object/empty-object/index.html");
 });
 
-for (let [name, file] of [
-  ["eleventyComputed returns permalink object Issue #1898", "eleventycomputed-object"],
-  ["eleventyComputed returns nested permalink object Issue #1898", "eleventycomputed-nested-object"],
-  ["eleventyComputed returns permalink object using permalink string (with replace) Issue #1898", "eleventycomputed-object-replace"],
+for (let [name, file, content] of [
+  ["eleventyComputed returns permalink object Issue #1898", "eleventycomputed-object", {
+    data: {
+      lang: "en",
+      eleventyComputed: {
+        permalink: {
+          build: function (data) {
+            return `/i18n/${data.lang}/`;
+          },
+        },
+      },
+    },
+  }],
+  ["eleventyComputed returns nested permalink object Issue #1898", "eleventycomputed-nested-object", {
+    data: {
+      lang: "en",
+      eleventyComputed: {
+        permalink: function (data) {
+          return {
+            build: `/i18n/${data.lang}/`,
+          };
+        },
+      },
+    },
+  }],
+  ["eleventyComputed returns permalink object using permalink string (with replace) Issue #1898", "eleventycomputed-object-replace", {
+    data: {
+      lang: "en",
+      permalink: "/i18n/{{lang}}/",
+      eleventyComputed: {
+        permalink: function (data) {
+          return {
+            build: data.permalink.replace("{{lang}}", "en"),
+          };
+        },
+      },
+    },
+  }],
 ]) {
   test(name, async (t) => {
-    let tmpl = await getNewTemplate(
-      `./test/stubs/stubs-computed-permalink/${file}.11ty.cjs`,
-      "./test/stubs/stubs-computed-permalink/",
-      "./test/stubs/stubs-computed-permalink/_site"
+    let tmpl = await getVirtualTemplate(
+      `./test/stubs-virtual-nowrite/${file}.11ty.cjs`,
+      "./test/stubs-virtual-nowrite/",
+      "./test/stubs/stubs-computed-permalink/_site",
+      { [`${file}.11ty.cjs`]: content }
     );
 
     let data = await tmpl.getData();
@@ -2049,10 +2564,18 @@ for (let [name, file] of [
 }
 
 test("page.templateSyntax works with templateEngineOverride", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/overrides/page-templatesyntax.md",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    {
+      "overrides/page-templatesyntax.md": `---
+templateEngineOverride: njk,md
+---
+
+{{ page.templateSyntax }}
+`,
+    }
   );
 
   t.assert.strictEqual((await renderTemplate(tmpl, await tmpl.getData())).trim(), "<p>njk,md</p>");

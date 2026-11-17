@@ -4,14 +4,36 @@ import TemplateData from "../src/Data/TemplateData.js";
 import TemplateMap from "../src/TemplateMap.js";
 
 import getNewTemplate from "./_getNewTemplateForTests.js";
-import { getTemplateConfigInstance } from "./_testHelpers.js";
+import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback } from "./_testHelpers.js";
 import ExtensionMap from "../src/ExtensionMap.js";
 
-test("Computed data can see tag generated collections", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs-computed-collections"
+function getVirtualConfig(input, templates) {
+  return getTemplateConfigInstanceCustomCallback({ input }, function (cfg) {
+    for (let [inputPath, content] of Object.entries(templates)) {
+      cfg.addTemplate(inputPath, content);
     }
+  });
+}
+
+const DOG_TEMPLATE = `---
+tags: dog
+---
+Hi from dog`;
+
+test("Computed data can see tag generated collections", async (t) => {
+  let eleventyConfig = await getVirtualConfig("test/stubs-virtual-nowrite", {
+    "collections.njk": `---js
+{
+  eleventyComputed: {
+    test: "hello",
+    dogCollection: data => {
+      return data.collections.dog;
+    }
+  }
+}
+---
+Issue #1114`,
+    "dog.njk": DOG_TEMPLATE,
   });
 
   let tm = new TemplateMap(eleventyConfig);
@@ -19,8 +41,8 @@ test("Computed data can see tag generated collections", async (t) => {
   let dataObj = new TemplateData(eleventyConfig);
   dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   let tmpl = await getNewTemplate(
-    "./test/stubs-computed-collections/collections.njk",
-    "./test/stubs-computed-collections/",
+    "./test/stubs-virtual-nowrite/collections.njk",
+    "./test/stubs-virtual-nowrite/",
     "./dist",
     dataObj,
     null,
@@ -32,8 +54,8 @@ test("Computed data can see tag generated collections", async (t) => {
   let dataObj2 = new TemplateData(eleventyConfig);
   dataObj2.extensionMap = new ExtensionMap(eleventyConfig);
   let tmpl2 = await getNewTemplate(
-    "./test/stubs-computed-collections/dog.njk",
-    "./test/stubs-computed-collections/",
+    "./test/stubs-virtual-nowrite/dog.njk",
+    "./test/stubs-virtual-nowrite/",
     "./dist",
     dataObj2,
     null,
@@ -61,18 +83,38 @@ test("Computed data can see tag generated collections", async (t) => {
 });
 
 test("Computed data can see paginated data, Issue #1138", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs-computed-pagination"
-    }
+  let eleventyConfig = await getVirtualConfig("test/stubs-virtual-nowrite", {
+    "paginated.njk": `---
+venues:
+  - first
+  - second
+pagination:
+  data: venues
+  size: 1
+  alias: venue
+  addAllPagesToCollections: true
+permalink: "venues/{{ venue }}/"
+tags: venue
+eleventyComputed:
+  title: "{{ venue }}"
+---`,
+    "child.11ty.cjs": {
+      data: {
+        eleventyComputed: {
+          venues: (data) => {
+            return data.collections.venue;
+          },
+        },
+      },
+    },
   });
   let tm = new TemplateMap(eleventyConfig);
 
   let dataObj = new TemplateData(eleventyConfig);
   dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   let tmpl = await getNewTemplate(
-    "./test/stubs-computed-pagination/paginated.njk",
-    "./test/stubs-computed-pagination/",
+    "./test/stubs-virtual-nowrite/paginated.njk",
+    "./test/stubs-virtual-nowrite/",
     "./dist",
     dataObj,
     null,
@@ -84,8 +126,8 @@ test("Computed data can see paginated data, Issue #1138", async (t) => {
   let dataObj2 = new TemplateData(eleventyConfig);
   dataObj2.extensionMap = new ExtensionMap(eleventyConfig);
   let tmpl2 = await getNewTemplate(
-    "./test/stubs-computed-pagination/child.11ty.cjs",
-    "./test/stubs-computed-pagination/",
+    "./test/stubs-virtual-nowrite/child.11ty.cjs",
+    "./test/stubs-virtual-nowrite/",
     "./dist",
     dataObj2,
     null,
@@ -169,10 +211,19 @@ test("Computed data in directory data file consumes data file data, Issue #1137"
 });
 
 test("Computed data can filter collections (and other array methods)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs-computed-collections-filter"
+  let eleventyConfig = await getVirtualConfig("test/stubs-virtual-nowrite", {
+    "collections.njk": `---js
+{
+  eleventyComputed: {
+    test: "hello",
+    dogCollection: data => {
+      return data.collections.dog.filter(entry => true);
     }
+  }
+}
+---
+Issue #1114`,
+    "dog.njk": DOG_TEMPLATE,
   });
 
   let tm = new TemplateMap(eleventyConfig);
@@ -180,8 +231,8 @@ test("Computed data can filter collections (and other array methods)", async (t)
   let dataObj = new TemplateData(eleventyConfig);
   dataObj.extensionMap = new ExtensionMap(eleventyConfig);
   let tmpl = await getNewTemplate(
-    "./test/stubs-computed-collections-filter/collections.njk",
-    "./test/stubs-computed-collections-filter/",
+    "./test/stubs-virtual-nowrite/collections.njk",
+    "./test/stubs-virtual-nowrite/",
     "./dist",
     dataObj,
     null,
@@ -193,8 +244,8 @@ test("Computed data can filter collections (and other array methods)", async (t)
   let dataObj2 = new TemplateData(eleventyConfig);
   dataObj2.extensionMap = new ExtensionMap(eleventyConfig);
   let tmpl2 = await getNewTemplate(
-    "./test/stubs-computed-collections-filter/dog.njk",
-    "./test/stubs-computed-collections-filter/",
+    "./test/stubs-virtual-nowrite/dog.njk",
+    "./test/stubs-virtual-nowrite/",
     "./dist",
     dataObj2,
     null,

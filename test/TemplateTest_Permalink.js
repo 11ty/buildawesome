@@ -4,7 +4,14 @@ import fs from "fs";
 import TemplateData from "../src/Data/TemplateData.js";
 import getNewTemplate from "./_getNewTemplateForTests.js";
 
-import { getTemplateConfigInstance } from "./_testHelpers.js";
+import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback } from "./_testHelpers.js";
+
+async function getVirtualTemplate(path, inputDir, outputDir, content) {
+  let $config = await getTemplateConfigInstanceCustomCallback({ input: inputDir, output: outputDir }, (cfg) => {
+    cfg.addTemplate(path.slice(inputDir.length), content);
+  });
+  return getNewTemplate(path, inputDir, outputDir, null, null, $config);
+}
 
 async function writeMapEntry(entry) {
   let promises = [];
@@ -29,10 +36,16 @@ async function getTemplateMapEntryWithContent(template, data) {
 }
 
 test("permalink: false", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/permalink-false/test.md",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    `---
+permalink: false
+---
+
+This shouldn’t write
+`
   );
 
   let data = await tmpl.getData();
@@ -43,10 +56,6 @@ test("permalink: false", async (t) => {
   t.assert.strictEqual(entry.data.page.outputPath, false);
 
   await writeMapEntry(entry);
-
-  // Input file exists (sanity check for paths)
-  t.assert.strictEqual(fs.existsSync("./test/stubs/permalink-false/"), true);
-  t.assert.strictEqual(fs.existsSync("./test/stubs/permalink-false/test.md"), true);
 
   // Output does not exist
   t.assert.strictEqual(fs.existsSync("./test/stubs/_site/permalink-false/"), false);
@@ -55,10 +64,17 @@ test("permalink: false", async (t) => {
 });
 
 test("permalink: false inside of eleventyComputed, Issue #1754", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/permalink-false-computed/test.md",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    `---
+eleventyComputed:
+  permalink: false
+---
+
+This shouldn’t write
+`
   );
 
   let data = await tmpl.getData();
@@ -69,10 +85,6 @@ test("permalink: false inside of eleventyComputed, Issue #1754", async (t) => {
 
   await writeMapEntry(entry);
 
-  // Input file exists (sanity check for paths)
-  t.assert.strictEqual(fs.existsSync("./test/stubs/permalink-false-computed/"), true);
-  t.assert.strictEqual(fs.existsSync("./test/stubs/permalink-false-computed/test.md"), true);
-
   // Output does not exist
   t.assert.strictEqual(fs.existsSync("./test/stubs/_site/permalink-false-computed/"), false);
   t.assert.strictEqual(fs.existsSync("./test/stubs/_site/permalink-false-computed/test/"), false);
@@ -80,10 +92,16 @@ test("permalink: false inside of eleventyComputed, Issue #1754", async (t) => {
 });
 
 test("permalink: true", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/permalink-true/permalink-true.md",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    `---
+permalink: true
+---
+
+This should throw an error.
+`
   );
 
   let data = await tmpl.getData();
@@ -93,10 +111,14 @@ test("permalink: true", async (t) => {
 });
 
 test("Disable dynamic permalinks", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/dynamic-permalink/test.njk",
     "./test/stubs/",
-    "./test/stubs/_site"
+    "./test/stubs/_site",
+    `---
+permalink: "/{{justastring}}/"
+dynamicPermalink: false
+---`
   );
   let data = await tmpl.getData();
 
@@ -107,7 +129,17 @@ test("Disable dynamic permalinks", async (t) => {
 });
 
 test("Permalink with variables!", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/permalinkdata.njk", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs/permalinkdata.njk",
+    "./test/stubs/",
+    "./dist",
+    `---
+title: Slug CANDIDATE
+permalink: subdir/{{ title | slugify }}/index.html
+---
+Slugged.
+`
+  );
 
   let data = await tmpl.getData();
 
@@ -115,16 +147,38 @@ test("Permalink with variables!", async (t) => {
 });
 
 test("Permalink with variables and JS front matter!", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/permalinkdata-jsfn.njk", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs/permalinkdata-jsfn.njk",
+    "./test/stubs/",
+    "./dist",
+    `---js
+{
+	title: "slug",
+	permalink: "subdir/{{title}}/"
+}
+---
+Slugged.
+`
+  );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/slug/index.html");
 });
 
 test("Use a JavaScript function for permalink in any template language", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/permalinkdata-jspermalinkfn.njk",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    `---js
+{
+	title: "slug",
+	permalink: function(data) {
+		return \`subdir/\${data.title}/\`;
+	}
+}
+---
+Slugged.
+`
   );
 
   let data = await tmpl.getData();
@@ -132,16 +186,31 @@ test("Use a JavaScript function for permalink in any template language", async (
 });
 
 test("Permalink with dates!", async (t) => {
-  let tmpl = await getNewTemplate("./test/stubs/permalinkdate.liquid", "./test/stubs/", "./dist");
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs/permalinkdate.liquid",
+    "./test/stubs/",
+    "./dist",
+    `---
+title: Date Permalink
+date: "2016-01-01T06:00-06:00"
+permalink: "/{{ page.date | date: '%Y/%m/%d' }}/index.html"
+---
+Date Permalinks`
+  );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/2016/01/01/index.html");
 });
 
 test("Permalink with dates on file name regex!", async (t) => {
-  let tmpl = await getNewTemplate(
+  let tmpl = await getVirtualTemplate(
     "./test/stubs/2016-02-01-permalinkdate.liquid",
     "./test/stubs/",
-    "./dist"
+    "./dist",
+    `---
+title: Date Permalink
+permalink: "/{{ page.date | date: '%Y/%m/%d' }}/index.html"
+---
+Date Permalinks`
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/2016/02/01/index.html");
@@ -168,70 +237,112 @@ test("Reuse permalink in directory specific data file", async (t) => {
 });
 
 test("Using slugify filter!", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/slugify-filter/test.njk",
-    "./test/slugify-filter/",
-    "./dist"
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs-virtual-nowrite/test.njk",
+    "./test/stubs-virtual-nowrite/",
+    "./dist",
+    `---
+title: _Slug ♥ CANDIDATE люблю $#%-
+permalink: subdir/{{ title | slugify }}/index.html
+---
+Slugged.
+`
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/slug-love-candidate-lyublyu/index.html");
 });
 
 test("Using slugify filter with comma and apostrophe", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/slugify-filter/comma.njk",
-    "./test/slugify-filter/",
-    "./dist"
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs-virtual-nowrite/comma.njk",
+    "./test/stubs-virtual-nowrite/",
+    "./dist",
+    `---
+title: "Hi, I'm ZAch"
+permalink: subdir/{{ title | slugify }}/index.html
+---
+Slugged.
+`
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/hi-i-m-zach/index.html");
 });
 
 test("Using slug filter with options params", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/slugify-filter/slug-options.njk",
-    "./test/slugify-filter/",
-    "./dist"
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs-virtual-nowrite/slug-options.njk",
+    "./test/stubs-virtual-nowrite/",
+    "./dist",
+    `---
+title: "Hi, I am ZAch"
+permalink: "subdir/{{ title | slugify({separator:'_'}) }}/index.html"
+---
+Slugged.
+`
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/hi_i_am_zach/index.html");
 });
 
 test("Using slugify filter with options params", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/slugify-filter/slugify-options.njk",
-    "./test/slugify-filter/",
-    "./dist"
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs-virtual-nowrite/slugify-options.njk",
+    "./test/stubs-virtual-nowrite/",
+    "./dist",
+    `---
+title: "Hi, I'm ZAch"
+permalink: "subdir/{{ title | slugify({decamelize: true}) }}/index.html"
+---
+Slugged.
+`
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/hi-i-m-z-ach/index.html");
 });
 
 test("Using slugify filter with a number #854", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/slugify-filter/slugify-number.njk",
-    "./test/slugify-filter/",
-    "./dist"
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs-virtual-nowrite/slugify-number.njk",
+    "./test/stubs-virtual-nowrite/",
+    "./dist",
+    `---
+number: 1
+permalink: subdir/{{ number | slugify }}/index.html
+---
+Slugged.
+`
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/1/index.html");
 });
 
 test("Using slug filter with a number #854", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/slugify-filter/slug-number.njk",
-    "./test/slugify-filter/",
-    "./dist"
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs-virtual-nowrite/slug-number.njk",
+    "./test/stubs-virtual-nowrite/",
+    "./dist",
+    `---
+number: 1
+permalink: subdir/{{ number | slugify }}/index.html
+---
+Slugged.
+`
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/1/index.html");
 });
 
 test.skip("Using slugify filter with multibyte", async (t) => {
-  let tmpl = await getNewTemplate(
-    "./test/slugify-filter/multibyte.njk",
-    "./test/slugify-filter/",
-    "./dist"
+  let tmpl = await getVirtualTemplate(
+    "./test/stubs-virtual-nowrite/multibyte.njk",
+    "./test/stubs-virtual-nowrite/",
+    "./dist",
+    `---
+title: "test-猫"
+permalink: subdir/{{ title | slugify }}/index.html
+---
+Slugged.
+`
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/test-猫/index.html");

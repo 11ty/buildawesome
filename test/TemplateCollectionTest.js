@@ -5,7 +5,107 @@ import Collection from "../src/TemplateCollection.js";
 import Sortable from "../src/Util/Objects/Sortable.js";
 
 import getNewTemplateForTests from "../test/_getNewTemplateForTests.js";
-import { getTemplateConfigInstance } from "./_testHelpers.js";
+import { getTemplateConfigInstanceCustomCallback } from "./_testHelpers.js";
+
+// A shared date keeps the input path as the sort tiebreaker.
+const COLLECTION_TEMPLATES = {
+  "test/stubs/collection/test1.md": `---
+title: Test Title
+date: 2020-01-01
+tags:
+  - post
+  - dog
+---
+
+# Test 1
+`,
+  "test/stubs/collection/test2.md": `---
+date: 2020-01-01
+tags: cat
+---
+
+# Test 2
+`,
+  "test/stubs/collection/test3.md": `---
+date: 2020-01-01
+tags:
+  - post
+  - cat
+---
+
+# Test 3
+`,
+  "test/stubs/collection/test4.md": `---
+date: 1983-01-01
+---
+
+# Test 3
+`,
+  "test/stubs/collection/test5.md": `---
+date: 2038-01-01
+---
+
+# Test 3
+`,
+  "test/stubs/collection/test6.html": `# Test 6
+`,
+  "test/stubs/collection/test7.njk": `# Test 7`,
+  "test/stubs/collection/test8.md": `---
+title: Test Title
+date: 2020-01-01
+tags:
+  - post
+  - office
+eleventyExcludeFromCollections: true
+---
+
+# Test 1
+`,
+  "test/stubs/collection/test9.md": `---
+title: Test Title
+date: 2020-01-01
+tags:
+  - post
+  - office
+eleventyExcludeFromCollections: post
+---
+
+# Test 1
+`,
+  "test/stubs/collection/test10.md": `---
+title: Test Title
+date: 2020-01-01
+tags:
+  - post
+  - office
+eleventyExcludeFromCollections:
+  - post
+---
+
+# Test 1
+`,
+  "test/stubs/issue-95/cat.md": `---
+tags: 
+  - cat
+---
+
+# Test 8
+`,
+  "test/stubs/issue-95/notacat.md": `---
+tags: notacat
+---
+
+# Test 8
+`,
+};
+
+function getTemplateConfigInstance() {
+  return getTemplateConfigInstanceCustomCallback({}, function (cfg) {
+    for (let [inputPath, content] of Object.entries(COLLECTION_TEMPLATES)) {
+      cfg.addTemplate(inputPath, content);
+    }
+  });
+}
 
 function getNewTemplate(filename, input, output, $config) {
   return getNewTemplateForTests(filename, input, output, null, null, $config);

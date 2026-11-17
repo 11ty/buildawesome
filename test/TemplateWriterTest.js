@@ -10,6 +10,119 @@ import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 import { getRenderedTemplates as getRenderedTmpls } from "./_getRenderedTemplates.js";
 import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback, getTemplateWriterInstance, deleteDirectory } from "./_testHelpers.js";
 
+// Virtual inputs use an empty directory so they never collide with files on disk.
+function getVirtualConfig(dirs, templates, callback) {
+  return getTemplateConfigInstanceCustomCallback(dirs, function (cfg) {
+    callback?.(cfg);
+    for (let [inputPath, content] of Object.entries(templates)) {
+      cfg.addTemplate(inputPath, content);
+    }
+  });
+}
+
+const COLLECTION_TEMPLATES = {
+  "test1.md": `---
+title: Test Title
+tags:
+  - post
+  - dog
+---
+
+# Test 1
+`,
+  "test2.md": `---
+tags: cat
+---
+
+# Test 2
+`,
+  "test3.md": `---
+tags:
+  - post
+  - cat
+---
+
+# Test 3
+`,
+  "test4.md": `---
+date: 1983-01-01
+---
+
+# Test 3
+`,
+  "test5.md": `---
+date: 2038-01-01
+---
+
+# Test 3
+`,
+  "test8.md": `---
+title: Test Title
+tags:
+  - post
+  - office
+eleventyExcludeFromCollections: true
+---
+
+# Test 1
+`,
+  "test9.md": `---
+title: Test Title
+tags:
+  - post
+  - office
+eleventyExcludeFromCollections: post
+---
+
+# Test 1
+`,
+  "test10.md": `---
+title: Test Title
+tags:
+  - post
+  - office
+eleventyExcludeFromCollections:
+  - post
+---
+
+# Test 1
+`,
+};
+
+const COLLECTION2_TEMPLATES = {
+  "test1.md": `---
+title: Test Title
+tags:
+  - post
+  - dog
+date: 2009-01-01
+---
+
+# Test 1
+`,
+  "test2.md": `---
+tags:
+  - post
+  - cat
+date: 2010-01-01
+---
+
+# Test 2
+`,
+};
+
+const PAGED_CONSUMER = `{% for item in collections.pagingtag %}{{ item.templateContent | safe }}{% endfor %}
+`;
+
+// A shared date keeps the input path as the sort tiebreaker.
+const PAGED_TAG1_TEMPLATES = Object.fromEntries([1, 2, 3].map((num) => [`test${num}.njk`, `---
+title: Testing ${num}
+date: 2020-01-01
+tags:
+  - tag1
+---
+{{ title }}`]));
+
 // TODO make sure if output is a subdir of input dir that they don’t conflict.
 test("Output is a subdir of input", async (t) => {
   let eleventyConfig = await getTemplateConfigInstance({
@@ -69,12 +182,10 @@ test("createTemplateMap (no leading dot slash)", async (t) => {
 });
 
 test("_testGetCollectionsData", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs/collection",
-      output: "test/stubs/_site"
-    }
-  });
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
+    output: "test/stubs/_site"
+  }, COLLECTION_TEMPLATES);
 
   let { templateWriter: tw } = getTemplateWriterInstance(["md"], eleventyConfig);
 
@@ -88,12 +199,10 @@ test("_testGetCollectionsData", async (t) => {
 
 // TODO remove this (used by other test things)
 test("_testGetAllTags", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs/collection",
-      output: "test/stubs/_site"
-    }
-  });
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
+    output: "test/stubs/_site"
+  }, COLLECTION_TEMPLATES);
 
   let { templateWriter: tw } = getTemplateWriterInstance(["md"], eleventyConfig);
 
@@ -124,10 +233,10 @@ test("Collection of files sorted by date", async (t) => {
 });
 
 test("__testGetCollectionsData with custom collection (ascending)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
-    input: "test/stubs/collection2",
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
     output: "test/stubs/_site"
-  }, function(config) {
+  }, COLLECTION2_TEMPLATES, function(config) {
     config.addCollection("customPostsAsc", function (collection) {
       return collection.getFilteredByTag("post").sort(function (a, b) {
         return a.date - b.date;
@@ -145,10 +254,10 @@ test("__testGetCollectionsData with custom collection (ascending)", async (t) =>
 });
 
 test("__testGetCollectionsData with custom collection (descending)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
-    input: "test/stubs/collection2",
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
     output: "test/stubs/_site"
-  }, function(eleventyConfig) {
+  }, COLLECTION2_TEMPLATES, function(eleventyConfig) {
     eleventyConfig.addCollection("customPosts", function (collection) {
       return collection.getFilteredByTag("post").sort(function (a, b) {
         return b.date - a.date;
@@ -169,10 +278,10 @@ test("__testGetCollectionsData with custom collection (descending)", async (t) =
 });
 
 test("__testGetCollectionsData with custom collection (filter only to markdown input)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
-    input: "test/stubs/collection2",
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
     output: "test/stubs/_site"
-  }, function(config) {
+  }, COLLECTION2_TEMPLATES, function(config) {
     config.addCollection("onlyMarkdown", function (collection) {
       return collection.getAllSorted().filter(function (item) {
         let extension = item.inputPath.split(".").pop();
@@ -193,11 +302,21 @@ test("__testGetCollectionsData with custom collection (filter only to markdown i
 });
 
 test("Pagination with a Collection", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs/paged/collection",
-      output: "test/stubs/_site"
-    }
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
+    output: "test/stubs/_site"
+  }, {
+    ...PAGED_TAG1_TEMPLATES,
+    "consumer.njk": PAGED_CONSUMER,
+    "main.njk": `---
+pagination:
+  data: collections.tag1
+  size: 2
+tags:
+  - pagingtag
+---
+<ol>{% for item in pagination.items %}<li>{{ item.url }}</li>{% endfor %}</ol>
+`,
   });
 
   let { templateWriter: tw } = getTemplateWriterInstance(["njk"], eleventyConfig);
@@ -209,9 +328,9 @@ test("Pagination with a Collection", async (t) => {
   t.assert.strictEqual(collectionsData.tag1.length, 3);
   t.assert.strictEqual(collectionsData.pagingtag.length, 1);
 
-  let mapEntry = templateMap.getMapEntryForInputPath("./test/stubs/paged/collection/main.njk");
+  let mapEntry = templateMap.getMapEntryForInputPath("./test/stubs-virtual-nowrite/main.njk");
   t.assert.ok(mapEntry);
-  t.assert.strictEqual(mapEntry.inputPath, "./test/stubs/paged/collection/main.njk");
+  t.assert.strictEqual(mapEntry.inputPath, "./test/stubs-virtual-nowrite/main.njk");
   t.assert.strictEqual(mapEntry._pages.length, 2);
   t.assert.strictEqual(mapEntry._pages[0].outputPath, "./test/stubs/_site/main/index.html");
   t.assert.strictEqual(mapEntry._pages[1].outputPath, "./test/stubs/_site/main/1/index.html");
@@ -221,11 +340,27 @@ test("Pagination with a Collection", async (t) => {
 });
 
 test("Pagination with a Collection from another Paged Template", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs/paged/cfg-collection-tag-cfg-collection",
-      output: "test/stubs/_site"
-    }
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
+    output: "test/stubs/_site"
+  }, {
+    ...PAGED_TAG1_TEMPLATES,
+    "consumer.njk": PAGED_CONSUMER,
+    "paged-downstream.njk": `---
+pagination:
+  data: collections.pagingtag
+  size: 1
+---
+<ol>{% for item in pagination.items %}<li>{{ item.url }}</li>{% endfor %}</ol>`,
+    "paged-main.njk": `---
+pagination:
+  data: collections.tag1
+  size: 2
+  addAllPagesToCollections: true
+tags:
+  - pagingtag
+---
+<ol>{% for item in pagination.items %}<li>{{ item.url }}</li>{% endfor %}</ol>`,
   });
 
   let { templateWriter: tw } = getTemplateWriterInstance(["njk"], eleventyConfig);
@@ -238,24 +373,34 @@ test("Pagination with a Collection from another Paged Template", async (t) => {
   t.assert.strictEqual(collectionsData.pagingtag.length, 2);
 
   let map1 = templateMap.getMapEntryForInputPath(
-    "./test/stubs/paged/cfg-collection-tag-cfg-collection/paged-main.njk",
+    "./test/stubs-virtual-nowrite/paged-main.njk",
   );
   t.assert.strictEqual(map1._pages[0].templateContent.trim(), "<ol><li>/test1/</li><li>/test2/</li></ol>");
   t.assert.strictEqual(map1._pages[1].templateContent.trim(), "<ol><li>/test3/</li></ol>");
 
   let map2 = templateMap.getMapEntryForInputPath(
-    "./test/stubs/paged/cfg-collection-tag-cfg-collection/paged-downstream.njk",
+    "./test/stubs-virtual-nowrite/paged-downstream.njk",
   );
   t.assert.strictEqual(map2._pages[0].templateContent.trim(), "<ol><li>/paged-main/</li></ol>");
   t.assert.strictEqual(map2._pages[1].templateContent.trim(), "<ol><li>/paged-main/1/</li></ol>");
 });
 
 test("Pagination with a Collection (apply all pages to collections)", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs/paged/collection-apply-to-all",
-      output: "test/stubs/_site"
-    }
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
+    output: "test/stubs/_site"
+  }, {
+    ...PAGED_TAG1_TEMPLATES,
+    "consumer.njk": PAGED_CONSUMER,
+    "main.njk": `---
+pagination:
+  data: collections.tag1
+  size: 2
+  addAllPagesToCollections: true
+tags:
+  - pagingtag
+---
+<ol>{% for item in pagination.items %}<li>{{ item.url }}</li>{% endfor %}</ol>`,
   });
 
   let { templateWriter: tw } = getTemplateWriterInstance(["njk"], eleventyConfig);
@@ -268,13 +413,13 @@ test("Pagination with a Collection (apply all pages to collections)", async (t) 
   t.assert.strictEqual(collectionsData.pagingtag.length, 2);
 
   let mapEntry = templateMap.getMapEntryForInputPath(
-    "./test/stubs/paged/collection-apply-to-all/main.njk",
+    "./test/stubs-virtual-nowrite/main.njk",
   );
   t.assert.ok(mapEntry);
-  t.assert.strictEqual(mapEntry.inputPath, "./test/stubs/paged/collection-apply-to-all/main.njk");
+  t.assert.strictEqual(mapEntry.inputPath, "./test/stubs-virtual-nowrite/main.njk");
 
   let { template: mainTmpl } = tw.createTemplate(
-    "./test/stubs/paged/collection-apply-to-all/main.njk",
+    "./test/stubs-virtual-nowrite/main.njk",
   );
   let data = await mainTmpl.getData();
   let outputPath = await mainTmpl.getOutputPath(data);
@@ -299,11 +444,24 @@ test("Pagination with a Collection (apply all pages to collections)", async (t) 
 });
 
 test("Use a collection inside of a template", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs/collection-template",
-      output: "test/stubs/collection-template/_site"
-    }
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
+    output: "test/stubs/collection-template/_site"
+  }, {
+    "_includes/layout.liquid": `Layout
+
+{{ content }}`,
+    "dog1.liquid": `---
+tags:
+  - dog
+---`,
+    "template.liquid": `---
+layout: layout.liquid
+---
+Template
+
+All {{ collections.all | size }} templates
+Template {{ collections.dog | size }} dog`,
   });
 
   let { templateWriter: tw } = getTemplateWriterInstance(["liquid"], eleventyConfig);
@@ -315,13 +473,13 @@ test("Use a collection inside of a template", async (t) => {
   t.assert.strictEqual(collectionsData.dog.length, 1);
 
   let mapEntry = templateMap.getMapEntryForInputPath(
-    "./test/stubs/collection-template/template.liquid",
+    "./test/stubs-virtual-nowrite/template.liquid",
   );
   t.assert.ok(mapEntry);
-  t.assert.strictEqual(mapEntry.inputPath, "./test/stubs/collection-template/template.liquid");
+  t.assert.strictEqual(mapEntry.inputPath, "./test/stubs-virtual-nowrite/template.liquid");
 
   let { template: mainTmpl } = tw.createTemplate(
-    "./test/stubs/collection-template/template.liquid",
+    "./test/stubs-virtual-nowrite/template.liquid",
   );
   let data = await mainTmpl.getData();
   let outputPath = await mainTmpl.getOutputPath(data);
@@ -342,11 +500,24 @@ Template 1 dog`,
 });
 
 test("Use a collection inside of a layout", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs/collection-layout",
-      output: "test/stubs/collection-layout/_site"
-    }
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
+    output: "test/stubs/collection-layout/_site"
+  }, {
+    "_includes/layout.liquid": `Layout
+
+{{ content }}
+
+All {{ collections.all | size }} templates
+Layout {{ collections.dog | size }} dog`,
+    "dog1.liquid": `---
+tags:
+  - dog
+---`,
+    "template.liquid": `---
+layout: layout.liquid
+---
+Template`,
   });
 
   let { templateWriter: tw } = getTemplateWriterInstance(["liquid"], eleventyConfig);
@@ -358,12 +529,12 @@ test("Use a collection inside of a layout", async (t) => {
   t.assert.strictEqual(collectionsData.dog.length, 1);
 
   let mapEntry = templateMap.getMapEntryForInputPath(
-    "./test/stubs/collection-layout/template.liquid",
+    "./test/stubs-virtual-nowrite/template.liquid",
   );
   t.assert.ok(mapEntry);
-  t.assert.strictEqual(mapEntry.inputPath, "./test/stubs/collection-layout/template.liquid");
+  t.assert.strictEqual(mapEntry.inputPath, "./test/stubs-virtual-nowrite/template.liquid");
 
-  let { template: mainTmpl } = tw.createTemplate("./test/stubs/collection-layout/template.liquid");
+  let { template: mainTmpl } = tw.createTemplate("./test/stubs-virtual-nowrite/template.liquid");
   let data = await mainTmpl.getData();
   let outputPath = await mainTmpl.getOutputPath(data);
   t.assert.strictEqual(outputPath, "./test/stubs/collection-layout/_site/template/index.html");
@@ -419,10 +590,10 @@ test("Pagination and TemplateContent", async (t) => {
 });
 
 test("Custom collection returns array", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
-    input: "test/stubs/collection2",
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
     output: "test/stubs/_site"
-  }, function(config) {
+  }, COLLECTION2_TEMPLATES, function(config) {
     config.addCollection("returnAllInputPaths", function (collection) {
       return collection.getAllSorted().map(function (item) {
         return item.inputPath;
@@ -441,10 +612,10 @@ test("Custom collection returns array", async (t) => {
 });
 
 test("Custom collection returns a string", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
-    input: "test/stubs/collection2",
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
     output: "test/stubs/_site"
-  }, function(config) {
+  }, COLLECTION2_TEMPLATES, function(config) {
     config.addCollection("returnATestString", function () {
       return "test";
     });
@@ -458,10 +629,10 @@ test("Custom collection returns a string", async (t) => {
 });
 
 test("Custom collection returns an object", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
-    input: "test/stubs/collection2",
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
     output: "test/stubs/_site"
-  }, function(config) {
+  }, COLLECTION2_TEMPLATES, function(config) {
     config.addCollection("returnATestObject", function () {
       return { test: "value" };
     });
@@ -475,11 +646,15 @@ test("Custom collection returns an object", async (t) => {
 });
 
 test("fileSlug should exist in a collection", async (t) => {
-  let eleventyConfig = await getTemplateConfigInstance({
-    dir: {
-      input: "test/stubs/collection-slug",
-      output: "test/stubs/collection-slug/_site"
-    }
+  let eleventyConfig = await getVirtualConfig({
+    input: "test/stubs-virtual-nowrite",
+    output: "test/stubs/collection-slug/_site"
+  }, {
+    "dog1.njk": `---
+tags:
+  - dog
+---`,
+    "template.njk": `fileSlug:{% for post in collections.dog %}{{ post.url }}:{{ post.fileSlug }}{% endfor %}`,
   });
 
   let { templateWriter: tw } = getTemplateWriterInstance(["njk"], eleventyConfig);
@@ -490,9 +665,9 @@ test("fileSlug should exist in a collection", async (t) => {
   let collectionsData = await templateMap._testGetCollectionsData();
   t.assert.strictEqual(collectionsData.dog.length, 1);
 
-  let mapEntry = templateMap.getMapEntryForInputPath("./test/stubs/collection-slug/template.njk");
+  let mapEntry = templateMap.getMapEntryForInputPath("./test/stubs-virtual-nowrite/template.njk");
   t.assert.ok(mapEntry);
-  t.assert.strictEqual(mapEntry.inputPath, "./test/stubs/collection-slug/template.njk");
+  t.assert.strictEqual(mapEntry.inputPath, "./test/stubs-virtual-nowrite/template.njk");
 
   let templates = await getRenderedTmpls(mapEntry.template, mapEntry.data);
   t.assert.strictEqual(templates[0].templateContent.trim(), "fileSlug:/dog1/:dog1");

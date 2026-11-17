@@ -12,6 +12,10 @@ test("Custom extension (.txt) with custom permalink compile function", async (t)
     input: "test/stubs",
     output: "dist",
   }, function(cfg) {
+    cfg.addTemplate("custom-extension.txt", `---
+permalink: custom-extension.lit
+---
+Sample content`);
     cfg.extensionMap.add({
       extension: "txt",
       key: "txt",
@@ -61,6 +65,10 @@ test("Custom extension with and compileOptions.permalink = false", async (t) => 
     input: "test/stubs",
     output: "dist",
   }, function(cfg) {
+    cfg.addTemplate("custom-extension.txt", `---
+permalink: custom-extension.lit
+---
+Sample content`);
     cfg.extensionMap.add({
       extension: "txt",
       key: "txt",
@@ -103,6 +111,10 @@ test("Custom extension with and opt-out of permalink compilation", async (t) => 
     input: "test/stubs",
     output: "dist",
   }, function(cfg) {
+    cfg.addTemplate("custom-extension.txt", `---
+permalink: custom-extension.lit
+---
+Sample content`);
     cfg.extensionMap.add({
       extension: "txt",
       key: "txt",
@@ -145,6 +157,7 @@ test("Custom extension (.txt) with custom permalink compile function but no perm
     input: "test/stubs",
     output: "dist",
   }, function(cfg) {
+    cfg.addTemplate("custom-extension-no-permalink.txt", `Sample content`);
     cfg.extensionMap.add({
       extension: "txt",
       key: "txt",
@@ -195,6 +208,7 @@ test("Custom extension (.txt) with custom permalink compile function (that retur
     input: "test/stubs",
     output: "dist",
   }, function(cfg) {
+    cfg.addTemplate("custom-extension-no-permalink.txt", `Sample content`);
     cfg.extensionMap.add({
       extension: "txt",
       key: "txt",
@@ -243,6 +257,7 @@ test("Custom extension (.txt) with custom permalink compile function that return
     input: "test/stubs",
     output: "dist",
   }, function(cfg) {
+    cfg.addTemplate("custom-extension-no-permalink.txt", `Sample content`);
     cfg.extensionMap.add({
       extension: "txt",
       key: "txt",
@@ -291,6 +306,7 @@ test("Custom extension (.txt) that returns undefined from compile", async (t) =>
     input: "test/stubs",
     output: "dist",
   }, function(cfg) {
+    cfg.addTemplate("custom-extension-no-permalink.txt", `Sample content`);
     cfg.extensionMap.add({
       extension: "txt",
       key: "txt",

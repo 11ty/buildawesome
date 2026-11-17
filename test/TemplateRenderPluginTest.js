@@ -32,6 +32,13 @@ async function getTestOutput(input, configCallback = function () {}) {
   return result;
 }
 
+async function getTestOutputForTemplate(inputPath, content, configCallback = function () {}) {
+  return getTestOutputForFile("./test/stubs-virtual-nowrite/", ($config) => {
+    $config.addTemplate(inputPath, content);
+    configCallback($config);
+  });
+}
+
 async function getTestOutputForFile(inputFile, configCallback) {
   let result = await getTestOutput(inputFile, configCallback);
   let html = normalizeNewLines(result[0].content.trim());
@@ -39,7 +46,21 @@ async function getTestOutputForFile(inputFile, configCallback) {
 }
 
 test("Use liquid in nunjucks", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid.njk");
+  let html = await getTestOutputForTemplate("liquid.njk", `---
+# Nunjucks
+hi: nunjucksHi
+argData:
+  hi: liquidHi
+  bye: liquidBye
+---
+{%- set nunjucksVar = 69 -%}
+{{ hi }}
+{{ nunjucksVar }}
+{% renderTemplate "liquid", argData %}
+{% assign liquidVar = 138 %}
+* {{ hi }} test test {{ bye }} {{ liquidVar }}
+{% endrenderTemplate %}
+`);
   t.assert.strictEqual(
     html,
     `nunjucksHi
@@ -51,7 +72,28 @@ test("Use liquid in nunjucks", async (t) => {
 });
 
 test("Use liquid+markdown in 11ty.js", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid-md.11ty.cjs");
+  let html = await getTestOutputForTemplate("liquid-md.11ty.cjs", class {
+    data() {
+      return {
+        argData: {
+          hi: "javascriptHi",
+          bye: "javascriptBye",
+        },
+      };
+    }
+
+    async render(data) {
+      return this.renderTemplate(
+        `
+# Markdown
+{% assign t1 = 2 %}
+* {{ t1 }}
+`,
+        "liquid,md",
+        data.argData
+      );
+    }
+  });
   t.assert.strictEqual(
     html,
     `<h1>Markdown</h1>
@@ -62,18 +104,57 @@ test("Use liquid+markdown in 11ty.js", async (t) => {
 });
 
 test("Use nunjucks in 11ty.js", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/nunjucks.11ty.cjs");
+  let html = await getTestOutputForTemplate("nunjucks.11ty.cjs", class {
+    data() {
+      return {
+        argData: {
+          hi: "javascriptHi",
+          bye: "javascriptBye",
+        },
+      };
+    }
+
+    async render(data) {
+      return this.renderTemplate(
+        `
+* {{ hi | reverse }}
+`,
+        "njk",
+        data.argData
+      );
+    }
+  });
   t.assert.strictEqual(html, `* iHtpircsavaj`);
 });
 
 // This is not yet supported and currently throws an error.
 test.skip("Use 11ty.js in liquid", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/11tyjs.liquid");
+  let html = await getTestOutputForTemplate("11tyjs.liquid", `---
+hi: value
+argData:
+  hi: liquidHi
+  bye: liquidBye
+---
+{% renderTemplate "11ty.js" argData %}
+module.exports = "TESTING";
+{% endrenderTemplate %}
+`);
   t.assert.strictEqual(html, `TESTING`);
 });
 
 test("Use nunjucks in liquid", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/nunjucks.liquid");
+  let html = await getTestOutputForTemplate("nunjucks.liquid", `---
+hi: value
+argData:
+  hi: liquidHi
+  bye: liquidBye
+---
+{% renderTemplate "njk" argData %}
+{% set bye = "abldskjfl" %}
+* {{ hi | reverse }}
+* {{ bye | reverse }}
+{% endrenderTemplate %}
+`);
   t.assert.strictEqual(
     html,
     `* iHdiuqil
@@ -82,7 +163,16 @@ test("Use nunjucks in liquid", async (t) => {
 });
 
 test("Use markdown in liquid", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/md.liquid");
+  let html = await getTestOutputForTemplate("md.liquid", `---
+hi: value
+argData:
+  hi: liquidHi
+  bye: liquidBye
+---
+{% renderTemplate "md" argData %}
+# Hello {{ hi }}
+* Testing
+{% endrenderTemplate %}`);
   t.assert.strictEqual(
     html,
     `<h1>Hello {{ hi }}</h1>
@@ -122,7 +212,12 @@ test("Use nunjucks file in liquid but it doesn’t exist", async (t) => {
 });
 
 test("No syntax passed, uses parent page syntax: liquid", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/false.liquid");
+  let html = await getTestOutputForTemplate("false.liquid", `{% renderTemplate %}
+{% assign name = "Bruno" %}
+# Hello {{ name }}
+* Testing
+{% endrenderTemplate %}
+`);
   t.assert.strictEqual(
     html,
     `# Hello Bruno
@@ -131,7 +226,15 @@ test("No syntax passed, uses parent page syntax: liquid", async (t) => {
 });
 
 test("No syntax passed (uses parent page syntax), but does pass data: liquid", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/data-no-templatelang.liquid");
+  let html = await getTestOutputForTemplate("data-no-templatelang.liquid", `---
+argData:
+  name: Bruno
+---
+{% renderTemplate argData %}
+# Hello {{ name }}
+* Testing
+{% endrenderTemplate %}
+`);
   t.assert.strictEqual(
     html,
     `# Hello Bruno
@@ -147,24 +250,57 @@ test.skip("renderFile but the target has front matter.", async (t) => {
 
 // Idea from https://twitter.com/raymondcamden/status/1460961620247650312
 test("Capture nunjucks render output to a liquid variable", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/capture-njk.liquid");
+  let html = await getTestOutputForTemplate("capture-njk.liquid", `---
+argData:
+  num: 2
+---
+{% capture nunjucksOutput %}
+{% renderTemplate "njk", argData %}
+{% set njkVar = num * 2 %}
+{{ njkVar }}
+{% endrenderTemplate %}
+{% endcapture %}
+{{ nunjucksOutput }}`);
   t.assert.strictEqual(html, `4`);
 });
 
 // Idea from https://twitter.com/raymondcamden/status/1460961620247650312
 // Possibly blocked by async in {% set %} https://github.com/mozilla/nunjucks/issues/815
 test("Capture liquid render output to a njk variable", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/capture-liquid.njk");
+  let html = await getTestOutputForTemplate("capture-liquid.njk", `---
+argData:
+  num: 2
+---
+{% setAsync "liquidOutput" %}
+{% renderTemplate "liquid", argData %}
+{% assign liquidVar = num | times: 2 %}
+{{ liquidVar }}
+{% endrenderTemplate %}
+{% endsetAsync %}
+{{ liquidOutput }}`);
   t.assert.strictEqual(html, `4`);
 });
 
 test("Capture liquid render output to a njk variable (new async support for set)", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/capture-liquid-set.njk");
+  let html = await getTestOutputForTemplate("capture-liquid-set.njk", `---
+argData:
+  num: 2
+---
+{% set liquidOutput %}
+{% renderTemplate "liquid", argData %}
+{% assign liquidVar = num | times: 2 %}
+{{ liquidVar }}
+{% endrenderTemplate %}
+{% endset %}
+{{ liquidOutput }}`);
   t.assert.strictEqual(html, `4`);
 });
 
 test("Remap non-object data to data._ if object is not passed in", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/bad-data.njk");
+  let html = await getTestOutputForTemplate("bad-data.njk", `{% renderTemplate "liquid", "string" %}
+{{ _ }}
+{% endrenderTemplate %}
+`);
   t.assert.strictEqual(html, "string");
 });
 
@@ -278,41 +414,77 @@ tested.
 });
 
 test("Use page in renderTemplate (liquid in liquid)", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid-page.liquid");
+  let html = await getTestOutputForTemplate("liquid-page.liquid", `{% renderTemplate "liquid" %}
+{{ page.url }}
+{% endrenderTemplate %}
+`);
   t.assert.strictEqual(html, `/liquid-page/`);
 });
 
 test("Use page in renderTemplate (liquid in njk)", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid-page.njk");
+  let html = await getTestOutputForTemplate("liquid-page.njk", `{% renderTemplate "liquid" %}
+{{ page.url }}
+{% endrenderTemplate %}
+`);
   t.assert.strictEqual(html, `/liquid-page/`);
 });
 
 test("Use page in renderTemplate (njk in liquid)", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/njk-page.liquid");
+  let html = await getTestOutputForTemplate("njk-page.liquid", `{% renderTemplate "njk" %}
+{{ page.url }}
+{% endrenderTemplate %}
+`);
   t.assert.strictEqual(html, `/njk-page/`);
 });
 
 test("Use eleventy in renderTemplate (njk in liquid)", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/njk-eleventy.liquid");
+  let html = await getTestOutputForTemplate("njk-eleventy.liquid", `---
+---
+{% renderTemplate "njk" %}
+{{ eleventy.version }}
+{% endrenderTemplate %}
+`);
   t.assert.strictEqual(html.startsWith("4."), true);
 });
 
 test("Use eleventy in renderTemplate (liquid in njk)", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid-eleventy.njk");
+  let html = await getTestOutputForTemplate("liquid-eleventy.njk", `---
+---
+{% renderTemplate "liquid" %}
+{{ eleventy.version }}
+{% endrenderTemplate %}
+`);
   t.assert.strictEqual(html.startsWith("4."), true);
 });
 test.skip("Use nunjucks in liquid (access to all global data)", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/nunjucks-global.liquid");
+  let html = await getTestOutputForTemplate("nunjucks-global.liquid", `---
+hi: globalHi
+---
+{% renderTemplate "njk" %}
+{{ hi }}
+{% endrenderTemplate %}
+`);
   t.assert.strictEqual(html, `globalHi`);
 });
 
 test.skip("Use liquid in njk (access to all global data)", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/liquid-global.njk");
+  let html = await getTestOutputForTemplate("liquid-global.njk", `---
+hi: globalHi
+---
+{% renderTemplate "liquid" %}
+{{ hi }}123
+{% endrenderTemplate %}
+`);
   t.assert.strictEqual(html, `globalHi`);
 });
 
 test("renderContent filter #3369 #3370 via renderTemplate (njk)", async (t) => {
-  let html = await getTestOutputForFile("./test/stubs-render-plugin/nunjucks-frontmatter.njk", ($config) => {
+  let html = await getTestOutputForTemplate("nunjucks-frontmatter.njk", `---
+hi: "{% test %}"
+---
+{{ hi | renderContent("njk") }}
+{# {% renderTemplate "njk", hi %}{{ _ }}{% endrenderTemplate %} #}
+`, ($config) => {
     $config.addShortcode("test", () => "test content")
   });
   t.assert.strictEqual(html, "test content");

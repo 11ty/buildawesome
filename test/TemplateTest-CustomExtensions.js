@@ -12,6 +12,10 @@ test("Using getData: false without getInstanceFromInputPath works ok", async (t)
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("custom-extension.txt", `---
+permalink: custom-extension.lit
+---
+Sample content`);
     cfg.extensionMap.add({
       extension: "txt",
       key: "txt",
@@ -48,6 +52,10 @@ test("Using getData: true without getInstanceFromInputPath should error", async 
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("custom-extension.txt", `---
+permalink: custom-extension.lit
+---
+Sample content`);
     cfg.extensionMap.add({
       extension: "txt",
       key: "txt",
@@ -87,6 +95,10 @@ test("Using getData: [] without getInstanceFromInputPath should error", async (t
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("custom-extension.txt", `---
+permalink: custom-extension.lit
+---
+Sample content`);
     cfg.extensionMap.add({
       extension: "txt",
       key: "txt",
@@ -130,6 +142,10 @@ test("Using getData: true and getInstanceFromInputPath to get data from instance
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("custom-extension.txt", `---
+permalink: custom-extension.lit
+---
+Sample content`);
     cfg.extensionMap.add({
       extension: "txt",
       key: "txt",
@@ -175,6 +191,10 @@ test("Using eleventyDataKey to get a different key data from instance", async (t
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("custom-extension.txt", `---
+permalink: custom-extension.lit
+---
+Sample content`);
     cfg.extensionMap.add({
       extension: "txt",
       key: "txt",
@@ -217,6 +237,7 @@ test("Uses default renderer (no compile function) when you override an existing 
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("default.liquid", `{{ "hi" }}`);
     cfg.extensionMap.add({
       extension: "liquid",
       key: "liquid",
@@ -248,6 +269,7 @@ test("Access to default renderer when you override an existing extension", async
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("default.liquid", `{{ "hi" }}`);
 		cfg.extensionMap.add({
 			extension: "liquid",
 			key: "liquid",
@@ -286,6 +308,8 @@ test("Overridden liquid gets used from a markdown template", async (t) => {
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("default.md", `{{ "hi" }}
+`);
 		cfg.extensionMap.add({
 			extension: "liquid",
 			key: "liquid",
@@ -325,6 +349,8 @@ test("Use marked for markdown", async (t) => {
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("default-no-liquid.md", `hi
+`);
 		cfg.extensionMap.add({
 			extension: "md",
 			key: "md",
@@ -364,6 +390,8 @@ test("Use defaultRenderer for markdown", async (t) => {
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("default.md", `{{ "hi" }}
+`);
 		cfg.extensionMap.add({
 			extension: "md",
 			key: "md",
@@ -401,6 +429,10 @@ test("Front matter in a custom extension", async (t) => {
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("default-frontmatter.txt", `---
+frontmatter: 1
+---
+hi`);
 		cfg.extensionMap.add({
 			extension: "txt",
 			key: "txt",
@@ -438,6 +470,7 @@ test("Access to default renderer when you override an existing extension (async 
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("default.liquid", `{{ "hi" }}`);
 		cfg.extensionMap.add({
 			extension: "liquid",
 			key: "liquid",
@@ -476,6 +509,7 @@ test("Access to default renderer when you override an existing extension (async 
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("default.liquid", `{{ "hi" }}`);
 		cfg.extensionMap.add({
 			extension: "liquid",
 			key: "liquid",
@@ -512,6 +546,10 @@ test("Return undefined in compile to ignore #2267", async (t) => {
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("custom-extension.txt", `---
+permalink: custom-extension.lit
+---
+Sample content`);
 		cfg.extensionMap.add({
 			extension: "txt",
 			key: "txt",
@@ -545,6 +583,10 @@ test("Return undefined in compile to ignore (async compile function) #2350", asy
   let eleventyConfig = await getTemplateConfigInstanceCustomCallback({
     input: "test/stubs"
   }, function(cfg) {
+    cfg.addTemplate("custom-extension.txt", `---
+permalink: custom-extension.lit
+---
+Sample content`);
 		cfg.extensionMap.add({
 			extension: "txt",
 			key: "txt",

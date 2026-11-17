@@ -14,7 +14,7 @@ import TemplateMap from "../src/TemplateMap.js";
 import TemplateConfig from "../src/TemplateConfig.js";
 import { getCreatedTimestamp, getUpdatedTimestamp } from "../src/Util/Git.js";
 import PathNormalizer from "../src/Util/PathNormalizer.js";
-import { normalizeNewLines, localizeNewLines } from "./Util/normalizeNewLines.js";
+import { normalizeNewLines } from "./Util/normalizeNewLines.js";
 import { isTypeScriptSupported } from "../src/Util/TypeScriptFeatureTest.cjs";
 import { deleteDirectory } from "./_testHelpers.js";
 
@@ -314,8 +314,16 @@ test("Throwing buildawesome.aftererror listener does not mask the original error
   t.assert.strictEqual(e.message, "Having trouble rendering njk template ./test/stubs/exitCode/failure.njk");
 });
 
+function addToJsonTemplates($config) {
+  $config.addTemplate("test.md", "# hi\n");
+  $config.addTemplate("test2.liquid", `---
+hi: hello
+---
+{{ hi }}`);
+}
+
 test("Eleventy to json", async (t) => {
-  let elev = new Eleventy("./test/stubs--to/");
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", undefined, { config: addToJsonTemplates });
   elev.setIsVerbose(false);
 
   let result = await elev.toJSON();
@@ -325,9 +333,9 @@ test("Eleventy to json", async (t) => {
     [
       {
         url: "/test/",
-        inputPath: "./test/stubs--to/test.md",
+        inputPath: "./test/stubs-virtual-nowrite/test.md",
         outputPath: "./_site/test/index.html",
-        rawInput: localizeNewLines("# hi\n"),
+        rawInput: "# hi\n",
         content: "<h1>hi</h1>\n",
       },
     ]
@@ -337,7 +345,7 @@ test("Eleventy to json", async (t) => {
     [
       {
         url: "/test2/",
-        inputPath: "./test/stubs--to/test2.liquid",
+        inputPath: "./test/stubs-virtual-nowrite/test2.liquid",
         outputPath: "./_site/test2/index.html",
         rawInput: "{{ hi }}",
         content: "hello",
@@ -378,7 +386,7 @@ test("Config propagates to other instances correctly", async (t) => {
 });
 
 test("Eleventy programmatic API without init", async (t) => {
-  let elev = new Eleventy("./test/stubs--to/");
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", undefined, { config: addToJsonTemplates });
   elev.setIsVerbose(false);
 
   let result = await elev.toJSON();
@@ -388,9 +396,9 @@ test("Eleventy programmatic API without init", async (t) => {
     [
       {
         url: "/test/",
-        inputPath: "./test/stubs--to/test.md",
+        inputPath: "./test/stubs-virtual-nowrite/test.md",
         outputPath: "./_site/test/index.html",
-        rawInput: localizeNewLines("# hi\n"),
+        rawInput: "# hi\n",
         content: "<h1>hi</h1>\n",
       },
     ]
@@ -400,7 +408,7 @@ test("Eleventy programmatic API without init", async (t) => {
     [
       {
         url: "/test2/",
-        inputPath: "./test/stubs--to/test2.liquid",
+        inputPath: "./test/stubs-virtual-nowrite/test2.liquid",
         outputPath: "./_site/test2/index.html",
         rawInput: `{{ hi }}`,
         content: "hello",
@@ -410,7 +418,7 @@ test("Eleventy programmatic API without init", async (t) => {
 });
 
 test("Can Eleventy run two executeBuilds in parallel?", async (t) => {
-  let elev = new Eleventy("./test/stubs--to/");
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", undefined, { config: addToJsonTemplates });
   elev.setIsVerbose(false);
 
   let p1 = elev.toJSON();
@@ -420,9 +428,9 @@ test("Can Eleventy run two executeBuilds in parallel?", async (t) => {
   let test1Result = [
     {
       url: "/test/",
-      inputPath: "./test/stubs--to/test.md",
+      inputPath: "./test/stubs-virtual-nowrite/test.md",
       outputPath: "./_site/test/index.html",
-      rawInput: localizeNewLines("# hi\n"),
+      rawInput: "# hi\n",
       content: "<h1>hi</h1>\n",
     },
   ];
@@ -430,7 +438,7 @@ test("Can Eleventy run two executeBuilds in parallel?", async (t) => {
   let test2Result = [
     {
       url: "/test2/",
-      inputPath: "./test/stubs--to/test2.liquid",
+      inputPath: "./test/stubs-virtual-nowrite/test2.liquid",
       outputPath: "./_site/test2/index.html",
       rawInput: "{{ hi }}",
       content: "hello",
@@ -457,7 +465,15 @@ test("Can Eleventy run two executeBuilds in parallel?", async (t) => {
 });
 
 test("Unicode in front matter `tags`, issue #670", async (t) => {
-  let elev = new Eleventy("./test/stubs-670/", "./test/stubs-670/_site");
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
+    config: function ($config) {
+      $config.addTemplate("content.njk", `---
+tags:
+  - Cañon City
+---`);
+      $config.addTemplate("index.njk", `{{ collections | length }},{% for key,item in collections %}{{ key }},{% endfor %}`);
+    },
+  });
 
   let results = await elev.toJSON();
   results.sort((a, b) => {
@@ -488,7 +504,23 @@ test("git getUpdatedTimestamp returns undefined on nonexistent path", async (t) 
 });
 
 test("#2167: Pagination with permalink: false", async (t) => {
-  let elev = new Eleventy("./test/stubs-2167/", "./test/stubs-2167/_site");
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
+    config: function ($config) {
+      $config.addTemplate("paginated.njk", `---
+dropdown:
+  - a
+  - b
+  - c
+  - d
+  - e
+pagination:
+  data: dropdown
+  size: 1
+permalink: false
+---
+`);
+    },
+  });
   elev.disableLogger();
   elev.setDryRun(true);
 
@@ -502,10 +534,24 @@ test("#2167: Pagination with permalink: false", async (t) => {
 test("Pagination over collection using eleventyComputed (liquid)", async (t) => {
   t.plan(5);
   let elev = new Eleventy(
-    "./test/stubs-pagination-computed-quotes/",
-    "./test/stubs-pagination-computed-quotes/_site",
+    "./test/stubs-virtual-nowrite/",
+    "./test/stubs-virtual-nowrite/_site",
     {
       config: function ($config) {
+        $config.addTemplate("post.liquid", `---
+tags: posts
+---
+No`);
+        $config.addTemplate("test.liquid", `---
+pagination:
+  data: "collections.posts"
+  size: 1
+quotes:
+  - The person that shared this is awesome
+eleventyComputed:
+  quote: "{{ quotes | selectRandomFromArray }}"
+---
+{{ quote }}`);
         $config.addFilter("selectRandomFromArray", (arr) => {
           t.assert.strictEqual(Array.isArray(arr), true);
           t.assert.deepStrictEqual(arr, ["The person that shared this is awesome"]);
@@ -525,10 +571,24 @@ test("Pagination over collection using eleventyComputed (liquid)", async (t) => 
 test("Pagination over collection using eleventyComputed (njk)", async (t) => {
   t.plan(5);
   let elev = new Eleventy(
-    "./test/stubs-pagination-computed-quotes-njk/",
-    "./test/stubs-pagination-computed-quotes-njk/_site",
+    "./test/stubs-virtual-nowrite/",
+    "./test/stubs-virtual-nowrite/_site",
     {
       config: function ($config) {
+        $config.addTemplate("post.njk", `---
+tags: posts
+---
+No`);
+        $config.addTemplate("test.njk", `---
+pagination:
+  data: "collections.posts"
+  size: 1
+quotes:
+  - The person that shared this is awesome
+eleventyComputed:
+  quote: "{{ quotes | selectRandomFromArray }}"
+---
+{{ quote }}`);
         $config.addFilter("selectRandomFromArray", (arr) => {
           t.assert.strictEqual(Array.isArray(arr), true);
           t.assert.deepStrictEqual(arr, ["The person that shared this is awesome"]);
@@ -564,8 +624,20 @@ test("Paginated template uses proxy and global data", async (t) => {
 test("Liquid shortcode with multiple arguments(issue #2348)", async (t) => {
   // NOTE issue #2348 was only active when you were processing multiple templates at the same time.
 
-  let elev = new Eleventy("./test/stubs-2367/", "./test/stubs-2367/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     config: function ($config) {
+      $config.addTemplate("templateWithLiquidShortcodeMultipleArguments.liquid", `---
+layout: layout.liquid
+---`);
+      $config.addTemplate("templateWithLiquidShortcodeMultipleArguments-template2.liquid", `---
+layout: layout.liquid
+---`);
+      $config.addTemplate("_includes/layout.liquid", `---
+text: layout
+url: "/mylayout"
+---
+{% simplelink text url text url text url %}
+{% simplelink text, url, text, url, text, url %}`);
       $config.addShortcode("simplelink", function (...args) {
         return JSON.stringify(args);
       });
@@ -731,8 +803,17 @@ test("Lodash get (for pagination data target) object key with spaces, issue #285
 });
 
 test("Eleventy tag collection with spaces in the tag name, issue #2851", async (t) => {
-  let elev = new Eleventy("./test/stubs-2851", "./test/stubs-2851/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     config: function ($config) {
+      $config.addTemplate("paginated.njk", `---
+pagination:
+  data: "collections['tag with spaces']"
+  size: 1
+---
+`);
+      $config.addTemplate("content.njk", `---
+tags: ['tag with spaces']
+---`);
       $config.dataFilterSelectors.add("collections");
     },
   });
@@ -747,8 +828,11 @@ test("Eleventy tag collection with spaces in the tag name, issue #2851", async (
 test("this.eleventy on JavaScript template functions, issue #2790", async (t) => {
   t.plan(3);
 
-  let elev = new Eleventy("./test/stubs-2790", "./test/stubs-2790/_site", {
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
     config: function ($config) {
+      $config.addTemplate("page.11ty.cjs", function ({ name }) {
+        return `<p>${this.jsfunction(name)}</p>`;
+      });
       $config.addJavaScriptFunction("jsfunction", function () {
         t.assert.ok(this.eleventy);
         return this.eleventy.generator.split(" ")[0];
@@ -798,8 +882,14 @@ function sortResultsBy(results, key = "content") {
 }
 
 test("Access to raw input of file (toJSON), issue #1206", async (t) => {
-  let elev = new Eleventy("./test/stubs-1206", "./test/stubs-1206/_site", {
-    config: function ($config) {},
+  let elev = new Eleventy("./test/stubs-virtual-nowrite/", "./test/stubs-virtual-nowrite/_site", {
+    config: function ($config) {
+      $config.addTemplate("page1.njk", `---
+tags: tag1
+---
+This is the first template.{{ page.rawInput }}`);
+      $config.addTemplate("page2.njk", `This is the second template.{{ collections.tag1[0].rawInput }}`);
+    },
   });
   let results = await elev.toJSON();
   sortResultsBy(results, "content");
