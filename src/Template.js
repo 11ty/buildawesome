@@ -30,8 +30,8 @@ const { set: lodashSet, get: lodashGet } = lodash;
 
 const debug = createDebug("Template");
 
-// logger => Set of computed data paths already warned about
-const earlyReadWarnings = new WeakMap();
+// logger => Set of warning ids already logged
+const warnedIds = new WeakMap();
 // data => layout key whose front matter is merged into that data
 const mergedLayoutKeys = new WeakMap();
 
@@ -401,12 +401,29 @@ class Template extends TemplateContent {
 		}
 
 		// No `permalink` specified in data cascade, do the default
+		let subfolder = this.getTemplateSubfolder();
+		let fileExtension = this.engine.defaultTemplateFileExtension;
+		let collapseMatchingFolder = this.config.permalinkCollapseMatchingFolder;
+		if (
+			!collapseMatchingFolder &&
+			!this.eleventyConfig.userConfig.checkErrorReporting("collapsedMatchingFolder", "allow") &&
+			fileExtension === "html" &&
+			this.baseFile !== "index" &&
+			TemplatePermalink._hasDuplicateFolder(subfolder, this.baseFile)
+		) {
+			this.#warnOnce(
+				`collapse-matching-folder:${this.inputPath}`,
+				`${this.inputPath} now writes to \`${subfolder}/${this.baseFile}/index.html\` instead of \`${subfolder}/index.html\` (changed in v4: file names that match their parent folder are no longer collapsed). Use \`$config.setPermalinkCollapseMatchingFolder(true)\` to restore the old behavior, or \`$config.configureErrorReporting({ collapsedMatchingFolder: "allow" })\` to silence this warning.`,
+			);
+		}
+
 		let p = TemplatePermalink.generate(
-			this.getTemplateSubfolder(),
+			subfolder,
 			this.baseFile,
 			this.extraOutputSubdirectory,
-			this.engine.defaultTemplateFileExtension,
+			fileExtension,
 			isDynamicPermalinkEnabled,
+			collapseMatchingFolder,
 		);
 		p.setUrlTransforms(this.config.urlTransforms);
 		return p;
@@ -775,10 +792,10 @@ class Template extends TemplateContent {
 
 	// One warning per path (not per page), per logger (Eleventy instance)
 	#warnOnce(id, message) {
-		if (!earlyReadWarnings.has(this.logger)) {
-			earlyReadWarnings.set(this.logger, new Set());
+		if (!warnedIds.has(this.logger)) {
+			warnedIds.set(this.logger, new Set());
 		}
-		let warned = earlyReadWarnings.get(this.logger);
+		let warned = warnedIds.get(this.logger);
 		if (warned.has(id)) {
 			return;
 		}

@@ -522,13 +522,13 @@ test("Paginate external data file", async (t) => {
   let pages = await tmpl.getTemplates(data);
   t.assert.strictEqual(pages.length, 2);
 
-  t.assert.strictEqual(pages[0].outputPath, "./dist/paged/index.html");
+  t.assert.strictEqual(pages[0].outputPath, "./dist/paged/paged/index.html");
   t.assert.strictEqual(
     (await renderTemplate(pages[0].template, pages[0].data)).trim(),
     "<ol><li>item1</li><li>item2</li><li>item3</li><li>item4</li><li>item5</li></ol>"
   );
 
-  t.assert.strictEqual(pages[1].outputPath, "./dist/paged/1/index.html");
+  t.assert.strictEqual(pages[1].outputPath, "./dist/paged/paged/1/index.html");
   t.assert.strictEqual(
     (await renderTemplate(pages[1].template, pages[1].data)).trim(),
     "<ol><li>item6</li><li>item7</li><li>item8</li></ol>"

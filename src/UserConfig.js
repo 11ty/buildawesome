@@ -168,6 +168,7 @@ export default class UserConfig {
 
 		this.activeNamespace = "";
 		this.dynamicPermalinks = true;
+		this.permalinkCollapseMatchingFolder = false;
 
 		this.useGitIgnore = true;
 
@@ -892,6 +893,11 @@ export default class UserConfig {
 		this.dynamicPermalinks = !!enabled;
 	}
 
+	// `true` restores the pre-v4 default of writing `dir/dir.md` to `dir/index.html`
+	setPermalinkCollapseMatchingFolder(enabled) {
+		this.permalinkCollapseMatchingFolder = !!enabled;
+	}
+
 	setUseGitIgnore(enabled) {
 		this.useGitIgnore = !!enabled;
 	}
@@ -1374,6 +1380,7 @@ export default class UserConfig {
 
 			libraryOverrides: this.libraryOverrides,
 			dynamicPermalinks: this.dynamicPermalinks,
+			permalinkCollapseMatchingFolder: this.permalinkCollapseMatchingFolder,
 			useGitIgnore: this.useGitIgnore,
 			ignores: this.ignores,
 			watchIgnores: this.watchIgnores,

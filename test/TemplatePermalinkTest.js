@@ -122,8 +122,12 @@ test("Permalink matching folder and filename", (t) => {
   t.assert.strictEqual(hasDupe("component", "component"), true);
   t.assert.strictEqual(hasDupe("component/", "component"), true);
 
-  t.assert.strictEqual(generate("component/", "component").toOutputPath(), "component/index.html");
-  t.assert.strictEqual(generate("component/", "component").toHref(), "/component/");
+  t.assert.strictEqual(generate("component/", "component").toOutputPath(), "component/component/index.html");
+  t.assert.strictEqual(generate("component/", "component").toHref(), "/component/component/");
+
+  let legacy = generate("component/", "component", undefined, "html", undefined, true);
+  t.assert.strictEqual(legacy.toOutputPath(), "component/index.html");
+  t.assert.strictEqual(legacy.toHref(), "/component/");
 });
 
 test("Permalink Object, build alias", (t) => {

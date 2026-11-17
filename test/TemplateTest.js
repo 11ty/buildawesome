@@ -181,7 +181,7 @@ test("subfolder outputs to a subfolder", async (t) => {
   let data = await tmpl.getData();
   t.assert.strictEqual(tmpl.parsed.dir, "./test/stubs/subfolder");
   t.assert.strictEqual(tmpl.getTemplateSubfolder(), "subfolder");
-  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subfolder/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subfolder/subfolder/index.html");
 });
 
 test("subfolder outputs to double subfolder", async (t) => {
@@ -194,7 +194,7 @@ test("subfolder outputs to double subfolder", async (t) => {
   let data = await tmpl.getData();
   t.assert.strictEqual(tmpl.parsed.dir, "./test/stubs/subfolder/subfolder");
   t.assert.strictEqual(tmpl.getTemplateSubfolder(), "subfolder/subfolder");
-  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subfolder/subfolder/index.html");
+  t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subfolder/subfolder/subfolder/index.html");
 });
 
 test("HTML files output to the same as the input directory have a file suffix added (only if index, this is not index).", async (t) => {

@@ -157,10 +157,12 @@ class TemplatePermalink {
 		extraSubdir,
 		fileExtension = "html",
 		isDynamicPermalinkEnabled,
+		collapseMatchingFolder = false,
 	) {
 		let path;
 		if (fileExtension === "html") {
-			let hasDupeFolder = TemplatePermalink._hasDuplicateFolder(dir, filenameNoExt);
+			let hasDupeFolder =
+				collapseMatchingFolder && TemplatePermalink._hasDuplicateFolder(dir, filenameNoExt);
 
 			path =
 				(dir ? dir + "/" : "") +
