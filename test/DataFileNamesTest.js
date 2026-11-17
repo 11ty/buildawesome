@@ -48,6 +48,29 @@ test("setDataFileNames `{ext}` includes user data extensions but not JavaScript"
   ]);
 });
 
+test("setDataFileNames `{ext}` excludes JavaScript even when added as a data extension", async (t) => {
+  let paths = await getPaths(function(cfg) {
+    cfg.addDataExtension("js, mjs", () => ({}));
+    cfg.setDataFileNames({ template: [], directory: ["_data.{ext}"] });
+  });
+
+  t.assert.deepStrictEqual(paths, ["./test/stubs/_data.json", "./test/stubs/component/_data.json"]);
+});
+
+test("Legacy suffixes still include JavaScript added as a data extension", async (t) => {
+  let paths = await getPaths(function(cfg) {
+    cfg.addDataExtension("js", () => ({}));
+    cfg.setDataFileSuffixes([""]);
+  });
+
+  t.assert.deepStrictEqual(paths, [
+    "./test/stubs/stubs.js",
+    "./test/stubs/stubs.json",
+    "./test/stubs/component/component.js",
+    "./test/stubs/component/component.json",
+  ]);
+});
+
 test("setDataFileNames `{js}` opts into JavaScript data files", async (t) => {
   let paths = await getPaths(function(cfg) {
     cfg.setDataFileNames({ template: [], directory: ["_data.{js}"] });

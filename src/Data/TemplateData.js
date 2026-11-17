@@ -275,40 +275,59 @@ class TemplateData {
 	}
 
 	// Highest priority first
-	#getPatternExtensions(token) {
+	#getPatternExtensions(token, isUserPattern) {
 		if (token === "js") {
 			return this.#eligibleJavaScriptExtensions;
 		}
-		return ["json", ...this.getUserDataExtensions()];
+
+		let extensions = ["json", ...this.getUserDataExtensions()];
+		if (!isUserPattern) {
+			return extensions;
+		}
+
+		// `setDataFileNames` patterns never include extensions that would be imported and executed
+		return extensions.filter(
+			(extension) => !this.#eligibleJavaScriptExtensions.includes(extension),
+		);
 	}
 
-	#expandDataFileName(pattern, name) {
+	// Legacy patterns converted from `setDataFileSuffixes` keep their original behavior
+	#isUserPattern(type) {
+		return Boolean(this.config.dataFileNames?.[type]);
+	}
+
+	#expandDataFileName(pattern, name, isUserPattern) {
 		let fileName = pattern.replaceAll("{name}", name);
 		let match = fileName.match(/\{(ext|js)\}/);
 		if (!match) {
 			return [fileName];
 		}
 
-		return this.#getPatternExtensions(match[1]).flatMap((extension) =>
-			this.#expandDataFileName(fileName.replace(match[0], extension), name),
+		return this.#getPatternExtensions(match[1], isUserPattern).flatMap((extension) =>
+			this.#expandDataFileName(fileName.replace(match[0], extension), name, isUserPattern),
 		);
 	}
 
-	#pushDataFilePaths(paths, dir, patterns, name) {
-		for (let pattern of patterns) {
+	#pushDataFilePaths(paths, dir, type, name) {
+		let isUserPattern = this.#isUserPattern(type);
+		for (let pattern of this.getDataFileNames()[type]) {
 			if (pattern.includes("{name}") && (!name || name === ".")) {
 				continue;
 			}
-			for (let fileName of this.#expandDataFileName(pattern, name)) {
+			for (let fileName of this.#expandDataFileName(pattern, name, isUserPattern)) {
 				paths.push(dir + "/" + fileName);
 			}
 		}
 	}
 
 	#getDataFileNameGlobs() {
-		let { template, directory } = this.getDataFileNames();
+		let names = this.getDataFileNames();
 		return unique(
-			[...template, ...directory].flatMap((pattern) => this.#expandDataFileName(pattern, "*")),
+			["template", "directory"].flatMap((type) =>
+				names[type].flatMap((pattern) =>
+					this.#expandDataFileName(pattern, "*", this.#isUserPattern(type)),
+				),
+			),
 		);
 	}
 
@@ -739,11 +758,10 @@ class TemplateData {
 		let parsed = path.parse(templatePath);
 
 		if (parsed.dir) {
-			let { template } = this.getDataFileNames();
 			let fileNameNoExt = this.extensionMap.removeTemplateExtension(parsed.base);
 
-			debug("Using %o patterns to find template data files.", template);
-			this.#pushDataFilePaths(paths, parsed.dir, template, fileNameNoExt);
+			debug("Using %o patterns to find template data files.", this.getDataFileNames().template);
+			this.#pushDataFilePaths(paths, parsed.dir, "template", fileNameNoExt);
 
 			paths.push(...this.#getDirectoryDataPaths(parsed.dir));
 		}
@@ -761,12 +779,11 @@ class TemplateData {
 
 		let paths = [];
 		let inputDir = this.inputDir;
-		let { directory } = this.getDataFileNames();
 
 		for (let dir of TemplatePath.getAllDirs(parsedDir)) {
 			// TODO use DirContains
 			if (!inputDir || (dir.startsWith(inputDir) && dir !== inputDir)) {
-				this.#pushDataFilePaths(paths, dir, directory, TemplatePath.getLastPathSegment(dir));
+				this.#pushDataFilePaths(paths, dir, "directory", TemplatePath.getLastPathSegment(dir));
 			}
 		}
 
@@ -777,7 +794,12 @@ class TemplateData {
 					TemplatePath.join(inputDir, TemplatePath.getLastPathSegment(inputDir)),
 				),
 			);
-			this.#pushDataFilePaths(paths, rootDir, directory, TemplatePath.getLastPathSegment(inputDir));
+			this.#pushDataFilePaths(
+				paths,
+				rootDir,
+				"directory",
+				TemplatePath.getLastPathSegment(inputDir),
+			);
 		}
 
 		this.#directoryDataPaths.set(parsedDir, paths);
