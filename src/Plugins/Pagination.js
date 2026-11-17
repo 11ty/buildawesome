@@ -83,6 +83,9 @@ class Pagination {
 
 		this.size = data.pagination.size;
 		this.alias = data.pagination.alias;
+		// `filter` is an alias for `exclude`, Issue #2522
+		let excluded = data.pagination.exclude ?? data.pagination.filter ?? [];
+		this.excluded = Array.isArray(excluded) ? excluded : [excluded];
 		this.fullDataSet = this._getDataSet();
 		// this returns an array
 		this.target = this._resolveItems();
@@ -110,19 +113,6 @@ class Pagination {
 		if ("resolve" in this.data.pagination) {
 			return this.data.pagination.resolve === "values";
 		}
-		return false;
-	}
-
-	isFiltered(value) {
-		if ("filter" in this.data.pagination) {
-			let filtered = this.data.pagination.filter;
-			if (Array.isArray(filtered)) {
-				return filtered.indexOf(value) > -1;
-			}
-
-			return filtered === value;
-		}
-
 		return false;
 	}
 
@@ -175,8 +165,8 @@ class Pagination {
 			result = result.reverse();
 		}
 
-		if (this.data.pagination.filter) {
-			result = result.filter((value) => !this.isFiltered(value));
+		if (this.excluded.length > 0) {
+			result = result.filter((value) => !this.excluded.includes(value));
 		}
 
 		return result;

@@ -501,6 +501,32 @@ test("Page over an object (filtered, array)", async (t) => {
   );
 });
 
+test("Page over an object (exclude, array)", async (t) => {
+  let tmpl = await getNewTemplate(
+    "./test/stubs/paged/pagedobjectexcludearray.njk",
+    "./test/stubs/",
+    "./dist"
+  );
+
+  let data = await tmpl.getData();
+  let pages = await tmpl.getTemplates(data);
+
+  t.assert.strictEqual(
+    (await renderTemplate(pages[0].template, pages[0].data)).trim(),
+    "<ol><li>item1</li><li>item2</li><li>item3</li><li>item5</li></ol>"
+  );
+});
+
+test("Pagination `exclude` with a falsy value", async (t) => {
+  let tmpl = await getNewTemplate("./test/stubs/paged/notpaged.njk", "./test/stubs/", "./dist");
+  let paging = new Pagination(
+    tmpl,
+    { pagination: { data: "items", size: 1, exclude: 0 }, items: [0, 1, 2] },
+    tmpl.config
+  );
+  t.assert.deepStrictEqual(paging.target, [1, 2]);
+});
+
 test("Page over an object (filtered, string)", async (t) => {
   let tmpl = await getNewTemplate(
     "./test/stubs/paged/pagedobjectfilterstring.njk",
