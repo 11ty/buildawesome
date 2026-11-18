@@ -261,3 +261,9 @@ test("Version checking for plugin compatibility >=2.0.0-canary.19 || >=2.0.0-bet
   t.assert.strictEqual(EleventyCompatibility.satisfies("3.0.0-beta.1", range), true);
   t.assert.strictEqual(EleventyCompatibility.satisfies("3.0.0", range), true);
 });
+
+test("Incompatible range error message", (t) => {
+  let compat = new EleventyCompatibility(">=999");
+  t.assert.strictEqual(compat.isCompatible(), false);
+  t.assert.ok(compat.getErrorMessage().includes("required version range: '>=999'"));
+});

@@ -12,6 +12,8 @@ test("normalizeSeparator", (t) => {
 });
 
 test("getParts", (t) => {
+  t.assert.deepStrictEqual(PathNormalizer.getParts(""), []);
+  t.assert.deepStrictEqual(PathNormalizer.getParts(undefined), []);
   t.assert.deepStrictEqual(PathNormalizer.getParts("."), []);
   t.assert.deepStrictEqual(PathNormalizer.getParts("test/a/b"), ["test", "a", "b"]);
   t.assert.deepStrictEqual(PathNormalizer.getParts("test\\a\\b".replace(/\\/g, path.sep)), ["test", "a", "b"]);

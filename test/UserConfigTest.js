@@ -192,6 +192,12 @@ test("Resolve plugin", async (t) => {
   t.assert.ok(typeof plugin === "function")
 });
 
+test("Resolve plugin (async import)", async (t) => {
+  let userConfig = new UserConfig();
+  let plugin = await userConfig.resolvePlugin("@11ty/eleventy/render-plugin");
+  t.assert.ok(typeof plugin === "function")
+});
+
 test("Resolve plugin (invalid)", async (t) => {
   let userConfig = new UserConfig();
   let e;

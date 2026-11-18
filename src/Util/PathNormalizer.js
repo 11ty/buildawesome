@@ -1,4 +1,4 @@
-import { parse, sep } from "node:path";
+import { sep } from "node:path";
 import { TemplatePath } from "@11ty/eleventy-utils";
 import { fileURLToPath } from "../Adapters/Packages/url.js";
 
@@ -36,20 +36,6 @@ export default class PathNormalizer {
 			return inputPath;
 		}
 		return inputPath.split(sep).join("/");
-	}
-
-	static addTrailingSlashToDirectory(dir) {
-		if (dir.endsWith("/")) {
-			return dir;
-		}
-
-		return dir + "/";
-	}
-
-	// returns a path
-	static getDirectoryFromFilePath(filePath) {
-		let parsed = parse(filePath);
-		return this.addTrailingSlashToDirectory(parsed.dir);
 	}
 
 	// Hot path for the dependency graph, which normalizes every node on every build
