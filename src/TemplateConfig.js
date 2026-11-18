@@ -260,6 +260,10 @@ class TemplateConfig {
 
 		this.config = await this.mergeConfig();
 		this.hasConfigMerged = true;
+
+		// The user config callback (and plugins) may have created files or directories, so any
+		// listings cached while resolving the config are now stale. Drop them; later lookups refill.
+		this.#existsCache.reset();
 	}
 
 	/**

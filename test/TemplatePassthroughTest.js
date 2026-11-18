@@ -184,6 +184,18 @@ test("getFiles where not glob and directory does not exist", async (t) => {
   t.assert.deepStrictEqual(files, []);
 });
 
+test("getFileMap returns [] for a missing non-glob source (no glob fall-through, no flatten)", async (t) => {
+  const inputPath = "./test/stubs/template-passthrough/static/not-exists/";
+  let pass = await getTemplatePassthrough(inputPath, "_site", "test/stubs");
+  t.assert.deepStrictEqual(await pass.getFileMap(), []);
+});
+
+test("getFileMap returns [] when a glob source matches nothing", async (t) => {
+  const inputPath = "./test/stubs/template-passthrough/static/not-exists/**";
+  let pass = await getTemplatePassthrough(inputPath, "_site", "test/stubs");
+  t.assert.deepStrictEqual(await pass.getFileMap(), []);
+});
+
 test("getFiles with glob", async (t) => {
   const inputPath = "./test/stubs/template-passthrough/static/**";
   let pass = await getTemplatePassthrough(inputPath, "_site", "test/views");

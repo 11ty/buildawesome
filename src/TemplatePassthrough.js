@@ -224,8 +224,14 @@ class TemplatePassthrough {
 			];
 		}
 
-		// TODO VirtualFileSystem candidate
-		if (!isDynamicPattern(this.inputPath) && this.isExists(this.inputPath)) {
+		// A literal (non-glob) source is copied as-is when it exists, and skipped when it doesn’t.
+		// Falling through to glob expansion would flatten a directory’s tree into the output root.
+		if (!isDynamicPattern(this.inputPath)) {
+			if (!this.isExists(this.inputPath)) {
+				return [];
+			}
+
+			// TODO VirtualFileSystem candidate
 			return [
 				{
 					inputPath: this.inputPath,
@@ -235,7 +241,6 @@ class TemplatePassthrough {
 		}
 
 		let paths = [];
-		// If not directory or file, attempt to get globs
 		let files = await this.getFiles(this.inputPath);
 		for (let filePathFromGlob of files) {
 			paths.push({
