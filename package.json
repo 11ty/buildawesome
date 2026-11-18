@@ -157,6 +157,6 @@
 		"tinyglobby": "^0.2.17"
 	},
 	"overrides": {
-		"minimatch": "^11.0.4"
+		"minimatch": "^11"
 	}
 }
