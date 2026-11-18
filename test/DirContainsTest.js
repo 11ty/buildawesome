@@ -45,3 +45,11 @@ test("Compare to sibling folder", (t) => {
   t.assert.strictEqual(DirContains("../test", "../test"), true);
   t.assert.strictEqual(DirContains("../test", "../test/sub1"), true);
 });
+
+test("Sibling folder sharing a name prefix", (t) => {
+  t.assert.strictEqual(DirContains("_site", "_site-extra/a.txt"), false);
+  t.assert.strictEqual(DirContains("_site", "_site-extra"), false);
+  t.assert.strictEqual(DirContains("_site", "_site/a.txt"), true);
+  t.assert.strictEqual(DirContains("_site/", "_site/a.txt"), true);
+  t.assert.strictEqual(DirContains("_site", "_site/..a.txt"), true);
+});
