@@ -187,6 +187,31 @@ class TemplatePassthrough {
 		return files;
 	}
 
+	// A source that fails the exact-case check but resolves case-insensitively copies on
+	// macOS/Windows yet is missing on Linux. Error by default (configurable), otherwise skip.
+	#checkCaseOnlyMiss() {
+		let userConfig = this.templateConfig.userConfig;
+		if (userConfig?.checkErrorReporting("passthroughCaseMismatch", "allow")) {
+			return;
+		}
+
+		let resolved = this.templateConfig.existsCache.resolve(this.inputPath);
+		if (!resolved) {
+			// Genuinely missing (not even a case variant on disk): skip silently.
+			return;
+		}
+
+		let message = `Passthrough copy source ${JSON.stringify(this.inputPath)} does not exist, but ${JSON.stringify(resolved)} does (differs only by case). This resolves on case-insensitive file systems (macOS, Windows) but is missing on Linux—fix the casing.`;
+
+		if (!userConfig?.checkErrorReporting("passthroughCaseMismatch", "warn")) {
+			throw new TemplatePassthroughError(
+				`${message}\nTo downgrade this to a warning, use \`$config.configureErrorReporting({ passthroughCaseMismatch: "warn" })\` (or \`"allow"\` to skip this check).`,
+			);
+		}
+
+		this.templateConfig.logger?.warn(`Warning: ${message}`);
+	}
+
 	isExists(filePath) {
 		return this.templateConfig.existsCache.exists(filePath);
 	}
@@ -228,6 +253,7 @@ class TemplatePassthrough {
 		// Falling through to glob expansion would flatten a directory’s tree into the output root.
 		if (!isDynamicPattern(this.inputPath)) {
 			if (!this.isExists(this.inputPath)) {
+				this.#checkCaseOnlyMiss();
 				return [];
 			}
 

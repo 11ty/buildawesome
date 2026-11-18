@@ -1253,6 +1253,7 @@ export default class UserConfig {
 	 * @param {boolean} [options.allowMissingExtensions] - Alias for `missingExtensions`
 	 * @param {"error"|"allow"} [options.caseCollisions]
 	 * @param {"error"|"warn"|"allow"} [options.tagCaseCollisions]
+	 * @param {"error"|"warn"|"allow"} [options.passthroughCaseMismatch]
 	 * @param {"end"|"immediate"} [options.logErrors] - CLI builds log errors after all other output by default
 	 */
 	configureErrorReporting(options = {}) {
