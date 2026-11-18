@@ -24,6 +24,28 @@ test("Comparator.isLangCode", (t) => {
   t.assert.strictEqual(Comparator.isLangCode("sv-feed"), false);
   t.assert.strictEqual(Comparator.isLangCode("en-sitemap"), false);
   t.assert.strictEqual(Comparator.isLangCode("om-meg"), false);
+
+  // Real three-letter language codes that are also common words
+  t.assert.strictEqual(Comparator.isLangCode("new"), false);
+  t.assert.strictEqual(Comparator.isLangCode("cat"), false);
+  t.assert.strictEqual(Comparator.isLangCode("fil"), false);
+  t.assert.strictEqual(Comparator.isLangCode("new-us"), false);
+
+  // Codes that `Intl` renames (Tagalog to Filipino, Twi to Akan) are still valid ISO 639-1
+  t.assert.strictEqual(Comparator.isLangCode("tl"), true);
+  t.assert.strictEqual(Comparator.isLangCode("tw"), true);
+
+  // Withdrawn ISO 639-1 codes and uppercase
+  t.assert.strictEqual(Comparator.isLangCode("in"), false);
+  t.assert.strictEqual(Comparator.isLangCode("iw"), false);
+  t.assert.strictEqual(Comparator.isLangCode("sh"), false);
+  t.assert.strictEqual(Comparator.isLangCode("EN"), false);
+});
+
+test("LangUtils ignores three-letter language codes in URLs and paths", (t) => {
+  t.assert.strictEqual(LangUtils.getLanguageCodeFromUrl("/new/"), "");
+  t.assert.strictEqual(LangUtils.getLanguageCodeFromInputPath("./new/es/index.md"), "es");
+  t.assert.strictEqual(LangUtils.swapLanguageCode("/new/", "en"), "/new/");
 });
 
 test("LangUtils.swapLanguageCode", (t) => {
@@ -520,4 +542,23 @@ test("buildawesomeTranslationKey groups paginated translations with different UR
   t.assert.strictEqual(content("/en/tags/wood/"), "/de/tags/holz/ |/en/tags/wood/");
   t.assert.strictEqual(content("/de/tags/holz/"), "/en/tags/wood/ |/de/tags/holz/");
   t.assert.strictEqual(content("/de/tags/metall/"), "/en/tags/metal/ |/de/tags/holz/");
+});
+
+test("locale_links labels use native language names", async (t) => {
+  let langs = ["en", "es", "ka", "zu", "ja", "tl"];
+  let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, { defaultLanguage: "en" });
+      for (let lang of langs) {
+        $config.addTemplate(`${lang}/index.njk`, `{% for link in page.url | locale_links %}{{ link.lang }}:{{ link.label }} {% endfor %}`);
+      }
+    },
+  });
+
+  let results = await elev.toJSON();
+  t.assert.strictEqual(
+    results.find((entry) => entry.url === "/en/").content,
+    // Capitalized for `es`, but not Georgian, `isiZulu` or scripts without case
+    "es:Español ja:日本語 ka:ქართული tl:Filipino zu:isiZulu ",
+  );
 });

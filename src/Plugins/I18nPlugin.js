@@ -1,4 +1,3 @@
-import iso639 from "iso-639-1";
 import { DeepCopy } from "@11ty/eleventy-utils";
 
 // pathPrefix note:
@@ -9,6 +8,12 @@ import { DeepCopy } from "@11ty/eleventy-utils";
 // path prefix at the beginning? Would need a better way to know `url` has transformed a string
 // rather than just raw comparison.
 // e.g. --pathprefix=/en/ should return `/en/en/` for `/en/index.liquid`
+
+// Withdrawn from ISO 639-1 but still known to `Intl`
+const WITHDRAWN_LANGUAGES = new Set(["bh", "in", "iw", "ji", "jw", "mo", "sh"]);
+
+// Georgian has no title case and these names have deliberate lowercase prefixes (`isiZulu`)
+const UNCAPITALIZED_LABEL_LANGUAGES = new Set(["ka", "nd", "sn", "zu"]);
 
 class LangUtils {
 	static getLanguageCodeFromInputPath(filepath, languages) {
@@ -46,6 +51,7 @@ class LangUtils {
 
 class Comparator {
 	// Created lazily so importing core doesn’t require `Intl`.
+	static #languageNames;
 	static #scriptNames;
 	static #regionNames;
 
@@ -58,7 +64,7 @@ class Comparator {
 		}
 
 		let [s] = (code || "").split("-");
-		if (!iso639.validate(s)) {
+		if (s.length !== 2 || s !== s.toLowerCase() || WITHDRAWN_LANGUAGES.has(s)) {
 			return false;
 		}
 		// Only language[-script][-region] with a real script and region, so names like `sv-feed` or `en-sitemap` don’t match.
@@ -67,6 +73,13 @@ class Comparator {
 		try {
 			({ script, region } = new Intl.Locale(code));
 		} catch {
+			return false;
+		}
+		Comparator.#languageNames ??= new Intl.DisplayNames(["en"], {
+			type: "language",
+			fallback: "none",
+		});
+		if (!Comparator.#languageNames.of(s)) {
 			return false;
 		}
 		if (code.split("-").length !== 1 + Boolean(script) + Boolean(region)) {
@@ -89,6 +102,21 @@ class Comparator {
 		}
 
 		return url.split("/").some((entry) => entry === code);
+	}
+}
+
+function getNativeLanguageName(langCode) {
+	let [code] = langCode.split("-");
+	try {
+		let name = new Intl.DisplayNames([code], { type: "language" }).of(code);
+		// CLDR names are lowercase mid-sentence in many languages (`español`), but labels start a list item.
+		if (UNCAPITALIZED_LABEL_LANGUAGES.has(code)) {
+			return name;
+		}
+		let [first] = name;
+		return first.toLocaleUpperCase(code) + name.slice(first.length);
+	} catch {
+		return code;
 	}
 }
 
@@ -145,7 +173,7 @@ function getLocaleUrlsMap(urlToInputPath, extensionMap, options = {}) {
 			filemap[replaced].push({
 				url,
 				lang: langCode,
-				label: iso639.getNativeName(langCode.split("-")[0]),
+				label: getNativeLanguageName(langCode),
 			});
 		} else {
 			filemap[replaced].push({ url });
