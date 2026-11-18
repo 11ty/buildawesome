@@ -562,3 +562,20 @@ test("locale_links labels use native language names", async (t) => {
     "es:Español ja:日本語 ka:ქართული tl:Filipino zu:isiZulu ",
   );
 });
+
+test("locale_links includeCurrent option", async (t) => {
+  let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+    config: function ($config) {
+      $config.addPlugin(I18nPlugin, { defaultLanguage: "en" });
+      for (let lang of ["en", "es"]) {
+        $config.addTemplate(
+          `${lang}/index.njk`,
+          `{% for link in page.url | locale_links({ includeCurrent: true }) %}{{ link.lang }}:{{ link.label }} {% endfor %}|{% for link in page.url | locale_links %}{{ link.lang }} {% endfor %}`,
+        );
+      }
+    },
+  });
+
+  let results = await elev.toJSON();
+  t.assert.strictEqual(results.find((entry) => entry.url === "/en/").content, "en:English es:Español |es ");
+});

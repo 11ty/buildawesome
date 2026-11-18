@@ -336,12 +336,19 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 
 	// Refactor to use url
 	// Find the links that are localized alternates to the inputPath argument
-	eleventyConfig.addFilter(options.filters.links, function (urlOverride) {
-		let url = urlOverride || this.page?.url;
-		return (contentMaps.localeUrlsMap[url] || []).filter((entry) => {
-			return entry.url !== url;
-		});
-	});
+	eleventyConfig.addFilter(
+		options.filters.links,
+		function (urlOverride, { includeCurrent = false } = {}) {
+			let url = urlOverride || this.page?.url;
+			let entries = contentMaps.localeUrlsMap[url] || [];
+			if (includeCurrent) {
+				return entries.slice();
+			}
+			return entries.filter((entry) => {
+				return entry.url !== url;
+			});
+		},
+	);
 
 	// Returns a `page`-esque variable for the root default language page
 	// If paginated, returns first result only
