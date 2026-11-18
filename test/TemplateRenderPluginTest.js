@@ -648,3 +648,10 @@ test("Invalid tagName throws", async (t) => {
 
   await t.assert.rejects(elev.toJSON(), (error) => /Invalid RenderPlugin `tagName` option/.test(error.cause?.message));
 });
+
+test("Removed RenderManager methods throw", async (t) => {
+  let renderMgr = new RenderManager();
+  t.assert.throws(() => renderMgr.initialGlobalData, /was removed in v4/);
+  t.assert.throws(() => renderMgr.getData(), /was removed in v4/);
+  t.assert.throws(() => renderMgr.render(), /was removed in v4/);
+});

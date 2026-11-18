@@ -1,10 +1,9 @@
 import { readFileSync } from "node:fs";
-import { Merge, TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
+import { TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 
 // TODO add a first-class Markdown component to expose this using Markdown-only syntax (will need to be synchronous for markdown-it)
 
 import { ProxyWrap } from "../Util/Objects/ProxyWrap.js";
-import ConfigurationGlobalData from "../Data/ConfigurationGlobalData.js";
 import BaseError from "../Errors/BaseError.js";
 import TemplateRender from "../TemplateRender.js";
 import ProjectDirectories from "../Util/ProjectDirectories.js";
@@ -518,7 +517,6 @@ class RenderManager {
 
 		this.#templateConfig = templateConfig;
 
-		// This is the only plugin running on the Edge
 		this.#templateConfig.userConfig.addPlugin(RenderPlugin, {
 			templateConfig: this.#templateConfig,
 			accessGlobalData: true,
@@ -549,23 +547,6 @@ class RenderManager {
 		}
 	}
 
-	get initialGlobalData() {
-		if (!this._data) {
-			this._data = new ConfigurationGlobalData(this.templateConfig);
-		}
-		return this._data;
-	}
-
-	// because we don’t have access to the full data cascade—but
-	// we still want configuration data added via `addGlobalData`
-	async getData(...data) {
-		await this.init();
-
-		let globalData = await this.initialGlobalData.getData();
-		let merged = Merge({}, globalData, ...data);
-		return merged;
-	}
-
 	async compile(content, templateLang, options = {}) {
 		await this.init();
 
@@ -573,21 +554,25 @@ class RenderManager {
 		options.extensionMap = this.#extensionMap;
 		options.strictMode = true;
 
-		// We don’t need `compile.call(this)` here because the Edge always uses "liquid" as the template lang (instead of relying on this.page.templateSyntax)
 		// returns promise
 		return compile(content, templateLang, options);
 	}
 
-	async render(fn, edgeData, buildTimeData) {
-		await this.init();
+	// Removed in v4 (Eleventy Edge leftovers)
+	get initialGlobalData() {
+		throw new Error(RenderManager.#removedMessage("initialGlobalData"));
+	}
 
-		let mergedData = await this.getData(edgeData);
-		// Set .data for options.accessGlobalData feature
-		let context = {
-			data: mergedData,
-		};
+	getData() {
+		throw new Error(RenderManager.#removedMessage("getData()"));
+	}
 
-		return renderShortcodeFn.call(context, fn, buildTimeData);
+	render() {
+		throw new Error(RenderManager.#removedMessage("render()"));
+	}
+
+	static #removedMessage(name) {
+		return `\`RenderManager#${name}\` was removed in v4 (it was only used by the Eleventy Edge plugin, removed in v3). Use \`compile()\` and call the returned function with your data instead.`;
 	}
 }
 
