@@ -626,3 +626,25 @@ test("Compiling without an extensionMap reuses engines (no listener per call)", 
   let fn = await RenderPluginString.call({}, "{{ x }}", "njk", { templateConfig });
   t.assert.strictEqual(await fn({ x: "ok" }), "ok");
 });
+
+test("Nunjucks paired tagName with digits and underscores", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: function ($config) {
+      $config.addPlugin(RenderPlugin, { tagName: "render_2" });
+      $config.addTemplate("index.njk", `{% render_2 "liquid" %}{{ "hi" | upcase }}{% endrender_2 %}`);
+    },
+  });
+
+  let [result] = await elev.toJSON();
+  t.assert.strictEqual(result.content.trim(), "HI");
+});
+
+test("Invalid tagName throws", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: function ($config) {
+      $config.addPlugin(RenderPlugin, { tagName: "render$" });
+    },
+  });
+
+  await t.assert.rejects(elev.toJSON(), (error) => /Invalid RenderPlugin `tagName` option/.test(error.cause?.message));
+});

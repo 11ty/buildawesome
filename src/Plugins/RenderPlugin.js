@@ -227,6 +227,11 @@ function RenderPlugin($config, options = {}) {
 	}
 
 	options.tagName ??= "renderTemplate";
+	if (!/^\w+$/.test(options.tagName)) {
+		throw new Error(
+			`Invalid RenderPlugin \`tagName\` option: ${JSON.stringify(options.tagName)}. Use only letters, numbers and underscores.`,
+		);
+	}
 	options.tagNameFile ??= "renderFile";
 	options.filterName ??= "renderContent";
 	options.templateConfig ??= null;
@@ -317,9 +322,12 @@ function RenderPlugin($config, options = {}) {
 				// This code was ripped from the Nunjucks parser for `raw`
 				// https://github.com/mozilla/nunjucks/blob/fd500902d7c88672470c87170796de52fc0f791a/nunjucks/src/parser.js#L655
 				const endTagName = "end" + tagName;
+				// Invalid `tagName` options already throw at setup, but never let a metacharacter into the regex.
+				const safeTagName = tagName.replace(/\W/g, "");
+				const safeEndTagName = "end" + safeTagName;
 				// Look for upcoming raw blocks (ignore all other kinds of blocks)
 				const rawBlockRegex = new RegExp(
-					"([\\s\\S]*?){%\\s*(" + tagName + "|" + endTagName + ")\\s*(?=%})%}",
+					"([\\s\\S]*?){%\\s*(" + safeTagName + "|" + safeEndTagName + ")\\s*(?=%})%}",
 				);
 				let rawLevel = 1;
 				let str = "";
