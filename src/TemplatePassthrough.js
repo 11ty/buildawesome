@@ -269,6 +269,23 @@ class TemplatePassthrough {
 			);
 		}
 
+		// recursive-copy joins each `rename` result to `dest` unchecked, then may `rm` what is there.
+		if (typeof copyOptions?.rename === "function") {
+			let rename = copyOptions.rename;
+			copyOptions = {
+				...copyOptions,
+				rename: (filePath) => {
+					let renamed = rename(filePath);
+					if (!this.directories.isFileInOutputFolder(path.join(dest, renamed))) {
+						throw new TemplatePassthroughError(
+							`Passthrough copy \`rename\` result \`${renamed}\` is outside of the site output directory.`,
+						);
+					}
+					return renamed;
+				},
+			};
+		}
+
 		let fileCopyCount = 0;
 		let fileSizeCount = 0;
 		let map = {};

@@ -3,6 +3,7 @@ import fs from "fs";
 
 import TemplateData from "../src/Data/TemplateData.js";
 import getNewTemplate from "./_getNewTemplateForTests.js";
+import Core from "../src/Core.js";
 
 import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback } from "./_testHelpers.js";
 
@@ -346,4 +347,32 @@ Slugged.
   );
   let data = await tmpl.getData();
   t.assert.strictEqual(await tmpl.getOutputPath(data), "./dist/subdir/test-猫/index.html");
+});
+
+test("permalink outside of the output directory throws", async (t) => {
+  let elev = new Core("./test/stubs-virtual/", "./test/stubs-virtual/_site", {
+    configPath: false,
+    quietMode: true,
+    config($config) {
+      $config.addTemplate("index.njk", "Hi", { permalink: "../../escaped.html" });
+    },
+  });
+  elev.disableLogger();
+  elev.setDryRun(true);
+
+  await t.assert.rejects(elev.write(), (e) => /outside of the output directory/.test(e.cause?.message ?? e.message));
+});
+
+test("permalinkBypassOutputDir can write outside of the output directory", async (t) => {
+  let elev = new Core("./test/stubs-virtual/", "./test/stubs-virtual/_site", {
+    configPath: false,
+    quietMode: true,
+    config($config) {
+      $config.addTemplate("index.njk", "Hi", { permalink: "../escaped.html", permalinkBypassOutputDir: true });
+    },
+  });
+  elev.disableLogger();
+  elev.setDryRun(true);
+
+  await elev.write();
 });

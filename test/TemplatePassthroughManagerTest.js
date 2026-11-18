@@ -375,3 +375,24 @@ test("`rawPathFilter` receives full paths when copying", async (t) => {
   t.assert.strictEqual(fs.existsSync(path.join(outputDir, "static/test.css")), true);
   t.assert.strictEqual(fs.existsSync(path.join(outputDir, "static/test.js")), false);
 });
+
+test("Passthrough copy `rename` outside of the output directory throws", async (t) => {
+  let tmp = mkdtempSync(path.join(tmpdir(), "passthrough-rename-"));
+  let outputDir = path.join(tmp, "_site");
+  let core = new Core("test/stubs/template-passthrough", outputDir, {
+    quietMode: true,
+    configPath: false,
+    config($config) {
+      $config.addPassthroughCopy({ "test/stubs/template-passthrough/src/views": "views" }, {
+        rename: (p) => `../../${p}`,
+      });
+    },
+  });
+  core.disableLogger();
+
+  await t.assert.rejects(core.write(), (e) => {
+    while (e.cause) e = e.cause;
+    return /outside of the site output directory/.test(e.message);
+  });
+  t.assert.deepStrictEqual(fs.readdirSync(tmp).filter((name) => name !== "_site"), []);
+});

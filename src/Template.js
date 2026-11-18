@@ -1137,6 +1137,15 @@ class Template extends TemplateContent {
 	}
 
 	async _write({ url, outputPath, data, rawInput }, finalContent) {
+		if (
+			!this.usePermalinkRoot(data) &&
+			!this.eleventyConfig.directories.isFileInOutputFolder(outputPath)
+		) {
+			throw new Error(
+				`Output path \`${outputPath}\` for ${this.inputPath} is outside of the output directory. Check your \`permalink\` value.`,
+			);
+		}
+
 		let lang = {
 			start: "Writing",
 			finished: "written",
