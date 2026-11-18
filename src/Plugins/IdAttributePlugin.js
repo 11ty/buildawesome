@@ -1,4 +1,4 @@
-import matchHelper from "posthtml-match-helper";
+import matchSelector from "@11ty/posthtml-match-selector";
 import { decodeHTML } from "entities";
 
 import { resolveAttributeName } from "../Util/PostHtml/Attrs.js";
@@ -54,7 +54,7 @@ export function IdAttributePlugin(eleventyConfig, options = {}) {
 				// Cache heading nodes for conflict resolution
 				let headingNodes = {};
 
-				tree.match(matchHelper(options.selector), function (node) {
+				tree.match(matchSelector(options.selector), function (node) {
 					if (node.attrs?.id) {
 						let id = node.attrs?.id;
 						if (conflictCheck[id]) {
