@@ -98,6 +98,12 @@ class ConsoleLogger {
 		this.message(msg, undefined, undefined, true);
 	}
 
+	// Breaks through quiet mode (but not `overrideLogger(false)`), for warnings that a site’s behavior changed.
+	/** @param {string} msg */
+	forceWarn(msg) {
+		this.message(msg, "warn", this.#colorFallbacks.warn, true);
+	}
+
 	/** @param {string} msg */
 	info(msg) {
 		this.message(msg, "log", this.#colorFallbacks.info);

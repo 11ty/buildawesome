@@ -1,9 +1,10 @@
 import test from "node:test";
 import Eleventy from "../src/Core.js";
 
-async function getResults(configCallback) {
+async function getResults(configCallback, options = {}) {
 	let warnings = [];
 	let elev = new Eleventy("test/noop", false, {
+		...options,
 		config($config) {
 			$config.addTemplate("2025/08/08.md", "a");
 			$config.addTemplate("2025/08/09.md", "b");
@@ -61,4 +62,11 @@ test("#3919 Explicit permalinks do not warn", async (t) => {
 		$config.addGlobalData("permalink", () => (data) => `${data.page.filePathStem}/index.html`);
 	});
 	t.assert.deepStrictEqual(warnings, []);
+});
+
+test("#3919 the warning breaks through quiet mode", async (t) => {
+	let { urls, warnings } = await getResults(undefined, { quietMode: true });
+	t.assert.strictEqual(urls["./test/noop/2025/08/08.md"], "/2025/08/08/");
+	t.assert.strictEqual(warnings.length, 1);
+	t.assert.ok(warnings[0].includes("setPermalinkCollapseMatchingFolder"));
 });

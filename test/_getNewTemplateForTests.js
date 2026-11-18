@@ -36,6 +36,7 @@ export default async function getNewTemplate(
   let tmpl = new Template(path, templateData, map, $config);
   let logger = new ConsoleLogger();
   logger.isVerbose = false;
+  logger.overrideLogger(false); // forced warnings would otherwise print during tests
   tmpl.logger = logger;
 
   await tmpl.getTemplateRender();

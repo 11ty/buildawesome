@@ -414,6 +414,7 @@ class Template extends TemplateContent {
 			this.#warnOnce(
 				`collapse-matching-folder:${this.inputPath}`,
 				`${this.inputPath} now writes to \`${subfolder}/${this.baseFile}/index.html\` instead of \`${subfolder}/index.html\` (changed in v4: file names that match their parent folder are no longer collapsed). Use \`$config.setPermalinkCollapseMatchingFolder(true)\` to restore the old behavior, or \`$config.configureErrorReporting({ collapsedMatchingFolder: "allow" })\` to silence this warning.`,
+				{ force: true },
 			);
 		}
 
@@ -795,7 +796,7 @@ class Template extends TemplateContent {
 	}
 
 	// One warning per path (not per page), per logger (Eleventy instance)
-	#warnOnce(id, message) {
+	#warnOnce(id, message, { force = false } = {}) {
 		if (!warnedIds.has(this.logger)) {
 			warnedIds.set(this.logger, new Set());
 		}
@@ -804,7 +805,11 @@ class Template extends TemplateContent {
 			return;
 		}
 		warned.add(id);
-		this.logger.warn(message);
+		if (force) {
+			this.logger.forceWarn(message);
+		} else {
+			this.logger.warn(message);
+		}
 	}
 
 	// e.g. ./articles/first.md › populatedCategories › collections (deferred) or ./index.md › title (not yet run)
@@ -814,6 +819,7 @@ class Template extends TemplateContent {
 			this.#warnOnce(
 				path.join(" › "),
 				`${prefix} Computed data resolves after preprocessors (except \`date\`, \`layout\`, ${this.config.keys.tags ? `\`${this.config.keys.tags}\`, ` : ""}\`${ResolveConfigurationData.EXCLUDE_FROM_COLLECTIONS_KEY}\`, \`${this.config.keys.import}\`, and paginated data), so read this value at render time instead.`,
+				{ force: true },
 			);
 			return;
 		}
@@ -821,6 +827,7 @@ class Template extends TemplateContent {
 		this.#warnOnce(
 			path.join(" › "),
 			`${prefix} This is likely a read from another page. You can work around this issue by reading the value at render time, or by reading \`collections\` directly in the computed data that reads this value (e.g. \`data.${path.at(-1)}\` instead of \`….data.${path[0]}\`).`,
+			{ force: true },
 		);
 	}
 
@@ -1013,6 +1020,7 @@ class Template extends TemplateContent {
 		this.#warnOnce(
 			`${key} › ${layoutKey}`,
 			`Warning: computed data set \`${key}\` to \`${layoutKey}\` after the rest of computed data resolved (likely because it reads \`collections\`), so that layout’s front matter data was not applied: ${this.inputPath} › ${key}. You can work around this issue by computing \`${key}\` without reading \`collections\`, or by setting it outside of computed data (e.g. front matter or a directory data file).`,
+			{ force: true },
 		);
 	}
 

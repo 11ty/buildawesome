@@ -58,6 +58,7 @@ export async function getTemplateConfigInstanceCustomCallback(dirObject, configC
 export function getTemplateWriterInstance(formats, templateConfig) {
   let logger = new ConsoleLogger();
   logger.isVerbose = false;
+  logger.overrideLogger(false); // forced warnings would otherwise print during tests
 
   let { eleventyFiles, passthroughManager } = getEleventyFilesInstance(formats, templateConfig);
   let templateWriter = new TemplateWriter(
