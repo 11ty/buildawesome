@@ -100,7 +100,7 @@ export default class Liquid extends TemplateEngine {
 				augmentObject(this, {
 					source: this.context,
 					getter: (key, context) => context.get([key]),
-
+					dataGetter: (context) => context.getAll(),
 					lazy: this.context.strictVariables,
 				});
 			}
@@ -120,6 +120,7 @@ export default class Liquid extends TemplateEngine {
 			augmentObject(obj, {
 				source: context,
 				getter: (key, context) => context.get([key]),
+				dataGetter: (context) => context.getAll(),
 				lazy: context.strictVariables,
 			});
 		}

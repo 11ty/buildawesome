@@ -859,6 +859,49 @@ test("this.buildawesome in filters", async (t) => {
   t.assert.deepStrictEqual(results.map(({ content }) => content), ["Eleventy", "Eleventy", "Eleventy"]);
 });
 
+test("this.getData() in filters and shortcodes", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: function ($config) {
+      $config.addGlobalData("siteName", "Awesome");
+      $config.addFilter("site", function () {
+        return `${this.getData().siteName}-${this.getData().item}`;
+      });
+      $config.addShortcode("siteSc", function () {
+        return `${this.getData().siteName}-${this.getData().item}`;
+      });
+      let pagination = { data: "items", size: 1, alias: "item" };
+      let items = ["a", "b"];
+      $config.addTemplate("liquid.liquid", "{{ '' | site }}|{% siteSc %}", { items, pagination, permalink: "/liquid/{{ item }}/" });
+      $config.addTemplate("njk.njk", "{{ '' | site }}|{% siteSc %}", { items, pagination, permalink: "/njk/{{ item }}/" });
+      $config.addTemplate("js.11ty.js", function () { return `${this.site()}|${this.siteSc()}`; }, { items, pagination, permalink: (data) => `/js/${data.item}/` });
+    },
+  });
+  let results = await elev.toJSON();
+  results.sort((a, b) => a.url.localeCompare(b.url));
+  t.assert.deepStrictEqual(results.map(({ url, content }) => [url, content]), [
+    ["/js/a/", "Awesome-a|Awesome-a"],
+    ["/js/b/", "Awesome-b|Awesome-b"],
+    ["/liquid/a/", "Awesome-a|Awesome-a"],
+    ["/liquid/b/", "Awesome-b|Awesome-b"],
+    ["/njk/a/", "Awesome-a|Awesome-a"],
+    ["/njk/b/", "Awesome-b|Awesome-b"],
+  ]);
+});
+
+test("this.page in Liquid filters with strictVariables", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: function ($config) {
+      $config.setLiquidOptions({ strictVariables: true });
+      $config.addFilter("pageUrl", function () {
+        return `${this.page.url}|${this.getData().title}`;
+      });
+      $config.addTemplate("index.liquid", "{{ '' | pageUrl }}", { title: "Hi" });
+    },
+  });
+  let results = await elev.toJSON();
+  t.assert.strictEqual(results[0].content, "/|Hi");
+});
+
 test("Global data JS files should only execute once, issue #2753", async (t) => {
   let elev = new Eleventy("./test/stubs-2753", "./test/stubs-2753/_site", {
     config: function ($config) {},

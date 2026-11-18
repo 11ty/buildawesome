@@ -181,6 +181,7 @@ export default class JavaScript extends TemplateEngine {
 			// prefer pre-existing `page` javascriptFunction, if one exists
 			fns[key] = augmentFunction(configFns[key], {
 				source: inst,
+				dataGetter: (inst) => inst.getData(),
 				overwrite: false,
 			});
 		}
@@ -192,6 +193,7 @@ export default class JavaScript extends TemplateEngine {
 		// TODO ArgumentHelper.wrapFilter(fn);
 		return augmentFunction(fn, {
 			source: inst,
+			dataGetter: (inst) => inst.getData(),
 		});
 	}
 
