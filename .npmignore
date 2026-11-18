@@ -1,6 +1,5 @@
 docs
 test
-coverage
 eslint.config.js
 .*
 packages/*

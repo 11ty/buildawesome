@@ -73,7 +73,7 @@
 		"format": "prettier . --write",
 		"check": "eslint src",
 		"typescript": "tsc && node scripts/prune-types.js",
-		"coverage": "npx c8 npm run test:core && npx c8 report --reporter=json-summary && node scripts/coverage-report.js",
+		"coverage": "npx c8 -o docs/coverage npm run test:core && npx c8 report -o docs/coverage --reporter=json-summary && node scripts/coverage-report.js",
 		"nano-staged": "nano-staged",
 		"prepare": "simple-git-hooks"
 	},
