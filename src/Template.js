@@ -404,30 +404,39 @@ class Template extends TemplateContent {
 		let subfolder = this.getTemplateSubfolder();
 		let fileExtension = this.engine.defaultTemplateFileExtension;
 		let collapseMatchingFolder = this.config.permalinkCollapseMatchingFolder;
+		let generate = (collapse) => {
+			let p = TemplatePermalink.generate(
+				subfolder,
+				this.baseFile,
+				this.extraOutputSubdirectory,
+				fileExtension,
+				isDynamicPermalinkEnabled,
+				collapse,
+			);
+			p.setUrlTransforms(this.config.urlTransforms);
+			return p;
+		};
+
+		let p = generate(collapseMatchingFolder);
 		if (
 			!collapseMatchingFolder &&
-			!this.eleventyConfig.userConfig.checkErrorReporting("collapsedMatchingFolder", "allow") &&
-			fileExtension === "html" &&
-			this.baseFile !== "index" &&
-			TemplatePermalink._hasDuplicateFolder(subfolder, this.baseFile)
+			!this.eleventyConfig.userConfig.checkErrorReporting("collapsedMatchingFolder", "allow")
 		) {
-			this.#warnOnce(
-				`collapse-matching-folder:${this.inputPath}`,
-				`${this.inputPath} now writes to \`${subfolder}/${this.baseFile}/index.html\` instead of \`${subfolder}/index.html\` (changed in v4: file names that match their parent folder are no longer collapsed). Use \`$config.setPermalinkCollapseMatchingFolder(true)\` to restore the old behavior, or \`$config.configureErrorReporting({ collapsedMatchingFolder: "allow" })\` to silence this warning.`,
-				{ force: true },
-			);
+			this.#warnCollapsedMatchingFolder(p.toHref(), generate(true).toHref());
 		}
-
-		let p = TemplatePermalink.generate(
-			subfolder,
-			this.baseFile,
-			this.extraOutputSubdirectory,
-			fileExtension,
-			isDynamicPermalinkEnabled,
-			collapseMatchingFolder,
-		);
-		p.setUrlTransforms(this.config.urlTransforms);
 		return p;
+	}
+
+	#warnCollapsedMatchingFolder(href, v3Href) {
+		if (href === v3Href) {
+			return;
+		}
+		let indexFile = `index${this.parsed.base.slice(this.baseFile.length)}`;
+		this.#warnOnce(
+			`collapse-matching-folder:${this.inputPath}`,
+			`${this.inputPath} now outputs to \`${href}\` (v3 output it to \`${v3Href}\`: file names that match their parent folder are no longer collapsed). To keep \`${v3Href}\`, rename it to \`${indexFile}\` or set a \`permalink\`. Or use \`$config.setPermalinkCollapseMatchingFolder(true)\` to restore the v3 behavior, or \`$config.configureErrorReporting({ collapsedMatchingFolder: "allow" })\` to silence this warning.`,
+			{ force: true },
+		);
 	}
 
 	usePermalinkRoot(data) {
@@ -770,12 +779,13 @@ class Template extends TemplateContent {
 			return outputLocations.get(data);
 		};
 
-		// Template string so placeholder rendering detects a computed `permalink` dependency
-		cd.addTemplateString("page.url", async (data) => (await getOutputLocations(data)).href, [
-			"permalink",
-			"dynamicPermalink",
-			this.config.keys.permalinkRoot,
-		]);
+		// Declared dependencies only, placeholder discovery would run `_getLink` against fake data (no cascade `permalink`)
+		cd.addTemplateString(
+			"page.url",
+			async (data) => (await getOutputLocations(data)).href,
+			["permalink", "dynamicPermalink", this.config.keys.permalinkRoot],
+			() => [],
+		);
 		// Same dependencies as `page.url` (no symbols to parse), so it resolves right after with the same render
 		cd.addTemplateString(
 			"page.outputPath",
