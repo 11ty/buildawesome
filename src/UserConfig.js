@@ -447,8 +447,15 @@ export default class UserConfig {
 			/** @this {any} */
 			async function (...args) {
 				let cb = args.pop();
-				// Note that `callback` is already a function as the `#add` method throws an error if not.
-				let ret = await callback.call(this, ...args);
+				let ret;
+				try {
+					// Note that `callback` is already a function as the `#add` method throws an error if not.
+					ret = await callback.call(this, ...args);
+				} catch (e) {
+					// Nunjucks waits for the callback forever if it isn’t called
+					cb(e);
+					return;
+				}
 				cb(null, ret);
 			},
 		);

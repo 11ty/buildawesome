@@ -1083,6 +1083,29 @@ test("addAsyncFilter for Nunjucks", async (t) => {
   t.assert.strictEqual(await fn(), "<p>12</p>");
 });
 
+test("Rejected async filter fails the Nunjucks render instead of hanging", async (t) => {
+  let templateConfig = await getTemplateConfigInstanceCustomCallback(
+    {},
+    function(cfg) {
+      cfg.addFilter("boom", async function () {
+        throw new Error("Boom");
+      });
+    }
+  );
+
+  let tr = await getNewTemplateRender("njk", null, templateConfig);
+  let fn = await tr.getCompiledTemplate("<p>{{ 'hi' | boom }}</p>");
+  await t.assert.rejects(fn, (e) => {
+    let messages = [];
+    for (let err = e; err; err = err.cause || err.originalError) {
+      messages.push(err.message);
+    }
+    t.assert.ok(messages.some(m => m.includes("Error in Nunjucks Filter `boom`")));
+    t.assert.ok(messages.includes("Boom"));
+    return true;
+  });
+});
+
 test("Asynchronous filters (via addNunjucksFilter) for Nunjucks", async (t) => {
   let templateConfig = await getTemplateConfigInstanceCustomCallback(
     {},

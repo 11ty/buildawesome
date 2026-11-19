@@ -189,24 +189,32 @@ export default class Nunjucks extends TemplateEngine {
 
 	addFilters(filters, isAsync) {
 		for (let name in filters) {
-			this.njkEnv.addFilter(name, Nunjucks.wrapFilter(name, filters[name]), isAsync);
+			this.njkEnv.addFilter(name, Nunjucks.wrapFilter(name, filters[name], isAsync), isAsync);
 		}
 	}
 
-	static wrapFilter(name, fn) {
+	static wrapFilter(name, fn, isAsync = false) {
 		return function (...args) {
+			let getError = (e) =>
+				new BuildAwesomeNunjucksError(
+					`Error in Nunjucks Filter \`${name}\`${this.page ? ` (${this.page.inputPath})` : ""}`,
+					e,
+				);
+
 			try {
 				augmentObject(this, {
 					source: this.ctx,
 					lazy: false, // context.env?.opts.throwOnUndefined,
 				});
 
+				if (isAsync) {
+					let cb = args.pop();
+					args.push((error, result) => cb(error ? getError(error) : null, result));
+				}
+
 				return fn.call(this, ...args);
 			} catch (e) {
-				throw new BuildAwesomeNunjucksError(
-					`Error in Nunjucks Filter \`${name}\`${this.page ? ` (${this.page.inputPath})` : ""}`,
-					e,
-				);
+				throw getError(e);
 			}
 		};
 	}
