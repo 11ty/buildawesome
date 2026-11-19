@@ -1,6 +1,8 @@
 import test from "node:test";
 import { TemplatePath } from "@11ty/eleventy-utils";
 
+import { Files } from "../src/Files.js";
+
 import { getTemplateConfigInstance, getTemplateConfigInstanceCustomCallback, getEleventyFilesInstance } from "./_testHelpers.js";
 
 /* .eleventyignore and .gitignore combos */
@@ -317,12 +319,28 @@ test("De-duplicated ignores", async (t) => {
   ]);
 });
 
-test("Negated .eleventyignore patterns re-include files", async (t) => {
+test("Negated .eleventyignore patterns are skipped without the experimental flag", async (t) => {
   let $config = await getTemplateConfigInstance({
     dir: {
       input: "test/stubs-4439",
       output: "test/stubs-4439/_site"
     }
+  });
+
+  let { eleventyFiles: evf } = getEleventyFilesInstance(["md"], $config);
+  evf.init();
+
+  t.assert.deepStrictEqual((await evf.getFiles()).sort(), [
+    "./test/stubs-4439/index.md",
+  ]);
+});
+
+test("Negated .eleventyignore patterns re-include files", async (t) => {
+  let $config = await getTemplateConfigInstanceCustomCallback({
+    input: "test/stubs-4439",
+    output: "test/stubs-4439/_site"
+  }, ($config) => {
+    $config.addExperimentalBehavior(Files.FLAGS.NEGATED_IGNORES);
   });
 
   let { eleventyFiles: evf } = getEleventyFilesInstance(["md"], $config);

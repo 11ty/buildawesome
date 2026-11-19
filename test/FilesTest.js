@@ -2,6 +2,7 @@ import test from "node:test";
 import { glob } from "tinyglobby";
 
 import TemplateConfig from "../src/TemplateConfig.js";
+import { Files } from "../src/Files.js";
 import TemplatePassthroughManager from "../src/TemplatePassthroughManager.js";
 import ProjectDirectories from "../src/Util/ProjectDirectories.js";
 import { isTypeScriptSupported } from "../src/Util/TypeScriptFeatureTest.cjs";
@@ -486,8 +487,28 @@ test("Glob Watcher Files with Config Passthroughs (no template formats)", async 
   ]);
 });
 
-test("Negations are kept in ignore content", async (t) => {
+test("Negations are skipped in ignore content without the experimental flag", async (t) => {
   let templateConfig = new TemplateConfig();
+  let projectDirs = new ProjectDirectories();
+  projectDirs.setViaConfigObject({
+    input: "test/stubs"
+  });
+  let $config = await getTemplateConfigInstance(templateConfig, projectDirs);
+  let { eleventyFiles: evf } = getEleventyFilesInstance([], $config);
+
+  t.assert.deepStrictEqual(
+    evf.normalizeIgnoreContent(
+      "./",
+      `hello
+!testing`
+    ),
+    ["./hello"]
+  );
+});
+
+test("Negations are kept in ignore content with the experimental flag", async (t) => {
+  let templateConfig = new TemplateConfig();
+  templateConfig.userConfig.addExperimentalBehavior(Files.FLAGS.NEGATED_IGNORES);
   let projectDirs = new ProjectDirectories();
   projectDirs.setViaConfigObject({
     input: "test/stubs"

@@ -12,6 +12,10 @@ import checkPassthroughCopyBehavior from "./Util/PassthroughCopyBehaviorCheck.js
 const debug = createDebug("Files");
 
 export class Files {
+	static FLAGS = {
+		NEGATED_IGNORES: "NEGATED_IGNORES",
+	};
+
 	#extensionMap;
 	#watcherGlobs;
 
@@ -228,12 +232,22 @@ export class Files {
 		let ignores = [];
 
 		if (ignoreContent) {
+			let allowNegations = this.config.experimentalFlags?.includes(Files.FLAGS.NEGATED_IGNORES);
 			ignores = ignoreContent
 				.split("\n")
 				.map((line) => {
 					return line.trim();
 				})
 				.filter((line) => {
+					if (line.charAt(0) === "!" && !allowNegations) {
+						debug(
+							">>> Negative pattern in .gitignore/.eleventyignore skipped (opt-in with `addExperimentalBehavior(%o)`): %o",
+							Files.FLAGS.NEGATED_IGNORES,
+							line,
+						);
+						return false;
+					}
+
 					// empty lines or comments get filtered out
 					return line.length > 0 && line.charAt(0) !== "#";
 				})
