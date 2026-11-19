@@ -152,7 +152,13 @@ async function exec() {
 		// --incremental=one.md --incremental=two.md => ["one.md", "two.md"]
 		// --incremental=one.md,two.md => ["one.md", "two.md"]
 		if(argv.incremental) {
-			core.setIncrementalFiles(argv.incremental);
+			const { resolveIncrementalCliFiles } = await import("./src/Util/IncrementalCliFiles.js");
+			// Keep includes, layouts and data eligible so core can choose its usual rebuild fallback.
+			const files = await resolveIncrementalCliFiles(
+				argv.incremental,
+				core.eleventyFiles.getGlobWatcherProjectIgnores(),
+			);
+			core.setIncrementalFiles(files);
 		} else if(argv.incremental !== undefined) {
 			core.setIncrementalBuild(argv.incremental === "" || argv.incremental);
 		}
