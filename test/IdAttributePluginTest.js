@@ -108,7 +108,7 @@ test("Issue #3424, id attribute conflicts (three deep, hard coded id conflicts)"
   });
 
   let results = await elev.toJSON();
-	t.assert.strictEqual(results[0].content.trim(), `<h1 id="testing-3">Testing</h1><h1 id="testing-2">Testing</h1><h1 id="testing">Testing</h1>`);
+	t.assert.strictEqual(results[0].content.trim(), `<h1 id="testing-2">Testing</h1><h1 id="testing-3">Testing</h1><h1 id="testing">Testing</h1>`);
 });
 
 test("Issue #3424, id attribute conflicts (four deep, hard coded id conflicts)", async (t) => {
@@ -121,7 +121,7 @@ test("Issue #3424, id attribute conflicts (four deep, hard coded id conflicts)",
   });
 
   let results = await elev.toJSON();
-	t.assert.strictEqual(results[0].content.trim(), `<h1 id="testing-4">Testing</h1><h1 id="testing-2">Testing</h1><h1 id="testing-3">Testing</h1><h1 id="testing">Testing</h1>`);
+	t.assert.strictEqual(results[0].content.trim(), `<h1 id="testing-2">Testing</h1><h1 id="testing-3">Testing</h1><h1 id="testing-4">Testing</h1><h1 id="testing">Testing</h1>`);
 });
 
 test("Issue #3424, id attribute conflicts (five deep, hard coded id conflicts)", async (t) => {
@@ -134,7 +134,7 @@ test("Issue #3424, id attribute conflicts (five deep, hard coded id conflicts)",
   });
 
   let results = await elev.toJSON();
-	t.assert.strictEqual(results[0].content.trim(), `<h1 id="testing-5">Testing</h1><h1 id="testing-2">Testing</h1><h1 id="testing-3">Testing</h1><h1 id="testing-4">Testing</h1><h1 id="testing">Testing</h1>`);
+	t.assert.strictEqual(results[0].content.trim(), `<h1 id="testing-2">Testing</h1><h1 id="testing-3">Testing</h1><h1 id="testing-4">Testing</h1><h1 id="testing-5">Testing</h1><h1 id="testing">Testing</h1>`);
 });
 
 test("Issue #3424, id attribute conflicts (two hard coded id conflicts)", async (t) => {
@@ -177,3 +177,21 @@ test("Issue #3424, filter callback skips", async (t) => {
 	t.assert.strictEqual(results[0].content.trim(), `<h1 id="testing-2">Testing</h1><h1 id="testing">Testing</h1>`);
 	t.assert.strictEqual(results[1].content.trim(), `<h1 id="testing">Testing</h1><h1 id="testing">Testing</h1>`);
 });
+
+for (let [name, input, expected] of [
+	["generated suffix conflicts with later heading", `<h1>Foo</h1><h1>Foo</h1><h1>Foo 2</h1>`, `<h1 id="foo">Foo</h1><h1 id="foo-3">Foo</h1><h1 id="foo-2">Foo 2</h1>`],
+	["generated suffix conflicts with later id attribute", `<h1>Foo</h1><h1>Foo</h1><div id="foo-2"></div>`, `<h1 id="foo">Foo</h1><h1 id="foo-3">Foo</h1><div id="foo-2"></div>`],
+	["renamed heading conflicts with later heading", `<h1>Foo</h1><div id="foo"></div><h1>Foo 2</h1>`, `<h1 id="foo-3">Foo</h1><div id="foo"></div><h1 id="foo-2">Foo 2</h1>`],
+]) {
+	test(`Issue #4445, id attribute conflicts (${name})`, async (t) => {
+		let elev = new Eleventy("./test/stubs-virtual/", "./test/stubs-virtual/_site", {
+			config: function ($config) {
+				$config.addPlugin(IdAttributePlugin);
+				$config.addTemplate("test.html", input, {});
+			},
+		});
+
+		let results = await elev.toJSON();
+		t.assert.strictEqual(results[0].content.trim(), expected);
+	});
+}

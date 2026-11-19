@@ -50,55 +50,52 @@ export function IdAttributePlugin(eleventyConfig, options = {}) {
 
 			return function (tree) {
 				// One per page
-				let conflictCheck = {};
-				// Cache heading nodes for conflict resolution
-				let headingNodes = {};
+				let usedIds = new Set();
+				let headings = [];
 
+				// Collect existing ids first so generated ids never collide with ids later in the document.
 				tree.match(matchSelector(options.selector), function (node) {
-					if (node.attrs?.id) {
-						let id = node.attrs?.id;
-						if (conflictCheck[id]) {
-							conflictCheck[id]++;
-							if (headingNodes[id]) {
-								// Rename conflicting assigned heading id
-								let newId = `${id}-${conflictCheck[id]}`;
-								headingNodes[newId] = headingNodes[id];
-								headingNodes[newId].attrs.id = newId;
-								delete headingNodes[id];
-							} else if (options.checkDuplicates === "error") {
-								// Existing `id` conflicts with assigned heading id, throw error
-								throw new Error(
-									'You have more than one HTML `id` attribute using the same value (id="' +
-										id +
-										'") in your template (' +
-										pluginOptions.page.inputPath +
-										"). You can disable this error in the IdAttribute plugin with the `checkDuplicates: false` option.",
-								);
-							}
-						} else {
-							conflictCheck[id] = 1;
+					let id = node.attrs?.id;
+					if (id) {
+						if (usedIds.has(id) && options.checkDuplicates === "error") {
+							throw new Error(
+								'You have more than one HTML `id` attribute using the same value (id="' +
+									id +
+									'") in your template (' +
+									pluginOptions.page.inputPath +
+									"). You can disable this error in the IdAttribute plugin with the `checkDuplicates: false` option.",
+							);
 						}
-					} else if (!node.attrs?.id && node.content) {
-						node.attrs = node.attrs || {};
+						usedIds.add(id);
+					} else if (node.content) {
 						let textContent = getTextNodeContent(node);
 						if (options.decodeEntities) {
 							textContent = decodeHTML(textContent);
 						}
-						let id = options.slugify(textContent);
-
-						if (conflictCheck[id]) {
-							conflictCheck[id]++;
-							id = `${id}-${conflictCheck[id]}`;
-						} else {
-							conflictCheck[id] = 1;
-						}
-
-						headingNodes[id] = node;
-						node.attrs.id = id;
+						headings.push({ node, slug: options.slugify(textContent) });
 					}
 
 					return node;
 				});
+
+				// Reserve every heading's own slug so a suffixed duplicate (`foo-2`) can't take another heading's natural id.
+				let reservedIds = new Set([...usedIds, ...headings.map(({ slug }) => slug)]);
+
+				for (let { node, slug } of headings) {
+					let id = slug;
+					if (usedIds.has(id)) {
+						let suffix = 2;
+						while (reservedIds.has(`${slug}-${suffix}`)) {
+							suffix++;
+						}
+						id = `${slug}-${suffix}`;
+						reservedIds.add(id);
+					}
+
+					usedIds.add(id);
+					node.attrs = node.attrs || {};
+					node.attrs.id = id;
+				}
 			};
 		},
 		{
