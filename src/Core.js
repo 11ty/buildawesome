@@ -433,7 +433,7 @@ export default class Core extends CoreFs {
 		this.watcher = new Watch(this.eleventyConfig);
 		this.watcher.watchTargets(targets);
 		this.watcher.addIgnores(ignores);
-		this.watcher.addIgnores(projectIgnores);
+		this.watcher.addIgnores(this.eleventyFiles.toWatcherIgnores(projectIgnores));
 
 		this.#passthroughCopyWatcher = new Watch(this.eleventyConfig);
 		this.#passthroughCopyWatcher.watchTargets(passthroughCopyTargets);

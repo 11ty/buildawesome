@@ -486,7 +486,7 @@ test("Glob Watcher Files with Config Passthroughs (no template formats)", async 
   ]);
 });
 
-test("Test that negations are ignored (for now) PR#709, will change when #693 is implemented", async (t) => {
+test("Negations are kept in ignore content", async (t) => {
   let templateConfig = new TemplateConfig();
   let projectDirs = new ProjectDirectories();
   projectDirs.setViaConfigObject({
@@ -501,6 +501,6 @@ test("Test that negations are ignored (for now) PR#709, will change when #693 is
       `hello
 !testing`
     ),
-    ["./hello"]
+    ["./hello", "!./testing"]
   );
 });

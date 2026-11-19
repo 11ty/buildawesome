@@ -4,7 +4,7 @@ import { TemplatePath } from "@11ty/eleventy-utils";
 
 import { createDebug } from "./Util/DebugLogUtil.js";
 import GlobRemap from "./Util/GlobRemap.js";
-import { isGlobMatch } from "./Util/GlobMatcher.js";
+import { isGlobMatch, createIgnoreMatcher, hasNegatedPattern } from "./Util/GlobMatcher.js";
 
 const debug = createDebug("FileSystemSearch");
 
@@ -85,16 +85,23 @@ class FileSystemSearch {
 			options.cwd = cwd;
 		}
 
+		let ignoreMatcher;
 		if (options.ignore && Array.isArray(options.ignore)) {
-			options.ignore = options.ignore.map((entry) => {
-				entry = TemplatePath.stripLeadingDotSlash(entry);
-
-				return GlobRemap.remapInput(entry, cwd);
-			});
+			let ignores = options.ignore.map((entry) => TemplatePath.stripLeadingDotSlash(entry));
+			// Negated ignores are applied after the crawl, which skips only what they can’t re-include
+			if (hasNegatedPattern(ignores)) {
+				ignoreMatcher = createIgnoreMatcher(ignores, { gitPatterns: options.gitIgnore });
+				ignores = ignoreMatcher.getPrunableIgnores();
+			}
+			options.ignore = ignores.map((entry) => GlobRemap.remapInput(entry, cwd));
+			delete options.gitIgnore;
 			debug("Glob search (%o) ignoring: %o", key, options.ignore);
 		}
 
 		let cacheKey = this.getCacheKey(key, globs, options);
+		if (ignoreMatcher) {
+			cacheKey += JSON.stringify([ignoreMatcher.patterns, ignoreMatcher.gitPatterns]);
+		}
 
 		// Only after the promise has resolved
 		if (this.outputs[cacheKey]) {
@@ -105,6 +112,7 @@ class FileSystemSearch {
 			this.inputs[cacheKey] = {
 				input: globs,
 				options,
+				ignoreMatcher,
 			};
 
 			this.count++;
@@ -121,11 +129,12 @@ class FileSystemSearch {
 			options.dot ??= true;
 
 			this.promises[cacheKey] = glob(globs, { ...options, fs: this.#fs }).then((results) => {
+				let paths = results.map((entry) => GlobRemap.remapOutput(entry, options.cwd));
+				if (ignoreMatcher) {
+					paths = paths.filter((entry) => !ignoreMatcher.isIgnored(entry));
+				}
 				this.outputs[cacheKey] = new Set(
-					results.map((entry) => {
-						let remapped = GlobRemap.remapOutput(entry, options.cwd);
-						return TemplatePath.standardizeFilePath(remapped);
-					}),
+					paths.map((entry) => TemplatePath.standardizeFilePath(entry)),
 				);
 
 				if (!this.#existsCache?.allowCaseCollisions) {
@@ -151,11 +160,12 @@ class FileSystemSearch {
 		let normalized = TemplatePath.standardizeFilePath(path);
 
 		for (let key in this.inputs) {
-			let { input, options } = this.inputs[key];
+			let { input, options, ignoreMatcher } = this.inputs[key];
 			if (
 				!isGlobMatch(normalized, input, {
 					ignore: options.ignore,
-				})
+				}) ||
+				ignoreMatcher?.isIgnored(normalized)
 			) {
 				continue;
 			}

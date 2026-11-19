@@ -61,7 +61,7 @@ test("#3543 Project ignores don’t apply to the passthrough copy watcher", asyn
 
   let isIgnoredByBuildWatcher = getIsIgnored(files.getGlobWatcherFiles(), [
     ...ignores,
-    ...files.getGlobWatcherProjectIgnores(),
+    ...files.toWatcherIgnores(files.getGlobWatcherProjectIgnores()),
   ]);
   t.assert.strictEqual(isIgnoredByBuildWatcher("test/stubs-3543/index.md", false), false);
   t.assert.strictEqual(isIgnoredByBuildWatcher("test/stubs-3543/assets/notes.md", false), true);

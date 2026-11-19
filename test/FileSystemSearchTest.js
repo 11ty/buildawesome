@@ -139,3 +139,33 @@ test("Glob search allows file names that differ only by case with allowCaseColli
   let results = await new FileSystemSearch(cache).search("x", [`${dir}/*.md`]);
   t.assert.strictEqual(results.length, 2);
 });
+
+test("Negated ignores re-include files", async (t) => {
+  let fs = new FileSystemSearch();
+  let results = await fs.search("key", "./test/stubs-4439/**/*.md", {
+    ignore: ["./test/stubs-4439/site/**", "!./test/stubs-4439/site/events/2018/**"],
+  });
+  t.assert.deepStrictEqual(results.sort(), [
+    "./test/stubs-4439/index.md",
+    "./test/stubs-4439/site/events/2018/b.md",
+  ]);
+
+  fs.add("./test/stubs-4439/site/events/2018/virtual.md");
+  fs.add("./test/stubs-4439/site/other/virtual.md");
+  t.assert.deepStrictEqual((await fs.search("key", "./test/stubs-4439/**/*.md", {
+    ignore: ["./test/stubs-4439/site/**", "!./test/stubs-4439/site/events/2018/**"],
+  })).sort(), [
+    "./test/stubs-4439/index.md",
+    "./test/stubs-4439/site/events/2018/b.md",
+    "./test/stubs-4439/site/events/2018/virtual.md",
+  ]);
+});
+
+test("Negated ignores can’t re-include files in a directory excluded by .gitignore", async (t) => {
+  let fs = new FileSystemSearch();
+  let results = await fs.search("key", "./test/stubs-4439/**/*.md", {
+    ignore: ["./test/stubs-4439/site/**", "!./test/stubs-4439/site/events/2018/**"],
+    gitIgnore: ["./test/stubs-4439/site/**"],
+  });
+  t.assert.deepStrictEqual(results, ["./test/stubs-4439/index.md"]);
+});

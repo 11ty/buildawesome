@@ -43,6 +43,9 @@ test("Get ignores (no .eleventyignore)", async (t) => {
     "./test/stubs/ignorelocalrootgitignore/test.md",
     "./test/stubs/ignore2/_site/**",
   ]);
+  t.assert.deepStrictEqual(Array.from(evf.gitIgnores), [
+    "./test/stubs/ignorelocalrootgitignore/thisshouldnotexist12345",
+  ]);
 
   t.assert.deepStrictEqual(evf.getIgnoreGlobs().slice(-2), [
     "**/node_modules/**",
@@ -312,4 +315,28 @@ test("De-duplicated ignores", async (t) => {
     "**/node_modules/**",
     "./test/stubs/ignore-dedupe/.git/**",
   ]);
+});
+
+test("Negated .eleventyignore patterns re-include files", async (t) => {
+  let $config = await getTemplateConfigInstance({
+    dir: {
+      input: "test/stubs-4439",
+      output: "test/stubs-4439/_site"
+    }
+  });
+
+  let { eleventyFiles: evf } = getEleventyFilesInstance(["md"], $config);
+  evf.init();
+
+  t.assert.deepStrictEqual((await evf.getFiles()).sort(), [
+    "./test/stubs-4439/index.md",
+    "./test/stubs-4439/site/events/2018/b.md",
+  ]);
+
+  let [isIgnored] = evf.toWatcherIgnores(evf.getGlobWatcherProjectIgnores());
+  let stats = (isDirectory) => ({ isDirectory: () => isDirectory });
+  t.assert.strictEqual(isIgnored("test/stubs-4439/site/events", stats(true)), false);
+  t.assert.strictEqual(isIgnored("test/stubs-4439/site/other", stats(true)), true);
+  t.assert.strictEqual(isIgnored("test/stubs-4439/site/events/2018/b.md", stats(false)), false);
+  t.assert.strictEqual(isIgnored("test/stubs-4439/site/events/2019/c.md", stats(false)), true);
 });

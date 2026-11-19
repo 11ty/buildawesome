@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
+import path from "node:path";
 
 import { TemplatePath } from "@11ty/eleventy-utils";
 
 import { createDebug } from "./Util/DebugLogUtil.js";
 import DirContains from "./Util/DirContains.js";
 import TemplateGlob from "./TemplateGlob.js";
+import { createIgnoreMatcher, hasNegatedPattern } from "./Util/GlobMatcher.js";
 import checkPassthroughCopyBehavior from "./Util/PassthroughCopyBehaviorCheck.js";
 
 const debug = createDebug("Files");
@@ -171,6 +173,9 @@ export class Files {
 	}
 
 	normalizeIgnoreEntry(entry) {
+		if (entry.startsWith("!")) {
+			return "!" + this.normalizeIgnoreEntry(entry.slice(1));
+		}
 		if (!entry.startsWith("**/")) {
 			return TemplateGlob.normalizePath(this.localPathRoot || ".", entry);
 		}
@@ -229,27 +234,18 @@ export class Files {
 					return line.trim();
 				})
 				.filter((line) => {
-					if (line.charAt(0) === "!") {
-						debug(
-							">>> When processing .gitignore/.eleventyignore, Eleventy does not currently support negative patterns but encountered one:",
-						);
-						debug(">>>", line);
-						debug(
-							"Follow along at https://github.com/11ty/buildawesome/issues/693 to track support.",
-						);
-					}
-
 					// empty lines or comments get filtered out
-					return line.length > 0 && line.charAt(0) !== "#" && line.charAt(0) !== "!";
+					return line.length > 0 && line.charAt(0) !== "#";
 				})
 				.map((line) => {
-					let path = TemplateGlob.normalizePath(dir, "/", line);
+					let negation = line.charAt(0) === "!" ? "!" : "";
+					let path = TemplateGlob.normalizePath(dir, "/", line.slice(negation.length));
 					path = TemplatePath.addLeadingDotSlash(TemplatePath.relativePath(path));
 
 					if (this.templateConfig.existsCache.isDirectory(path)) {
-						return path + "/**";
+						return negation + path + "/**";
 					}
-					return path;
+					return negation + path;
 				});
 		}
 
@@ -263,9 +259,16 @@ export class Files {
 
 	getIgnores() {
 		let files = new Set();
+		this.gitIgnores = new Set();
 
-		for (let ignore of this.getFileIgnores(this.getIgnoreFiles())) {
-			files.add(ignore);
+		for (let ignoreFile of this.getIgnoreFiles()) {
+			let isGitIgnore = TemplatePath.getLastPathSegment(ignoreFile) === ".gitignore";
+			for (let ignore of this.getFileIgnores(ignoreFile)) {
+				files.add(ignore);
+				if (isGitIgnore) {
+					this.gitIgnores.add(ignore);
+				}
+			}
 		}
 
 		// testing API
@@ -356,6 +359,7 @@ export class Files {
 		debug("Searching for: %o", globs);
 		return this.fileSystemSearch.search("templates", globs, {
 			ignore: this.uniqueIgnores,
+			gitIgnore: Array.from(this.gitIgnores ?? []),
 		});
 	}
 
@@ -473,6 +477,25 @@ export class Files {
 		}
 
 		return Array.from(entries);
+	}
+
+	/* Negated project ignores become one ordered matcher function for chokidar `ignored` */
+	toWatcherIgnores(ignores) {
+		if (!hasNegatedPattern(ignores)) {
+			return ignores;
+		}
+
+		let matcher = createIgnoreMatcher(ignores, { gitPatterns: this.gitIgnores });
+		// chokidar may omit `stats`, so assume a directory to avoid pruning re-included files.
+		return [
+			(filePath, stats) => {
+				let relativePath = path.isAbsolute(filePath) ? path.relative(".", filePath) : filePath;
+				return matcher.isIgnored(
+					TemplatePath.standardizeFilePath(relativePath),
+					stats ? stats.isDirectory() : true,
+				);
+			},
+		];
 	}
 
 	getIncludesAndDataDirs() {
