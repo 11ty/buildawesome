@@ -254,6 +254,19 @@ test("locale_url still rejects a non-localized fallback with a fragment in stric
   await t.assert.rejects(() => elev.toJSON());
 });
 
+for (let errorMode of ["strict", "allow-fallback"]) {
+  test(`locale_url rejects a URL that matches no page (${errorMode})`, async (t) => {
+    let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
+      config: function (config) {
+        config.addPlugin(I18nPlugin, { defaultLanguage: "en", errorMode });
+        config.addTemplate("es/index.njk", '{{ "/missing/" | locale_url }}');
+      },
+    });
+    elev.disableLogger();
+    await t.assert.rejects(() => elev.toJSON());
+  });
+}
+
 test("locale_url leaves fragment-only and external links unchanged", async (t) => {
   let elev = new Eleventy("./test/stubs-empty/", "./test/stubs-empty/_site", {
     config: function (config) {

@@ -324,7 +324,7 @@ function I18nPlugin(eleventyConfig, opts = {}) {
 					`Localized file for URL ${prependedLangCodeUrl} was not found in your project. A non-localized version does exist—are you sure you meant to use the \`${options.filters.url}\` filter for this? You can bypass this error using the \`errorMode\` option in the I18N plugin (current value: "${options.errorMode}").`,
 				);
 			}
-		} else if (options.errorMode === "allow-fallback") {
+		} else if (options.errorMode !== "never") {
 			// You’re linking to a localized file that doesn’t exist!
 			throw new Error(
 				`Localized file for URL ${prependedLangCodeUrl} was not found in your project! You will need to add it if you want to link to it using the \`${options.filters.url}\` filter. You can bypass this error using the \`errorMode\` option in the I18N plugin (current value: "${options.errorMode}").`,
