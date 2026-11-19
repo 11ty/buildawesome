@@ -661,7 +661,9 @@ Arguments:
 
      --incremental=first.md,second.md
      --incremental=first.md --incremental=second.md
-       Does not require watch/serve. Run an incremental build targeting one or more files.
+     --incremental=src/**/*.md
+       Does not require watch/serve. Run an incremental build targeting one or more files
+       (file paths or glob patterns).
 
      --ignore-initial
        Start without a build; build when files change. Works best with watch/serve/incremental.

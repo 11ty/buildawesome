@@ -152,6 +152,7 @@ async function exec() {
 		// v4.0.0-alpha.8 multiple now supported via:
 		// --incremental=one.md --incremental=two.md => ["one.md", "two.md"]
 		// --incremental=one.md,two.md => ["one.md", "two.md"]
+		// --incremental=dir/**/*.md => glob patterns are expanded to matching files
 		if(argv.incremental) {
 			core.setIncrementalFiles(argv.incremental);
 		} else if(argv.incremental !== undefined) {
