@@ -185,6 +185,14 @@ export default class ComputedData {
 		}
 	}
 
+	// A shallow copy for template engines that copy all of their data (e.g. a Nunjucks context), which isn’t an early read
+	getUnguardedCopy(data) {
+		if (!this.#guards.get(data)?.size) {
+			return data;
+		}
+		return withoutTracking(() => ({ ...data }));
+	}
+
 	async processRemainingData(data) {
 		await this.setupData(data);
 	}
@@ -383,7 +391,8 @@ export default class ComputedData {
 				}
 			}
 
-			let value = target[prop];
+			// Its own previous value (e.g. overriding front matter) isn’t an early read
+			let value = path === context.key ? withoutTracking(() => target[prop]) : target[prop];
 			if (context.signals.hasPendingChild(path, context.key)) {
 				// e.g. reading `page` before `page.url` is set
 				return this.#getTrackingProxy(
@@ -391,6 +400,11 @@ export default class ComputedData {
 					context,
 					path,
 				);
+			}
+
+			// Parents of a dotted key stay proxied so it reads its own previous value through the check above
+			if (value && typeof value === "object" && context.key.startsWith(path + ".")) {
+				return this.#getTrackingProxy(value, context, path);
 			}
 
 			return value;

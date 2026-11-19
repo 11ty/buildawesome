@@ -732,7 +732,7 @@ class Template extends TemplateContent {
 			computedData.addTemplateString(
 				parentKey,
 				async function (innerData) {
-					return this.tmpl.#renderComputedUnit(obj, innerData);
+					return this.tmpl.#renderComputedUnit(obj, computedData.getUnguardedCopy(innerData));
 				},
 				declaredDependencies,
 				async (innerData) => this.parseForSymbols(obj, await this.getComputedDataEngine(innerData)),
@@ -765,7 +765,7 @@ class Template extends TemplateContent {
 		let outputLocations = new WeakMap();
 		let getOutputLocations = (data) => {
 			if (!outputLocations.has(data)) {
-				outputLocations.set(data, this.getOutputLocations(data));
+				outputLocations.set(data, this.getOutputLocations(cd.getUnguardedCopy(data)));
 			}
 			return outputLocations.get(data);
 		};
@@ -826,7 +826,6 @@ class Template extends TemplateContent {
 			this.#warnOnce(
 				path.join(" › "),
 				`${prefix} Computed data resolves after preprocessors (except \`date\`, \`layout\`, ${this.config.keys.tags ? `\`${this.config.keys.tags}\`, ` : ""}\`${ResolveConfigurationData.EXCLUDE_FROM_COLLECTIONS_KEY}\`, \`${this.config.keys.import}\`, and paginated data), so read this value at render time instead.`,
-				{ force: true },
 			);
 			return;
 		}
@@ -834,7 +833,6 @@ class Template extends TemplateContent {
 		this.#warnOnce(
 			path.join(" › "),
 			`${prefix} This is likely a read from another page. You can work around this issue by reading the value at render time, or by reading \`collections\` directly in the computed data that reads this value (e.g. \`data.${path.at(-1)}\` instead of \`….data.${path[0]}\`).`,
-			{ force: true },
 		);
 	}
 

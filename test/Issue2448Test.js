@@ -100,3 +100,59 @@ test("#2448: No warning when a preprocessor reads computed data resolved before 
 	await elev.toJSON();
 	t.assert.strictEqual(warnings.length, 0);
 });
+
+test("#2448: No warning when a dotted computed key reads its own previous value", async (t) => {
+	let elev = new Eleventy("test/noop", false, {
+		config(eleventyConfig) {
+			eleventyConfig.addTemplate("seo.njk", "{{ seo.image }}", {
+				seo: { image: "/a.jpg" },
+				eleventyComputed: { seo: { image: (data) => data.seo?.image || "/fallback.jpg" } },
+			});
+		},
+	});
+	let warnings = captureWarnings(elev);
+
+	let results = await elev.toJSON();
+	t.assert.strictEqual(results[0].content, "/a.jpg");
+	t.assert.strictEqual(warnings.length, 0);
+});
+
+test("#2448: No warning when a Nunjucks permalink renders before other computed data resolves", async (t) => {
+	let elev = new Eleventy("test/noop", false, {
+		config(eleventyConfig) {
+			eleventyConfig.addTemplate("post.njk", "{{ title }}", {
+				title: "front matter",
+				permalink: "/posts/{{ page.fileSlug }}/",
+				eleventyComputed: {
+					title: (data) => `computed ${data.title}`,
+					label: "{{ title }}!",
+				},
+			});
+		},
+	});
+	let warnings = captureWarnings(elev);
+
+	let [result] = await elev.toJSON();
+	t.assert.strictEqual(result.url, "/posts/post/");
+	t.assert.strictEqual(result.content, "computed front matter");
+	t.assert.strictEqual(warnings.length, 0);
+});
+
+test("#2448: Early read warnings are verbose-only (debug output in quiet mode)", async (t) => {
+	let elev = new Eleventy("test/noop", false, {
+		config(eleventyConfig) {
+			eleventyConfig.addPreprocessor("check", "njk", (data) => {
+				data.title;
+			});
+			eleventyConfig.addTemplate("lazy.njk", "{{ title }}", {
+				title: "front matter",
+				eleventyComputed: { title: () => "computed" },
+			});
+		},
+	});
+	let warnings = captureWarnings(elev);
+	elev.setIsVerbose(false);
+
+	await elev.toJSON();
+	t.assert.strictEqual(warnings.length, 0);
+});
