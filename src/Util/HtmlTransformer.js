@@ -1,4 +1,4 @@
-import posthtml from "posthtml";
+import posthtml from "@11ty/posthtml";
 import urls from "@11ty/posthtml-urls";
 import { FilePathUtil } from "./FilePathUtil.js";
 
@@ -15,7 +15,7 @@ export class HtmlTransformer {
 		/** @type {object} */
 		this.callbacks = {};
 
-		/** @type {object} */
+		/** @type {import("@11ty/posthtml").ProcessOptions} */
 		this.posthtmlProcessOptions = {
 			xmlMode: false,
 			recognizeNoValueAttribute: true,
