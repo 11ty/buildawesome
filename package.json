@@ -133,7 +133,7 @@
 		"@11ty/dependency-tree": "^5.0.0-alpha.3",
 		"@11ty/eleventy-dev-server": "^3.0.0-alpha.17",
 		"@11ty/eleventy-plugin-bundle": "^4.1.0",
-		"@11ty/eleventy-utils": "^3.0.1",
+		"@11ty/eleventy-utils": "^3.1.0",
 		"@11ty/gray-matter": "^3.0.0",
 		"@11ty/lodash-custom": "^5.0.0",
 		"@11ty/node-version-check": "^1.0.1",

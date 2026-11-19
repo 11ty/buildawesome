@@ -1,9 +1,16 @@
 import { isPlainObject } from "@11ty/eleventy-utils";
+
+import { withoutTracking } from "../../Data/InternalReads.js";
 // import { createDebug } from "../DebugLogUtil.js";
 
 // const debug = createDebug("Dev:Eleventy:Proxy");
 
 const ProxySymbol = Symbol.for("11ty.ProxySymbol");
+
+// `Object.isFrozen` walks every key, which isn’t a real read of tracked global data
+function isFrozen(value) {
+	return withoutTracking(() => Object.isFrozen(value));
+}
 
 // One handler per proxy with shared trap methods (instead of five closures per proxy)
 class FallbackHandler {
@@ -63,7 +70,7 @@ class FallbackHandler {
 			}
 
 			if (isPlainObject(value) && Reflect.has(this.fallback, prop)) {
-				if (Object.isFrozen(value)) {
+				if (isFrozen(value)) {
 					return value;
 				}
 
@@ -85,7 +92,7 @@ class FallbackHandler {
 			let fallbackValue = Reflect.get(this.fallback, prop);
 
 			if (isPlainObject(fallbackValue)) {
-				if (Object.isFrozen(fallbackValue)) {
+				if (isFrozen(fallbackValue)) {
 					return fallbackValue;
 				}
 
@@ -115,7 +122,7 @@ class FallbackHandler {
 }
 
 function wrapObject(target, fallback) {
-	if (Object.isFrozen(target)) {
+	if (isFrozen(target)) {
 		return target;
 	}
 

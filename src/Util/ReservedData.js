@@ -1,3 +1,5 @@
+import { isPlainObject } from "@11ty/eleventy-utils";
+
 class CoreReservedDataError extends TypeError {}
 
 class ReservedData {
@@ -72,6 +74,14 @@ class ReservedData {
 
 	static checkSubset(data, sourceLocation) {
 		this.#check(data, sourceLocation, this.properties);
+	}
+
+	// Frozen global data is copied on write, so merging an object into a reserved global key no longer throws on its own
+	static checkGlobalOverrides(data, globalKeys, sourceLocation) {
+		let reservedNames = globalKeys.filter((key) => isPlainObject(data?.[key]));
+		if (reservedNames.length > 0) {
+			throw this.getError({ reservedNames, sourceLocation });
+		}
 	}
 
 	static getError(options = {}) {

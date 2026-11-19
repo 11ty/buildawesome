@@ -1303,9 +1303,9 @@ eleventy:
   	e = err;
   	return true;
   });
-  t.assert.strictEqual(e.message, 'You attempted to set one of Build Awesome’s reserved data property names. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/');
+  t.assert.strictEqual(e.message, 'You attempted to set one of Build Awesome’s reserved data property names: eleventy. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/');
 
-  t.assert.strictEqual(e.cause.toString(), "TypeError: Cannot add property key1, object is not extensible");
+  t.assert.deepStrictEqual(e.reservedNames, ["eleventy"]);
 });
 
 test("Eleventy setting reserved data throws error (pkg)", async (t) => {
@@ -1324,9 +1324,9 @@ pkg:
   	e = err;
   	return true;
   });
-  t.assert.strictEqual(e.message, 'You attempted to set one of Build Awesome’s reserved data property names. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/');
+  t.assert.strictEqual(e.message, 'You attempted to set one of Build Awesome’s reserved data property names: pkg. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/');
 
-  t.assert.strictEqual(e.cause.toString(), "TypeError: Cannot add property myOwn, object is not extensible");
+  t.assert.deepStrictEqual(e.reservedNames, ["pkg"]);
 });
 
 test("Eleventy pagination works okay with reserved data throws (eleventy) Issue #3262", async (t) => {
@@ -1540,9 +1540,9 @@ parkour:
   	e = err;
   	return true;
   });
-  t.assert.strictEqual(e.message, 'You attempted to set one of Build Awesome’s reserved data property names. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/');
+  t.assert.strictEqual(e.message, 'You attempted to set one of Build Awesome’s reserved data property names: parkour. You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/');
 
-  t.assert.strictEqual(e.cause.toString(), "TypeError: Cannot add property myOwn, object is not extensible");
+  t.assert.deepStrictEqual(e.reservedNames, ["parkour"]);
 });
 
 test("Eleventy data schema (success) #879", async (t) => {
@@ -2292,4 +2292,61 @@ test(`Truthy outputPath without a file extension error message is disabled via m
 
   let results = await elev.toJSON();
   t.assert.strictEqual(results.length, 1);
+});
+
+test("Global data objects are shared across templates and copied on write", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      $config.addGlobalData("site", { meta: { title: "Global" }, nav: { home: "/" } });
+      $config.addTemplate("a.njk", "{{ site.meta.title }} {{ site.meta.lang }}", { site: { meta: { lang: "en" } } });
+      $config.addTemplate("b.njk", "{{ site.meta.title }} {{ site.meta.lang }}");
+    }
+  });
+
+  let results = await elev.toJSON();
+  results.sort((a, b) => a.inputPath.localeCompare(b.inputPath));
+  t.assert.strictEqual(results[0].content, "Global en");
+  t.assert.strictEqual(results[1].content, "Global ");
+
+  let [a, b] = elev.writer.templateMap.getMap().sort((a, b) => a.inputPath.localeCompare(b.inputPath));
+  t.assert.strictEqual(a.data.site.nav, b.data.site.nav);
+  t.assert.notStrictEqual(a.data.site.meta, b.data.site.meta);
+  t.assert.strictEqual(Object.isFrozen(b.data.site.meta), true);
+  t.assert.throws(() => {
+    "use strict";
+    b.data.site.meta.title = "Mutated";
+  });
+});
+
+test("Global data passed in by the user isn’t frozen in place", async (t) => {
+  let site = { meta: { title: "Global" } };
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      $config.addGlobalData("site", site);
+      $config.addTemplate("index.njk", "{{ site.meta.title }}");
+    }
+  });
+
+  let results = await elev.toJSON();
+  t.assert.strictEqual(results[0].content, "Global");
+  t.assert.strictEqual(Object.isFrozen(site.meta), false);
+  t.assert.strictEqual(Object.isFrozen(elev.writer.templateMap.getMap()[0].data.site.meta), true);
+});
+
+test("setFreezeGlobalData(false) gives each template its own mutable copy", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    config: $config => {
+      $config.setFreezeGlobalData(false);
+      $config.addGlobalData("site", { nav: { home: "/" } });
+      $config.addTemplate("a.njk", "a");
+      $config.addTemplate("b.njk", "b");
+    }
+  });
+
+  await elev.toJSON();
+  let [a, b] = elev.writer.templateMap.getMap();
+  t.assert.strictEqual(Object.isFrozen(a.data.site.nav), false);
+  t.assert.notStrictEqual(a.data.site.nav, b.data.site.nav);
+  a.data.site.nav.home = "/changed/";
+  t.assert.strictEqual(b.data.site.nav.home, "/");
 });

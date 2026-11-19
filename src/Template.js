@@ -525,6 +525,13 @@ class Template extends TemplateContent {
 		}
 
 		try {
+			if (this.config.freezeReservedData) {
+				let reservedGlobalKeys = ["eleventy", "buildawesome", this.config.keys.package];
+				for (let data of [mergedLayoutData, localData, frontMatterData]) {
+					ReservedData.checkGlobalOverrides(data, reservedGlobalKeys);
+				}
+			}
+
 			let mergedData = Merge({}, globalData, mergedLayoutData, localData, frontMatterData);
 
 			if (this.config.freezeReservedData) {

@@ -1,6 +1,6 @@
 import path from "node:path";
 import lodash from "@11ty/lodash-custom";
-import { Merge, TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
+import { DeepCopy, Merge, TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 
 import { inspect } from "../Adapters/Packages/inspect.js";
 import unique from "../Util/Objects/Unique.js";
@@ -535,7 +535,19 @@ class TemplateData {
 		);
 
 		// OK: Shallow merge when combining rawImports (pkg) with global data files
-		return Object.assign({}, mergedGlobalData, rawImports);
+		let globalData = Object.assign({}, mergedGlobalData, rawImports);
+
+		// Frozen values are shared by reference across every template’s data cascade instead of deep-copied
+		if (this.config.freezeGlobalData) {
+			for (let [key, value] of Object.entries(globalData)) {
+				if (isPlainObject(value)) {
+					// Freeze a copy so objects the user still holds a reference to stay mutable
+					globalData[key] = DeepFreeze(DeepCopy({}, value));
+				}
+			}
+		}
+
+		return globalData;
 	}
 
 	// Available after `getGlobalData()`

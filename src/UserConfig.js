@@ -223,6 +223,7 @@ export default class UserConfig {
 		/** @type {Record<string, any>} */
 		this.virtualTemplates = {};
 		this.freezeReservedData = true;
+		this.freezeGlobalData = true;
 		this.customDateParsingCallbacks = new Set();
 		this.dateTimeZone = undefined;
 
@@ -1177,6 +1178,11 @@ export default class UserConfig {
 		this.freezeReservedData = !!bool;
 	}
 
+	// Global data is frozen and shared across templates, opt out to give each template its own mutable copy.
+	setFreezeGlobalData(bool) {
+		this.freezeGlobalData = !!bool;
+	}
+
 	addDateParsing(callback) {
 		if (typeof callback === "function") {
 			this.customDateParsingCallbacks.add(callback);
@@ -1420,6 +1426,7 @@ export default class UserConfig {
 			virtualTemplates: this.virtualTemplates,
 			// `directories` and `directoryAssignments` are merged manually prior to plugin processing
 			freezeReservedData: this.freezeReservedData,
+			freezeGlobalData: this.freezeGlobalData,
 			customDateParsing: this.customDateParsingCallbacks,
 			dateTimeZone: this.dateTimeZone,
 			errorReporting: this.errorReporting,
