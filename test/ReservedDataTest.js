@@ -97,3 +97,17 @@ test("Eleventy freeze data written in a global data function throws error #4341"
     message: 'You attempted to set one of Build Awesome’s reserved data property names (source: ./test/stubs-freeze/eleventy-fn/_data/meta.js). You can opt-out of this behavior with `$config.setFreezeReservedData(false)` or rename/remove the property in your data cascade that conflicts with reserved property names (e.g. `buildawesome`, `eleventy`, `pkg`, and others). Learn more: https://v3.11ty.dev/docs/data-eleventy-supplied/'
   });
 });
+
+test("Eleventy freeze data `override:` prefix on a reserved global key throws error", async (t) => {
+  let elev = new Eleventy("./test/stubs-virtual/", undefined, {
+    configPath: "./test/stubs-virtual/eleventy.config.js",
+    config: $config => {
+      $config.addTemplate("index.html", ``, { "override:pkg": { name: "nope" } });
+    }
+  });
+  elev.disableLogger();
+
+  await t.assert.rejects(() => elev.toJSON(), {
+    message: /reserved data property names: pkg/
+  });
+});

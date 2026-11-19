@@ -565,7 +565,12 @@ class TemplateData {
 
 	/* Template and Directory data files */
 	async combineLocalData(localDataPaths) {
-		let localData = {};
+		return Merge({}, ...(await this.getLocalDataSources(localDataPaths)));
+	}
+
+	// One entry per data file (least to most specific), unmerged so `override:` keys reach the data cascade
+	async getLocalDataSources(localDataPaths) {
+		let sources = [];
 		if (!Array.isArray(localDataPaths)) {
 			localDataPaths = [localDataPaths];
 		}
@@ -579,7 +584,7 @@ class TemplateData {
 		this.config.events.emit("buildawesome.datafiles", localDataPaths);
 
 		if (!localDataPaths.length) {
-			return localData;
+			return sources;
 		}
 
 		let dataSource = {};
@@ -608,29 +613,40 @@ class TemplateData {
 					dataSource[key] = path;
 				}
 
-				Merge(localData, ResolveConfigurationData.normalize(cleanedDataForPath));
+				sources.push(ResolveConfigurationData.normalize(cleanedDataForPath));
 			}
 		}
 
-		return localData;
+		return sources;
 	}
 
-	async getTemplateDirectoryData(templatePath) {
+	async #getTemplateDirectoryEntry(templatePath) {
 		if (!this.#templateDirectoryData[templatePath]) {
 			// Data file names match case-insensitively (#4224)
 			let existsCache = this.templateConfig.existsCache;
 			let localDataPaths = (await this.getLocalDataPaths(templatePath))
 				.map((path) => existsCache.resolve(path))
 				.filter(Boolean);
-			let importedData = await this.combineLocalData(localDataPaths);
+			let sources = await this.getLocalDataSources(localDataPaths);
 
 			// For incremental builds, a changed data file only affects the templates using it
 			this.config.uses?.addDataFiles(templatePath, localDataPaths);
 
-			this.#templateDirectoryData[templatePath] = importedData;
+			this.#templateDirectoryData[templatePath] = {
+				sources,
+				data: Merge({}, ...sources),
+			};
 		}
 
 		return this.#templateDirectoryData[templatePath];
+	}
+
+	async getTemplateDirectoryData(templatePath) {
+		return (await this.#getTemplateDirectoryEntry(templatePath)).data;
+	}
+
+	async getTemplateDirectoryDataSources(templatePath) {
+		return (await this.#getTemplateDirectoryEntry(templatePath)).sources;
 	}
 
 	getUserDataExtensions() {

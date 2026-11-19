@@ -501,10 +501,12 @@ class Template extends TemplateContent {
 
 	async #getCascadeSources() {
 		let localData = {};
+		let localDataSources = [];
 		let globalData = {};
 
 		if (this.templateData) {
 			localData = await this.templateData.getTemplateDirectoryData(this.inputPath);
+			localDataSources = await this.templateData.getTemplateDirectoryDataSources(this.inputPath);
 			globalData = await this.templateData.getGlobalData();
 		}
 
@@ -513,7 +515,7 @@ class Template extends TemplateContent {
 		let key = this.config.keys.layout;
 		let layoutKey = frontMatterData[key] || localData[key] || globalData[key];
 
-		return { localData, globalData, frontMatterData, layoutKey };
+		return { localData, localDataSources, globalData, frontMatterData, layoutKey };
 	}
 
 	async #getLayoutData(layoutKey) {
@@ -524,7 +526,8 @@ class Template extends TemplateContent {
 	}
 
 	async #getData() {
-		let { localData, globalData, frontMatterData, layoutKey } = await this.#getCascadeSources();
+		let { localData, localDataSources, globalData, frontMatterData, layoutKey } =
+			await this.#getCascadeSources();
 
 		let mergedLayoutData = {};
 		let tr = await this.getTemplateRender();
@@ -541,7 +544,13 @@ class Template extends TemplateContent {
 				}
 			}
 
-			let mergedData = Merge({}, globalData, mergedLayoutData, localData, frontMatterData);
+			let mergedData = Merge(
+				{},
+				globalData,
+				mergedLayoutData,
+				...localDataSources,
+				frontMatterData,
+			);
 
 			if (this.config.freezeReservedData) {
 				ReservedData.checkSubset(mergedData);
@@ -912,10 +921,10 @@ class Template extends TemplateContent {
 
 		let layoutKey = data[key];
 		if (layoutKey !== mergedLayoutKey) {
-			let { localData, globalData, frontMatterData } = await this.#getCascadeSources();
+			let { localDataSources, globalData, frontMatterData } = await this.#getCascadeSources();
 			let previousLayoutData = await this.#getLayoutData(mergedLayoutKey);
 			let layoutData = await this.#getLayoutData(layoutKey);
-			let merged = Merge({}, globalData, layoutData, localData, frontMatterData);
+			let merged = Merge({}, globalData, layoutData, ...localDataSources, frontMatterData);
 			let computedKeys = this.computedData.computedKeys;
 
 			for (let name of new Set([...Object.keys(previousLayoutData), ...Object.keys(layoutData)])) {
