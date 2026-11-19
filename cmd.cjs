@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+"use strict";
 
 // This file intentionally uses older code conventions to be as friendly
 // as possible with error messaging to folks on older runtimes.
