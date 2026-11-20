@@ -1,4 +1,5 @@
 import lodash from "@11ty/lodash-custom";
+import { isPlainObject } from "@11ty/eleventy-utils";
 
 import { createDebug } from "../Util/DebugLogUtil.js";
 import ComputedDataTemplateString from "./ComputedDataTemplateString.js";
@@ -134,8 +135,27 @@ export default class ComputedData {
 		return {};
 	}
 
+	// Frozen global data is shared across templates, so a dotted key’s ancestors are copied before writing to it, Issue #4452
+	#copyFrozenAncestors(rootData, path) {
+		withoutTracking(() => {
+			let data = rootData;
+			for (let part of path.split(".").slice(0, -1)) {
+				let value = data[part];
+				if (!isPlainObject(value)) {
+					return;
+				}
+				if (Object.isFrozen(value)) {
+					value = { ...value };
+					data[part] = value;
+				}
+				data = value;
+			}
+		});
+	}
+
 	#addGuard(rootData, path, onRead) {
 		this.#removeGuard(rootData, path);
+		this.#copyFrozenAncestors(rootData, path);
 		let { data, key } = this.#getGuardTarget(rootData, path);
 		if (!data) {
 			return;
@@ -262,6 +282,7 @@ export default class ComputedData {
 
 		// lodash `set` reads the previous value (possibly through a paginated page’s parent data)
 		this.#removeGuard(data, key);
+		this.#copyFrozenAncestors(data, key);
 		withoutTracking(() => lodashSet(data, key, result));
 		signal.done();
 	}
