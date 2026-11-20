@@ -72,6 +72,16 @@ describe("Command line", { concurrency: true }, () => {
     });
   });
 
+  test("--version prints the package name before the version", async (t) => {
+    await new Promise((resolve) => {
+      exec("node ./cmd.cjs --version", (error, stdout) => {
+        t.assert.ok(!error);
+        t.assert.match(stdout, /^eleventy \d+\.\d+\.\d+\S*\n$/);
+        resolve();
+      });
+    });
+  });
+
   // Warning: this test writes to the file system
   test("Test command line --events-file writes build.end on success", async (t) => {
     // --dryrun leaves pages empty

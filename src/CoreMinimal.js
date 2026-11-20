@@ -227,6 +227,9 @@ export class CoreMinimal {
 		return this.options.pathPrefix || "/";
 	}
 
+	/** @type {string} */
+	static packageName = pkg.name.split("/").pop();
+
 	/**
 	 * Reads the version of Eleventy.
 	 *

@@ -29,7 +29,7 @@
 		"./plugins/preserve-closing-tags": "./src/Plugins/PreserveClosingTagsPlugin.js",
 		"./plugins/render": "./src/Plugins/RenderPlugin.js",
 		"./utils/git": "./src/Util/Git.js",
-		"./cli": "./cmd.cjs"
+		"./cli": "./cli.cjs"
 	},
 	"bin": {
 		"eleventy": "cmd.cjs"
