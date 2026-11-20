@@ -348,3 +348,49 @@ test("setConcurrency throws on zero or negative values", (t) => {
   userCfg.setConcurrency(2);
   t.assert.equal(userCfg.getConcurrency(), 2);
 });
+
+test("configureFeatures calls the matching set* methods", (t) => {
+  let userCfg = new UserConfig();
+  userCfg.configureFeatures({
+    dynamicPermalinks: false,
+    permalinkCollapseMatchingFolder: true,
+    layoutResolution: false,
+    useGitIgnore: false,
+    useTemplateCache: false,
+    watchJavaScriptDependencies: false,
+    skipUnchangedWrites: false,
+    freezeReservedData: false,
+    freezeGlobalData: false,
+    quietMode: true,
+    dataDeepMerge: true,
+    serverPassthroughCopyBehavior: "passthrough",
+    liquidParameterParsing: "builtin",
+  });
+
+  t.assert.strictEqual(userCfg.dynamicPermalinks, false);
+  t.assert.strictEqual(userCfg.permalinkCollapseMatchingFolder, true);
+  t.assert.strictEqual(userCfg.layoutResolution, false);
+  t.assert.strictEqual(userCfg.useGitIgnore, false);
+  t.assert.strictEqual(userCfg.useTemplateCache, false);
+  t.assert.strictEqual(userCfg.watchJavaScriptDependencies, false);
+  t.assert.strictEqual(userCfg.skipUnchangedWrites, false);
+  t.assert.strictEqual(userCfg.freezeReservedData, false);
+  t.assert.strictEqual(userCfg.freezeGlobalData, false);
+  t.assert.strictEqual(userCfg.quietMode, true);
+  t.assert.strictEqual(userCfg.serverPassthroughCopyBehavior, "passthrough");
+  t.assert.strictEqual(userCfg.liquid.parameterParsing, "builtin");
+  t.assert.strictEqual(userCfg.features.collections, true);
+});
+
+test("configureFeatures keeps each setter’s validation", (t) => {
+  let userCfg = new UserConfig();
+  t.assert.throws(() => userCfg.configureFeatures({ liquidParameterParsing: "nope" }), {
+    message: /setLiquidParameterParsing/,
+  });
+  t.assert.throws(() => userCfg.configureFeatures({ dataDeepMerge: false }), {
+    message: /setDataDeepMerge/,
+  });
+  t.assert.throws(() => userCfg.configureFeatures({ inputDirectory: "src" }), {
+    message: /Unknown feature/,
+  });
+});

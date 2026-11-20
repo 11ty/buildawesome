@@ -15,6 +15,23 @@ import PathNormalizer from "./Util/PathNormalizer.js";
 
 const debug = createDebug("UserConfig");
 
+// `configureFeatures` keys that are aliases for existing methods
+const FEATURE_SETTERS = {
+	dynamicPermalinks: "setDynamicPermalinks",
+	permalinkCollapseMatchingFolder: "setPermalinkCollapseMatchingFolder",
+	layoutResolution: "setLayoutResolution",
+	useGitIgnore: "setUseGitIgnore",
+	useTemplateCache: "setUseTemplateCache",
+	watchJavaScriptDependencies: "setWatchJavaScriptDependencies",
+	skipUnchangedWrites: "setSkipUnchangedWrites",
+	freezeReservedData: "setFreezeReservedData",
+	freezeGlobalData: "setFreezeGlobalData",
+	quietMode: "setQuietMode",
+	dataDeepMerge: "setDataDeepMerge",
+	serverPassthroughCopyBehavior: "setServerPassthroughCopyBehavior",
+	liquidParameterParsing: "setLiquidParameterParsing",
+};
+
 class UserConfigError extends BaseError {
 	// TypeScript slop
 	constructor(message, originalError) {
@@ -1079,20 +1096,37 @@ export default class UserConfig {
 	/**
 	 * @param {object} features
 	 * @param {boolean} [features.collections=true] `false` skips all collections work, reading `collections` then throws
+	 * @param {boolean} [features.dynamicPermalinks]
+	 * @param {boolean} [features.permalinkCollapseMatchingFolder]
+	 * @param {boolean} [features.layoutResolution]
+	 * @param {boolean} [features.useGitIgnore]
+	 * @param {boolean} [features.useTemplateCache]
+	 * @param {boolean} [features.watchJavaScriptDependencies]
+	 * @param {boolean} [features.skipUnchangedWrites]
+	 * @param {boolean} [features.freezeReservedData]
+	 * @param {boolean} [features.freezeGlobalData]
+	 * @param {boolean} [features.quietMode]
+	 * @param {boolean} [features.dataDeepMerge]
+	 * @param {string} [features.serverPassthroughCopyBehavior]
+	 * @param {string} [features.liquidParameterParsing]
 	 */
 	configureFeatures(features = {}) {
-		for (let [name, enabled] of Object.entries(features)) {
+		for (let [name, value] of Object.entries(features)) {
+			if (Object.hasOwn(FEATURE_SETTERS, name)) {
+				this[FEATURE_SETTERS[name]](value);
+				continue;
+			}
 			if (!Object.hasOwn(this.features, name)) {
 				throw new UserConfigError(
-					`Unknown feature in \`configureFeatures\`: ${name}. Expected one of: ${Object.keys(this.features).join(", ")}`,
+					`Unknown feature in \`configureFeatures\`: ${name}. Expected one of: ${[...Object.keys(this.features), ...Object.keys(FEATURE_SETTERS)].join(", ")}`,
 				);
 			}
-			if (typeof enabled !== "boolean") {
+			if (typeof value !== "boolean") {
 				throw new UserConfigError(
-					`Expected a boolean for \`${name}\` in \`configureFeatures\`, received: ${JSON.stringify(enabled)}`,
+					`Expected a boolean for \`${name}\` in \`configureFeatures\`, received: ${JSON.stringify(value)}`,
 				);
 			}
-			this.features[name] = enabled;
+			this.features[name] = value;
 		}
 	}
 
