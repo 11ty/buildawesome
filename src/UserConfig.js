@@ -11,6 +11,7 @@ import BaseError from "./Errors/BaseError.js";
 import BenchmarkManager from "./Benchmark/BenchmarkManager.js";
 import { augmentFunction } from "./Engines/Util/ContextAugmenter.js";
 import { getTimeZoneParser } from "./Util/DateParse.js";
+import PathNormalizer from "./Util/PathNormalizer.js";
 
 const debug = createDebug("UserConfig");
 
@@ -19,6 +20,23 @@ class UserConfigError extends BaseError {
 	constructor(message, originalError) {
 		super(message, originalError);
 	}
+}
+
+// Accepts `import.meta.resolve()` results as passthrough copy sources
+function normalizePassthroughInput(inputPath) {
+	if (inputPath instanceof URL) {
+		if (inputPath.protocol !== "file:") {
+			throw new Error(
+				`\`addPassthroughCopy\` only accepts \`URL\` instances that use the \`file:\` protocol. Received: ${inputPath.href}`,
+			);
+		}
+		inputPath = inputPath.href;
+	}
+
+	if (typeof inputPath === "string" && inputPath.startsWith("file://")) {
+		return PathNormalizer.fullNormalization(inputPath);
+	}
+	return inputPath;
 }
 
 /**
@@ -791,6 +809,12 @@ export default class UserConfig {
 	 * @returns {any} a reference to the `EleventyConfig` object.
 	 */
 	addPassthroughCopy(fileOrDir, copyOptions = {}) {
+		if (Array.isArray(fileOrDir)) {
+			fileOrDir = fileOrDir.map((entry) => normalizePassthroughInput(entry));
+		} else if (typeof fileOrDir === "string" || fileOrDir instanceof URL) {
+			fileOrDir = normalizePassthroughInput(fileOrDir);
+		}
+
 		if (copyOptions.mode) {
 			if (copyOptions.mode !== "html-relative") {
 				throw new Error(
@@ -815,7 +839,7 @@ export default class UserConfig {
 			}
 		} else {
 			for (let [inputPath, outputPath] of Object.entries(fileOrDir)) {
-				this.passthroughCopies[inputPath] = { outputPath, copyOptions };
+				this.passthroughCopies[normalizePassthroughInput(inputPath)] = { outputPath, copyOptions };
 			}
 		}
 

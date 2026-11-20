@@ -120,6 +120,45 @@ test("Set manual Pass-through File Copy (chained calls)", (t) => {
   });
 });
 
+test("Pass-through File Copy accepts `import.meta.resolve` file URLs", (t) => {
+  let userCfg = new UserConfig();
+  let fileUrl = import.meta.resolve("./stubs/template-passthrough/img.jpg");
+  let dirUrl = import.meta.resolve("./stubs/template-passthrough/static");
+  let encodedUrl = import.meta.resolve("./stubs/with space/img.jpg");
+
+  userCfg.addPassthroughCopy(fileUrl);
+  userCfg.addPassthroughCopy([dirUrl]);
+  userCfg.addPassthroughCopy({ [encodedUrl]: "img.jpg" });
+
+  t.assert.deepStrictEqual(userCfg.passthroughCopies, {
+    "test/stubs/template-passthrough/img.jpg": { outputPath: true, copyOptions: {} },
+    "test/stubs/template-passthrough/static": { outputPath: true, copyOptions: {} },
+    "test/stubs/with space/img.jpg": { outputPath: "img.jpg", copyOptions: {} },
+  });
+});
+
+test("Pass-through File Copy accepts `file:` `URL` instances", (t) => {
+  let userCfg = new UserConfig();
+  let fileUrl = new URL(import.meta.resolve("./stubs/template-passthrough/img.jpg"));
+  let dirUrl = new URL(import.meta.resolve("./stubs/template-passthrough/static"));
+
+  userCfg.addPassthroughCopy(fileUrl);
+  userCfg.addPassthroughCopy([dirUrl]);
+
+  t.assert.deepStrictEqual(userCfg.passthroughCopies, {
+    "test/stubs/template-passthrough/img.jpg": { outputPath: true, copyOptions: {} },
+    "test/stubs/template-passthrough/static": { outputPath: true, copyOptions: {} },
+  });
+});
+
+test("Pass-through File Copy throws on non-`file:` `URL` instances", (t) => {
+  let userCfg = new UserConfig();
+  let url = new URL("https://example.com/img.jpg");
+
+  t.assert.throws(() => userCfg.addPassthroughCopy(url), { message: /`file:` protocol/ });
+  t.assert.throws(() => userCfg.addPassthroughCopy([url]), { message: /`file:` protocol/ });
+});
+
 test("Set manual Pass-through File Copy (array)", (t) => {
   let userCfg = new UserConfig();
   userCfg.addPassthroughCopy(["img", "./src/**/*.css"], { dot: false });

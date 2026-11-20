@@ -70,6 +70,35 @@ test("Basic usage", async (t) => {
 	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site-basica/test/index.html"), true);
 });
 
+test("Accepts `file:` URL strings and `URL` instances", async (t) => {
+	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site-fileurl", {
+		configPath: false,
+		config: function ($config) {
+			$config.ignores.add("./test/stubs-autocopy/_site*/**");
+
+			$config.addPassthroughCopy(
+				[
+					import.meta.resolve("./stubs-autocopy/possum.png"),
+					new URL(import.meta.resolve("./stubs-autocopy/possum.jpg")),
+				],
+				{
+					mode: "html-relative",
+				},
+			);
+
+			$config.addTemplate("test.njk", `<img src="possum.png"><img src="possum.jpg">`);
+		},
+	});
+
+	elev.disableLogger();
+
+	let [copy] = await elev.write();
+
+	t.assert.strictEqual(copy.length, 2);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site-fileurl/test/possum.png"), true);
+	t.assert.strictEqual(fs.existsSync("test/stubs-autocopy/_site-fileurl/test/possum.jpg"), true);
+});
+
 test("More complex image path (parent dir)", async (t) => {
 	let elev = new Eleventy("./test/stubs-autocopy/", "./test/stubs-autocopy/_site-basicb", {
 		configPath: false,
