@@ -12,6 +12,7 @@ import { ResolveConfigurationData } from "./Data/ResolveConfigurationData.js";
 import { withoutTracking } from "./Data/InternalReads.js";
 import { createDebug } from "./Util/DebugLogUtil.js";
 import { isGlobMatch } from "./Util/GlobMatcher.js";
+import { disabledCollections, getDisabledCollectionsError } from "./Util/DisabledCollections.js";
 
 const debug = createDebug("TemplateMap");
 
@@ -67,6 +68,10 @@ class TemplateMap {
 			this._config = this.eleventyConfig.getConfig();
 		}
 		return this._config;
+	}
+
+	get #collectionsDisabled() {
+		return this.config.features?.collections === false;
 	}
 
 	async add(template) {
@@ -146,9 +151,19 @@ class TemplateMap {
 		// TODO it’d be nice to set the dependency relationship for addCollection here
 		// But collections are not yet populated (they populate after template order)
 		// Computed `tags` reading pagination data resolve per page, so this read is expected to miss them, Issue #1952
-		let publishes = withoutTracking(() =>
-			TemplateData.getIncludedCollectionNames(entry.data, this.config.keys.tags),
-		);
+		let publishes = [];
+		if (this.#collectionsDisabled) {
+			let consumed = consumes.filter(Boolean);
+			if (consumed.length > 0) {
+				throw getDisabledCollectionsError(
+					`${entry.inputPath} consumes collections (${consumed.join(", ")}) via \`pagination.data\` or \`${this.config.keys.import}.collections\`.`,
+				);
+			}
+		} else {
+			publishes = withoutTracking(() =>
+				TemplateData.getIncludedCollectionNames(entry.data, this.config.keys.tags),
+			);
+		}
 
 		this.config.uses.addNewNodeRelationships(entry.inputPath, consumes, publishes);
 
@@ -208,6 +223,10 @@ class TemplateMap {
 
 		for (let depEntry of fullTemplateOrder) {
 			if (GlobalDependencyMap.isCollection(depEntry)) {
+				if (this.#collectionsDisabled) {
+					continue;
+				}
+
 				let tagName = GlobalDependencyMap.getTagName(depEntry);
 				// [keys] should initialize `all`
 				if (tagName === SPECIAL_COLLECTION_NAMES.keys) {
@@ -235,6 +254,10 @@ class TemplateMap {
 			let map = this.getMapEntryForInputPath(depEntry);
 			this.eleventyConfig.queryRegistry.populate(map.inputPath);
 			await this.#initDependencyMapEntry(map);
+		}
+
+		if (this.#collectionsDisabled) {
+			return;
 		}
 
 		// Per-page tags (e.g. computed from pagination data) aren’t in the dependency graph, Issue #1952
@@ -329,6 +352,7 @@ class TemplateMap {
 
 				if (counter === 0 || map.data.pagination?.addAllPagesToCollections) {
 					if (
+						!this.#collectionsDisabled &&
 						ResolveConfigurationData.getValue(
 							map.data,
 							ResolveConfigurationData.EXCLUDE_FROM_COLLECTIONS_KEY,
@@ -374,8 +398,9 @@ class TemplateMap {
 
 		this.collectionsData = {};
 
+		let collections = this.#collectionsDisabled ? disabledCollections : this.collectionsData;
 		for (let entry of this.map) {
-			entry.data.collections = this.collectionsData;
+			entry.data.collections = collections;
 		}
 
 		let fullTemplateOrder = this.getTemplateOrder();
@@ -680,6 +705,10 @@ class TemplateMap {
 	}
 
 	populateCollectionsWithContent() {
+		if (this.#collectionsDisabled) {
+			return;
+		}
+
 		for (let collectionName in this.collectionsData) {
 			// skip custom collections set in configuration files that have arbitrary types
 			if (!Array.isArray(this.collectionsData[collectionName])) {

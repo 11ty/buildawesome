@@ -1,6 +1,7 @@
 import { TemplatePath } from "@11ty/eleventy-utils";
 
 import { isGlobMatch } from "./GlobMatcher.js";
+import { getDisabledCollectionsError } from "./DisabledCollections.js";
 
 // Not a plain object, so the data cascade keeps it by reference instead of merging into it
 class TemplateQueryResult {}
@@ -137,11 +138,16 @@ export class TemplateQueryRegistry {
 	}
 
 	// Front matter for a file is re-evaluated as a whole, so its previous queries are replaced
-	createApi(inputPath, directories) {
+	createApi(inputPath, directories, enabled = true) {
 		let queries = [];
 		this.#queries.set(inputPath, queries);
 
 		let add = (single, target, globs) => {
+			if (!enabled) {
+				throw getDisabledCollectionsError(
+					`Cannot use \`collections.${single ? "query" : "queryAll"}()\` in ${inputPath}.`,
+				);
+			}
 			let paths = globs.map((glob) =>
 				TemplateQueryRegistry.resolvePath(inputPath, glob, directories),
 			);

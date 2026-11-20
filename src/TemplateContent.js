@@ -266,6 +266,7 @@ class TemplateContent {
 					options.globals = this.eleventyConfig.queryRegistry.createApi(
 						this.inputPath,
 						this.eleventyConfig.directories,
+						this.config.features?.collections !== false,
 					);
 				}
 				fm = matter(content, options);

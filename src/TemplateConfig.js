@@ -10,6 +10,7 @@ import UserConfig from "./UserConfig.js";
 import GlobalDependencyMap from "./GlobalDependencyMap.js";
 import { TemplateQueryRegistry } from "./Util/TemplateQuery.js";
 import ExistsCache from "./Util/ExistsCache.js";
+import { getDisabledCollectionsError } from "./Util/DisabledCollections.js";
 import ProjectTemplateFormats from "./Util/ProjectTemplateFormats.js";
 import { expandEligibleJavaScriptFilePaths } from "./Util/FilePathUtil.js";
 
@@ -591,6 +592,18 @@ class TemplateConfig {
 			throw new ConfigError(
 				`Nested properties are not supported in \`keys.tags\`, received: ${JSON.stringify(tagsKey)}`,
 			);
+		}
+
+		if (mergedConfig.features?.collections === false) {
+			let names = Object.keys(this.userConfig.getCollections());
+			if (names.length > 0) {
+				throw getDisabledCollectionsError(
+					`\`$config.addCollection()\` cannot be used (received: ${names.join(", ")}).`,
+				);
+			}
+			if (Object.keys(mergedConfig.precompiledCollections || {}).length > 0) {
+				throw getDisabledCollectionsError("`$config.setPrecompiledCollections()` cannot be used.");
+			}
 		}
 
 		// Add to the merged config too

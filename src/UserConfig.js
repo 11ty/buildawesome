@@ -82,6 +82,8 @@ export default class UserConfig {
 		this.pathPrefix = undefined;
 		/** @type {Record<string, any>} */
 		this.errorReporting = {};
+		/** @type {Record<string, boolean>} */
+		this.features = { collections: true };
 
 		this.reset();
 		this.#uniqueId = Math.random();
@@ -119,6 +121,7 @@ export default class UserConfig {
 		this.collectionOptions = {};
 		/** @type {Record<string, any>} */
 		this.precompiledCollections = {};
+		this.features = { collections: true };
 		this.templateFormats = undefined;
 		this.templateFormatsAdded = [];
 
@@ -1073,6 +1076,26 @@ export default class UserConfig {
 		this.precompiledCollections = collections;
 	}
 
+	/**
+	 * @param {object} features
+	 * @param {boolean} [features.collections=true] `false` skips all collections work, reading `collections` then throws
+	 */
+	configureFeatures(features = {}) {
+		for (let [name, enabled] of Object.entries(features)) {
+			if (!Object.hasOwn(this.features, name)) {
+				throw new UserConfigError(
+					`Unknown feature in \`configureFeatures\`: ${name}. Expected one of: ${Object.keys(this.features).join(", ")}`,
+				);
+			}
+			if (typeof enabled !== "boolean") {
+				throw new UserConfigError(
+					`Expected a boolean for \`${name}\` in \`configureFeatures\`, received: ${JSON.stringify(enabled)}`,
+				);
+			}
+			this.features[name] = enabled;
+		}
+	}
+
 	// "passthrough" is the default, no other value is explicitly required in code
 	// but opt-out via "copy" is suggested
 	setServerPassthroughCopyBehavior(behavior) {
@@ -1442,6 +1465,7 @@ export default class UserConfig {
 			plugins: this.plugins,
 			useTemplateCache: this.useTemplateCache,
 			precompiledCollections: this.precompiledCollections,
+			features: this.features,
 			dataFilterSelectors: this.dataFilterSelectors,
 			libraryAmendments: this.libraryAmendments,
 			serverPassthroughCopyBehavior: this.serverPassthroughCopyBehavior,
