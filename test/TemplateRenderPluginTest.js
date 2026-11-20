@@ -242,10 +242,35 @@ argData:
   );
 });
 
-// Not yet supported
-test.skip("renderFile but the target has front matter.", async (t) => {
+test("#4451 renderFile but the target has front matter.", async (t) => {
   let html = await getTestOutputForFile("./test/stubs-render-plugin/using-frontmatter.liquid");
   t.assert.strictEqual(html, `frontmatterString`);
+});
+
+test("#4451 renderFile front matter is overridden by passed data", async (t) => {
+  let html = await getTestOutputForTemplate(
+    "frontmatter-override.njk",
+    `{% renderFile "./test/stubs-render-plugin/_includes/frontmatter.liquid", { test: "passed" } %}`,
+  );
+  t.assert.strictEqual(html, `passed`);
+});
+
+test("#4451 renderFile front matter overrides global data (accessGlobalData)", async (t) => {
+  let html = await getTestOutputForFile("./test/stubs-virtual-nowrite/", ($config) => {
+    $config.addPlugin(RenderPlugin, { accessGlobalData: true });
+    $config.addGlobalData("test", "global");
+    $config.addTemplate(
+      "frontmatter-global.njk",
+      `{% renderFile "./test/stubs-render-plugin/_includes/frontmatter.liquid" %}`,
+    );
+  });
+  t.assert.strictEqual(html, `frontmatterString`);
+});
+
+test("#4451 Direct use of render file plugin with front matter", async (t) => {
+  let fn = await RenderPluginFile("./test/stubs-render-plugin/_includes/frontmatter.liquid");
+  t.assert.strictEqual((await fn()).trim(), `frontmatterString`);
+  t.assert.strictEqual((await fn({ test: "passed" })).trim(), `passed`);
 });
 
 // Idea from https://twitter.com/raymondcamden/status/1460961620247650312

@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import matter from "@11ty/gray-matter";
 import { TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 
 // TODO add a first-class Markdown component to expose this using Markdown-only syntax (will need to be synchronous for markdown-it)
@@ -6,6 +7,7 @@ import { TemplatePath, isPlainObject } from "@11ty/eleventy-utils";
 import { ProxyWrap } from "../Util/Objects/ProxyWrap.js";
 import BaseError from "../Errors/BaseError.js";
 import TemplateRender from "../TemplateRender.js";
+import TemplateContent from "../TemplateContent.js";
 import ProjectDirectories from "../Util/ProjectDirectories.js";
 import TemplateConfig from "../TemplateConfig.js";
 import ExtensionMap from "../ExtensionMap.js";
@@ -83,8 +85,40 @@ async function compile(content, templateLang, options = {}) {
 	return tr.getCompiledTemplate(content);
 }
 
+async function readFrontMatter(inputPath, templateConfig) {
+	let content = readFileSync(inputPath, "utf8");
+	let options = new TemplateContent(inputPath, templateConfig).getFrontMatterParsingOptions();
+	options.filePath = inputPath;
+	// Excerpts are a page-level feature.
+	options.excerpt = false;
+
+	try {
+		let fm = matter(content, options);
+		return { content: fm.content, data: await fm.data };
+	} catch (e) {
+		throw new Error(`Having trouble reading front matter from \`renderFile\` target ${inputPath}`, {
+			cause: e,
+		});
+	}
+}
+
 // No templateLang default, it should infer from the inputPath.
 async function compileFile(inputPath, options = {}, templateLang) {
+	let { fn, data: frontMatterData } = await compileFileWithFrontMatter(
+		inputPath,
+		options,
+		templateLang,
+	);
+	if (typeof fn !== "function" || !frontMatterData) {
+		return fn;
+	}
+
+	return (data) =>
+		fn(data === undefined || isPlainObject(data) ? { ...frontMatterData, ...data } : data);
+}
+
+// Front matter is returned separately so the shortcode can layer it between passed data and global data.
+async function compileFileWithFrontMatter(inputPath, options = {}, templateLang) {
 	let { templateConfig, extensionMap, config } = options;
 	let strictMode = options.strictMode ?? false;
 	if (!inputPath) {
@@ -129,12 +163,14 @@ async function compileFile(inputPath, options = {}, templateLang) {
 	}
 
 	if (!tr.engine.needsToReadFileContents()) {
-		return tr.getCompiledTemplate(null);
+		return { fn: await tr.getCompiledTemplate(null) };
 	}
 
-	// TODO we could make this work with full templates (with front matter?)
-	let content = readFileSync(inputPath, "utf8");
-	return tr.getCompiledTemplate(content);
+	let { content, data } = await readFrontMatter(inputPath, templateConfig);
+	return {
+		fn: await tr.getCompiledTemplate(content),
+		data: isPlainObject(data) && Object.keys(data).length > 0 ? data : undefined,
+	};
 }
 
 const memoizedCompiles = new WeakMap();
@@ -453,19 +489,23 @@ function RenderPlugin($config, options = {}) {
 
 		addDependency(this?.page, inputPath);
 
-		let fn;
-		let compileFn = () => compileFile(inputPath, renderFileOptions, templateLang);
+		let compiled;
+		let compileFn = () => compileFileWithFrontMatter(inputPath, renderFileOptions, templateLang);
 		if (memoize.has("file") && renderFileOptions.templateConfig) {
-			fn = await memoizeCompile(
+			compiled = await memoizeCompile(
 				renderFileOptions.templateConfig,
 				`file:${templateLang || ""}:${inputPath}`,
 				compileFn,
 			);
 		} else {
-			fn = await compileFn();
+			compiled = await compileFn();
 		}
 
-		return renderShortcodeFn.call(this, fn, data);
+		if (compiled.data) {
+			data = { ...compiled.data, ...(isPlainObject(data) ? data : { _: data }) };
+		}
+
+		return renderShortcodeFn.call(this, compiled.fn, data);
 	}
 
 	// Render strings
